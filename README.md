@@ -20,8 +20,6 @@ Project that does ... implemented in ... runs on Qualcomm® *\<processor\>*
 
 List requirements to run the project, how to install them, instructions to use docker container, etc...
 
-## Installation Instructions
-
 How to install the software itself.
 
 ## Usage
