@@ -1,2 +1,14 @@
 out/
 *.swp
+temp_*/
+*.o
+*.so
+*.a
+*.bak
+*.html*
+__pycache__/
+sandbox_root/
+overlay_fs_dir/
+*.pyc
+release/
+*.test

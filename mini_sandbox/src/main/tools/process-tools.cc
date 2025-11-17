@@ -1,0 +1,481 @@
+// Copyright 2015 The Bazel Authors. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#include "src/main/tools/process-tools.h"
+#include "src/main/tools/logging.h"
+#include "src/main/tools/error_handling.h"
+#include "src/main/tools/linux-sandbox-options.h"
+
+#include <mntent.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <math.h>
+#include <signal.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/resource.h>
+#include <sys/stat.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#if __has_include(<filesystem>)
+#include <filesystem>
+namespace fs = std::filesystem;
+#else
+#include <experimental/filesystem>
+namespace fs = std::experimental::filesystem;
+#define _EXPERIMENTAL_FILESYSTEM_
+#endif
+#include <algorithm>
+#include <climits>
+#include <random>
+#include <string>
+#include <vector>
+#include <memory>
+
+#define MAX_ATTEMPTS 100
+#define INTERNAL_MINI_SANDBOX_ENV "__INTERNAL_MINI_SANDBOX_ON"
+
+
+void InstallSignalHandler(int signum, void (*handler)(int)) {
+  struct sigaction sa = {};
+  sa.sa_handler = handler;
+  if (handler == SIG_IGN || handler == SIG_DFL) {
+    // No point in blocking signals when using the default handler or ignoring
+    // the signal.
+    if (sigemptyset(&sa.sa_mask) < 0) {
+      DIE("sigemptyset");
+    }
+  } else {
+    // When using a custom handler, block all signals from firing while the
+    // handler is running.
+    if (sigfillset(&sa.sa_mask) < 0) {
+      DIE("sigfillset");
+    }
+  }
+  // sigaction may fail for certain reserved signals. Ignore failure in this
+  // case, but report it in debug mode, just in case.
+  if (sigaction(signum, &sa, nullptr) < 0) {
+    PRINT_DEBUG("sigaction(%d, &sa, nullptr) failed", signum);
+  }
+}
+
+void IgnoreSignal(int signum) {
+  // These signals can't be handled, so we'll just not do anything for these.
+  if (signum != SIGSTOP && signum != SIGKILL) {
+    InstallSignalHandler(signum, SIG_IGN);
+  }
+}
+
+void InstallDefaultSignalHandler(int signum) {
+  // These signals can't be handled, so we'll just not do anything for these.
+  if (signum != SIGSTOP && signum != SIGKILL) {
+    InstallSignalHandler(signum, SIG_DFL);
+  }
+}
+
+
+void ClearSignalMask() {
+  // Use an empty signal mask for the process.
+  sigset_t empty_sset;
+  if (sigemptyset(&empty_sset) < 0) {
+    DIE("sigemptyset");
+  }
+  if (sigprocmask(SIG_SETMASK, &empty_sset, nullptr) < 0) {
+    DIE("sigprocmask");
+  }
+
+  // Set the default signal handler for all signals.
+  for (int i = 1; i < NSIG; ++i) {
+    if (i == SIGKILL || i == SIGSTOP) {
+      continue;
+    }
+
+    struct sigaction sa = {};
+    sa.sa_handler = SIG_DFL;
+    if (sigemptyset(&sa.sa_mask) < 0) {
+      DIE("sigemptyset");
+    }
+    // Ignore possible errors, because we might not be allowed to set the
+    // handler for certain signals, but we still want to try.
+    sigaction(i, &sa, nullptr);
+  }
+}
+
+// Write contents to a file.
+void WriteFile(const std::string &filename, const char *fmt, ...) {
+  FILE *stream = fopen(filename.c_str(), "w");
+  if (stream == nullptr) {
+    DIE("fopen(%s)", filename.c_str());
+  }
+
+  va_list ap;
+  va_start(ap, fmt);
+  int r = vfprintf(stream, fmt, ap);
+  va_end(ap);
+
+  if (r < 0) {
+    DIE("vfprintf");
+  }
+
+  if (fclose(stream) != 0) {
+    DIE("fclose(%s)", filename.c_str());
+  }
+}
+
+// Waits for a signal to proceed from the pipe.
+void WaitPipe(int *pipe) {
+  char buf = 0;
+  // Close the writer fd of this process as it should only be written to by the
+  // writer of the other process.
+  if (close(pipe[1]) < 0) {
+    DIE("close");
+  }
+  if (read(pipe[0], &buf, 1) < 0) {
+    DIE("read");
+  }
+  if (close(pipe[0]) < 0) {
+    DIE("close");
+  }
+}
+
+// Sends a signal to the pipe for the other waiting process proceed.
+void SignalPipe(int *pipe) {
+  char buf = 0;
+  // Close the reader fd of this process as it should only be read by the reader
+  // of the other process.
+  if (close(pipe[0]) < 0) {
+    DIE("close");
+  }
+  if (write(pipe[1], &buf, 1) < 0) {
+    DIE("write");
+  }
+  if (close(pipe[1]) < 0) {
+    DIE("close");
+  }
+}
+
+
+int CreateDirectory(const std::string& basePath, const std::string& dirName, std::string& out) {
+  int res = 0;
+  out = basePath + "/" + dirName;
+  fs::path p = fs::path(out);
+  if (!fs::exists(p)) {
+    if(! fs::create_directories(out)) {
+        res = MiniSbxReport("Could not create directory %s\n", out.c_str());
+    }
+  }
+  return res;
+}
+
+
+std::string CreateTempDirectory(const std::string &basePath) {
+
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_int_distribution<> dis(1000, INT_MAX);
+  int randomID;
+  bool res;
+  
+  for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
+    randomID = dis(gen);
+    std::string tempDirPath = basePath + "/temp_" + std::to_string(randomID);
+    fs::path p = fs::path(tempDirPath);
+    if (!fs::exists(p)) {
+      res = fs::create_directories(tempDirPath);
+      if (!res) {
+        MiniSbxReport("Could not create temporary directory %s\n", tempDirPath.c_str());
+      }
+      return tempDirPath;
+    }
+  }
+  return nullptr;
+}
+
+
+
+std::string CreateRandomFilename(const std::string& basePath) {
+    std::mt19937 rng(std::chrono::steady_clock::now().time_since_epoch().count());
+    std::uniform_int_distribution<int> dist(1000, INT_MAX);
+
+    std::string filename;
+    do {
+        int randomNumber = dist(rng);
+        filename = basePath + "/" + std::to_string(randomNumber) + ".rules";
+    } while (fs::exists(filename));
+
+    return filename;
+}
+
+std::string GetCurrentWorkingDirectory() { return fs::current_path().string(); }
+
+int GetCWD(std::string& res) {
+
+  try {
+    fs::path currentPath = fs::current_path();
+    res += currentPath.string();
+    return 0;
+  } catch (const fs::filesystem_error& e) {
+        return MiniSbxReport("Filesystem error");
+  } catch (const std::exception& e) {
+        return MiniSbxReport("General exception");
+  } catch (...) {
+    return MiniSbxReportError(__func__, ErrorCode::Unknown);
+  }
+
+}
+
+
+int CountMounts() {
+    FILE* fp = setmntent("/proc/self/mounts", "r");
+    if (!fp) return -1;
+
+    int count = 0;
+    while (getmntent(fp)) {
+        ++count;
+    }
+
+    endmntent(fp);
+    return count;
+}
+
+
+bool isSubpath(const fs::path &base, const fs::path &sub) {
+  auto baseIt = base.begin();
+  auto subIt = sub.begin();
+
+  while (baseIt != base.end() && subIt != sub.end() && *baseIt == *subIt) {
+    ++baseIt;
+    ++subIt;
+  }
+  return baseIt == base.end();
+}
+
+#include <sys/sysmacros.h>
+
+static int ValidateDevId(const char* mnt_dir, dev_t st_dev ) {
+  struct stat mountStat;
+  if (stat(mnt_dir, &mountStat) == 0) {
+      if (st_dev == mountStat.st_dev) {
+          return 0;         
+      }
+  }
+  return -1;
+}
+
+std::string GetMountPointOf(const std::string& dir) {
+    PRINT_DEBUG("Executing %s\n", __func__);
+
+    const char* dir_str = dir.c_str();
+    
+    struct stat dirStat;
+    if (stat(dir_str, &dirStat) != 0) {
+        perror("stat");
+        return "";
+    }
+
+    FILE* mtab = setmntent("/etc/mtab", "r");
+    if (!mtab) {
+        perror("setmntent");
+        return "";
+    }
+
+    std::string mountPoint;
+    size_t currMountPointLen = 0;
+    struct mntent* ent;
+    while ((ent = getmntent(mtab)) != nullptr) {
+        if (isSubpath(ent->mnt_dir, dir_str)) {
+	    if (ValidateDevId(ent->mnt_dir, dirStat.st_dev) == 0) {
+                if (mountPoint.empty()) {
+                    mountPoint = ent->mnt_dir;
+                    currMountPointLen = strlen(ent->mnt_dir);
+                } 
+                else {
+                    size_t newMountPointLen = strlen(ent->mnt_dir);
+                    if (newMountPointLen > currMountPointLen) {
+                        mountPoint = ent->mnt_dir;
+                    }
+                } 
+            }
+        }
+    }
+    PRINT_DEBUG("Final mount point -> %s\n", mountPoint.c_str());
+
+    endmntent(mtab);
+    return mountPoint;
+}
+
+
+std::string GetParentCWD() {
+  fs::path currentPath = fs::current_path();
+  fs::path parentPath = currentPath.parent_path();
+  return parentPath.string();
+}
+
+std::string GetHomeDir() {
+  std::string home_dir(std::getenv("HOME"));
+  return home_dir;
+}
+
+std::string GetLocalBin() {
+  std::string home_dir = GetHomeDir();
+  return home_dir.append("/.local/bin");
+}
+
+std::string GetLocalLib() {
+  std::string home_dir = GetHomeDir();
+  return home_dir.append("/.local/lib");
+}
+
+void addIfNotPresent(std::vector<std::string> &paths, const char *pathToCheck) {
+  // Convert the const char* to std::string for comparison
+  std::string pathStr(pathToCheck);
+
+  // Check if the path is already in the vector
+  if (std::find(paths.begin(), paths.end(), pathStr) == paths.end()) {
+    // If not found, add the path to the vector
+    paths.push_back(pathStr);
+  }
+
+}
+
+
+static inline void makeWritable(const fs::path &dir, unsigned depth, unsigned max_depth) {
+  std::error_code ec;
+
+  fs::permissions(dir,
+                  fs::perms::owner_write | fs::perms::group_write |
+                      fs::perms::others_write | fs::perms::owner_exec |
+                      fs::perms::group_exec | fs::perms::others_exec |
+                      fs::perms::owner_read | fs::perms::group_read |
+                      fs::perms::others_read
+#ifdef _EXPERIMENTAL_FILESYSTEM_
+                      | fs::perms::add_perms,
+#else
+                  ,
+                  fs::perm_options::add,
+#endif
+                  ec);
+
+  if (ec) {
+    PRINT_DEBUG("Warning: error changing permissions for %s",
+                dir.string().c_str());
+  }
+  if (depth > max_depth)
+    return;
+
+  for (const auto &entry : fs::directory_iterator(
+           dir, fs::directory_options::skip_permission_denied)) {
+    if (fs::is_directory(entry.status())) {
+      makeWritable(entry.path(), depth + 1, max_depth);
+    }
+  }
+}
+
+
+
+void Cleanup() {
+  if (opt.use_default || opt.use_overlayfs || opt.hermetic) {
+    PRINT_DEBUG("delete %s\n", opt.sandbox_root.c_str());
+    try {
+      fs::path sandbox_dir = opt.sandbox_root.c_str();
+      makeWritable(sandbox_dir, 0, MAX_DEPTH_SANDBOX_ROOT);
+      if (fs::remove_all(sandbox_dir) < 0) {
+        MiniSbxReport("ERROR when removing the sandbox directory");
+      }
+
+      if (!opt.hermetic) {
+        fs::path overlayfs_dir = opt.tmp_overlayfs.c_str();
+        makeWritable(overlayfs_dir, 0, MAX_DEPTH_OVERLAYFS_ROOT);
+        if (fs::remove_all(overlayfs_dir) < 0) {
+          MiniSbxReport("ERROR when removing the overlay directory");
+        }
+      }
+    } catch (const std::exception &e) {
+      std::cerr << "Warning: Could not remove the trash files: " << e.what()
+                << std::endl;
+    }
+  }
+}
+
+
+uid_t get_outer_uid() {
+    FILE *f = fopen("/proc/self/uid_map", "r");
+    if (!f) {
+        perror("fopen /proc/self/uid_map");
+        return (uid_t)-1;  // Sentinel for error
+    }
+
+    char line[256];
+    uid_t outer_uid = (uid_t)-1;
+
+    while (fgets(line, sizeof(line), f)) {
+        unsigned int inside, outside, size;
+        if (sscanf(line, "%u %u %u", &inside, &outside, &size) == 3) {
+            if (inside == 0) {
+                outer_uid = (uid_t)outside;
+                break;
+            }
+        }
+    }
+
+    fclose(f);
+    return outer_uid;
+}
+
+
+gid_t get_outer_gid() {
+    FILE *f = fopen("/proc/self/gid_map", "r");
+    if (!f) {
+        perror("fopen /proc/self/gid_map");
+        return (gid_t)-1;  // Sentinel for error
+    }
+
+    char line[256];
+    gid_t outer_gid = (gid_t)-1;
+
+    while (fgets(line, sizeof(line), f)) {
+        unsigned int inside, outside, size;
+        if (sscanf(line, "%u %u %u", &inside, &outside, &size) == 3) {
+            if (inside == 0) {
+                outer_gid = (gid_t)outside;
+                break;
+            }
+        }
+    }
+
+    fclose(f);
+    return outer_gid;
+}
+
+
+int MiniSbxSetInternalEnv() {
+  if (setenv(INTERNAL_MINI_SANDBOX_ENV, "1", 1) != 0) {
+      std::cerr << "Failed to set environment variable." << std::endl;
+      MiniSbxReport("Failed to set environment variable __INTERNAL_MINI_SANDBOX_ON");
+  }
+  return 0;
+}
+
+
+int MiniSbxGetInternalEnv() {
+  const char* value = getenv(INTERNAL_MINI_SANDBOX_ENV);
+  if (value) {
+    return 0;
+  } 
+  return -1;
+}
