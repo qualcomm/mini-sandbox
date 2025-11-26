@@ -23,5 +23,3 @@ The basic idea is that we reduce the privileges of code running inside our sandb
 
 
 Conceptually, as explained in the introduction, this effort resembles a docker container, but we have simplified the usage so that `mini-sandbox` can be used as a drop-in solution instead of bothering with Dockerfile, sudo access, etc.
-
-

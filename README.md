@@ -4,9 +4,27 @@ A sandbox CLI and library based on the concept of namespaces which can be used t
 
 More details about the goals at [motivations](docs/motivations.md)
 
-## Build
+## Comparison with other projects
 
-`git clone --recurse-submodules <this repository>`
+This project is heavily inspired by few other open-source projects that have been proposed over the last few years. However, we haven't found any of these projects to fulfill all our necessities and that's why we decided to work on a different implementation. In the following table you can see an informal comparison of what features we considered for our evaluation and how the other projects correlate to those. Importantly we are not claiming to be better than the other tools, simply that we try to look at a different features set.
+
+
+Tool   | Root-less/Needs Root | Drop-in replacement | overlay FS | root-less firewall | library | python module |
+Docker | X | V | X | V | X | X |
+Podman | V | X | V | X | V | X |
+nsjail | X | X | V | V | X | X |
+Sandboxed API | V | V | X | X | V | X |
+Bubblewrap | V | V | X | X | V | X |
+mini-sandbox | V | V | V | V | V | V |
+mini-sandbox | V | V | V | V | V | V |
+
+
+
+## Getting started
+
+Here we are going to highlight three 
+
+## Build
 
 See build instructions at `docs/Build.md`
 
