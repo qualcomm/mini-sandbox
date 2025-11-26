@@ -6,17 +6,19 @@ More details about the goals at [motivations](docs/motivations.md)
 
 ## Comparison with other projects
 
-This project is heavily inspired by few other open-source projects that have been proposed over the last few years. However, we haven't found any of these projects to fulfill all our necessities and that's why we decided to work on a different implementation. In the following table you can see an informal comparison of what features we considered for our evaluation and how the other projects correlate to those. Importantly we are not claiming to be better than the other tools, simply that we try to look at a different features set.
+This project is heavily inspired by few other open-source projects that have been proposed over the last few years. However, we haven't found any of these projects to fulfill all our necessities and that's why we decided to work on a different implementation in the attempt to maximize the deployability and usability of the project. In the following table you can see an informal comparison of what features we considered for our evaluation and how the other projects correlate to those. To keep the comparison more consistent we are also going to highlight few features that we do not currently support but keep in mind that we are not claiming to be better than the other tools, simply that we try to look at a different features set.
 
 
-Tool   | Root-less/Needs Root | Drop-in replacement | overlay FS | root-less firewall | library | python module |
-Docker | X | V | X | V | X | X |
-Podman | V | X | V | X | V | X |
-nsjail | X | X | V | V | X | X |
-Sandboxed API | V | V | X | X | V | X |
-Bubblewrap | V | V | X | X | V | X |
-mini-sandbox | V | V | V | V | V | V |
-mini-sandbox | V | V | V | V | V | V |
+| Tool   | Root-less | Drop-in replacement | overlay FS | root-less firewall | library | Seccomp | Full-system container |
+| :----- | :-------: | :-----------------: | :--------: | :----------------: | :-----: | :-----: |  :------------------: |
+| Docker | :x:       | :x:                 | ✅         |  :x:              | :x:      |  ✅    |   ✅ |
+| Podman/root-less Docker | ✅ | :x: | ✅   | ✅  | :x:     |  ✅ | ✅ |
+| nsjail | ✅ | ✅ | :x: | :x: | :x: | ✅ | :x: |
+| Sandboxed API | ✅ | ✅  | :x: | :x: | ✅ | ✅ | :x: |
+| Bubblewrap | ✅ | ✅ | :x: | :x: | :x: | ✅ | :x: |
+| **mini-sandbox** | ✅ | ✅ |✅ | :x: | ✅ | :x: | :x: |
+| **mini-tapbox** | ✅ | ✅ |✅ | ✅ | ✅ | :x: | :x: |
+
 
 
 
