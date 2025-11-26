@@ -1,4 +1,6 @@
 out/
+__pycache__/
+*.bin
 *.swp
 temp_*/
 *.o
