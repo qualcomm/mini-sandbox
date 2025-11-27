@@ -10,4 +10,19 @@ We support 5 main functioning modes here listed by security (first is the most s
 
 - '-h sandbox_root' this chroot to sandbox_root but does not mount any filesystem by default. User will have to manually mount the needed filesystems with '-M'/'-w' to achieve custom minimal sandbox configuration for advanced scenarios (example for a minimal working environment: `mini-sandbox -M /lib -M /lib64 -M /usr -M /bin -M /etc -M /proc -M /opt -M /var -h /local/mnt/workspace/abc -- /bin/bash`). OverlayFS is not available in this scenario.
 
-- No flags - if no flag is provided, we spawn a best-effort sandbox that re-mounts all mount points as read-only. We do not use overlayfs and chroot to pivot the home directory. THis functioning mode is meant for debugging or very specific use cases but NOT FOR PRODUCTION.
+- No flags - if no flag is provided, we spawn a best-effort sandbox that re-mounts all mount points as read-only. We do not use overlayfs and chroot to pivot the home directory. THis functioning mode is meant for debugging or very specific use cases.
+
+## Usage
+
+### custom CLI mode -- usage
+
+If you need more customization, instead of using the `-x` flag you can use a combination of `-w` (mount fs as writable), `-M` (mount fs as read) and `-k` (mount fs as overlay). See the following command line as an example: 
+
+`mini-sandbox -w $(pwd) -w /tmp -w /dev/shm -o /local/mnt/workspace/sandbox -d /local/mnt/workspace/overlayfs -D /tmp/dbg -N -k /afs -k /boot -k /etc -k /lib -k /lib64 -k /mnt -k /root -k /sbin -k /srv -k /tmp -k /bin -k /cm -k /emul -k /lib32 -k /libx32 -k /pkg -k /usr -M /proc -M /var -M /opt -- /bin/bash`
+
+`/var` and `/opt` are both needed to resolve the username
+
+More details about the CLI at `docs/Flags.md`
+
+
+

@@ -4,6 +4,62 @@ A sandbox CLI and library based on the concept of namespaces which can be used t
 
 More details about the goals at [motivations](docs/motivations.md)
 
+## Getting started
+
+Download the binaries/libraries from the release page. You can also build the code, see [build instructions](docs/build.md).
+
+Here we are going to highlight three main uses cases
+
+### Default Command line usage
+
+The fastest, default usage is:
+
+`mini-sandbox -x -- /bin/bash`
+
+In short this will i) shut down the network 2) mount several filesystems as overlay (modifications do not affect the filesystem out of the sandbox) 3) mount less-security sensitive filesystems as read-only (/prj) 4) chroot into a custom folder .
+If you need to open network connections in your app/package check out the `TUN mode` below to enable the root-less firewall feature that will allow you to block all connections except for the necessary ones.
+
+**IMPORTANT** If you execute this from hour $HOME directory we will mount the $HOME directory as fully writable and many of our isolation guarantees do not hold anymore.
+
+### TUN mode -- root-less firewall
+
+By leveraging the gVisor framework by Google, we manage to use a tap interface and a TCP/IP network stack to be able to run a firewall inside our sandbox. To have this feature you need to build the `mini-tapbox` binary (see `docs/build.md`). Once the binary has been built usage is straightforward -- just collect the list of IP addresses, domain names, subnets needed for your app into a file and use the -F flag (see example below)
+
+```bash
+echo "google.com" > /tmp/allowed_ips
+echo "8.8.8.8" >> /tm[/allowed_ips // we wanna have access to the DNS
+mini-tapbox -x -F /tmp/allowed_ips -- /bin/bash
+ping google.com  // google.com - succeed
+ping wikipedia.com   // will fail !
+```
+
+
+### Library Mode -- Python
+
+Last, we have bindings for C/C++ and Python. See here an example of how to use this in python code (pip package coming, but fow now you'll have to manually add this to your PYTHONPATH). For a list of APIs checkout [the APIs documentation](docs/libminisandbox_apis.md).
+
+```python
+import pyminisandbox as mn_sbx
+
+if __name__ == "__main__":
+        
+    mn_sbx.mini_sandbox_setup_default()
+    mn_sbx.mini_sandbox_mount_write("/usr2")
+ 
+    mn_sbx.mini_sandbox_allow_domain("www.wikipedia.org")
+    # mn_sbx.mini_sandbox_allow_ipv4_subnet("142.250.72.132/24")
+ 
+    mn_sbx.mini_sandbox_start()
+     
+    print("Running inside the sandbox...")
+    attempt_network_connection("http://www.google.com") 
+    attempt_network_connection("http://www.wikipedia.org")
+ 
+    # rest of your logic here
+    # use all third-party deps you want as now they are sandboxed
+```
+
+
 ## Comparison with other projects
 
 This project is heavily inspired by few other open-source projects that have been proposed over the last few years. However, we haven't found any of these projects to fulfill all our necessities and that's why we decided to work on a different implementation in the attempt to maximize the deployability and usability of the project. In the following table you can see an informal comparison of what features we considered for our evaluation and how the other projects correlate to those. To keep the comparison more consistent we are also going to highlight few features that we do not currently support but keep in mind that we are not claiming to be better than the other tools, simply that we try to look at a different features set.
@@ -18,55 +74,3 @@ This project is heavily inspired by few other open-source projects that have bee
 | Bubblewrap | ✅ | ✅ | :x: | :x: | :x: | ✅ | :x: |
 | **mini-sandbox** | ✅ | ✅ |✅ | :x: | ✅ | :x: | :x: |
 | **mini-tapbox** | ✅ | ✅ |✅ | ✅ | ✅ | :x: | :x: |
-
-
-
-
-## Getting started
-
-Here we are going to highlight three 
-
-## Build
-
-See build instructions at `docs/Build.md`
-
-## Usage
-
-The fastest, default usage is:
-
-`mini-sandbox -x -- /bin/bash`
-
-In short this will i) shut down the network 2) mount several filesystems as overlay (modifications do not affect the filesystem out of the sandbox) 3) mount less-security sensitive filesystems as read-only (/prj) 4) chroot into a custom folder .
-If you need to open network connections in your app/package check out the `TUN mode` below to enable the user-space firewall feature that will allow you to block all connections except for the necessary ones.
-
-### custom CLI mode -- usage
-
-If you need more customization, instead of using the `-x` flag you can use a combination of `-w` (mount fs as writable), `-M` (mount fs as read) and `-k` (mount fs as overlay). See the following command line as an example: 
-
-`mini-sandbox -w $(pwd) -w /tmp -w /dev/shm -o /local/mnt/workspace/sandbox -d /local/mnt/workspace/overlayfs -D /tmp/dbg -N -k /afs -k /boot -k /etc -k /lib -k /lib64 -k /mnt -k /root -k /sbin -k /srv -k /tmp -k /bin -k /cm -k /emul -k /lib32 -k /libx32 -k /pkg -k /usr -M /proc -M /var -M /opt -- /bin/bash`
-
-`/var` and `/opt` are both needed to resolve the username
-
-More details about the CLI at `docs/Flags.md`
-
-
-### TUN mode -- user-space firewall
-
-By leveraging the gVisor framework by Google, we manage to use a tap interface and a TCP/IP network stack to be able to run a firewall inside our sandbox. To have this feature you need to run the following commands from the root of this folder. Once the binary has been built usage is straightforward -- just collect the list of IP addresses, domain names, subnets needed for your app into a file and use the -F flag (see example below)
-
-```
-make mini-tapbox
-```
-
-Example usage:
-
-```
-echo "142.250.189.14" > /tmp/allowed_ips
-./out/mini-tapbox -x -F /tmp/allowed_ips -- /bin/bash
-ping 142.250.189.14  // google.com - ok
-ping wikipedia.com   // will fail !
-```
-
-### Library mode
-
-Library APIs are availabe for importing in C, C++ and Python codebases. Have a look at `docs/Libminisandbox.md` and `docs/Libminisandbox-API_description.md`
