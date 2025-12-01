@@ -6,7 +6,9 @@ More details about the goals at [motivations](docs/motivations.md)
 
 ## Getting started
 
-Download the binaries/libraries from the release page. You can also build the code, see [build instructions](docs/build.md).
+The easier way to access the tool is to download the binaries/libraries from the [release page](https://github.com/qualcomm/mini-sandbox/releases). 
+
+Alternatively, you can also build the code, see [build instructions](docs/build.md).
 
 Here we are going to highlight three main uses cases
 
@@ -16,18 +18,18 @@ The fastest, default usage is:
 
 `mini-sandbox -x -- /bin/bash`
 
-In short this will i) shut down the network 2) mount several filesystems as overlay (modifications do not affect the filesystem out of the sandbox) 3) mount less-security sensitive filesystems as read-only (/prj) 4) chroot into a custom folder .
-If you need to open network connections in your app/package check out the `TUN mode` below to enable the root-less firewall feature that will allow you to block all connections except for the necessary ones.
+In short this will i) shut down the network 2) mount several mount points as overlay (modifications do not affect the filesystem out of the sandbox) 3) mount less-security sensitive or custom filesystems as read-only (e.g., autofs, nfs, ..) 4) chroot into a custom folder .
+If you need to open network connections in your app/package check out the `TAP mode` below to enable the root-less firewall feature that will allow you to block all connections except for the necessary ones.
 
 **IMPORTANT** If you execute this from hour $HOME directory we will mount the $HOME directory as fully writable and many of our isolation guarantees do not hold anymore.
 
-### TUN mode -- root-less firewall
+### TAP mode -- root-less firewall
 
 By leveraging the gVisor framework by Google, we manage to use a tap interface and a TCP/IP network stack to be able to run a firewall inside our sandbox. To have this feature you need to build the `mini-tapbox` binary (see `docs/build.md`). Once the binary has been built usage is straightforward -- just collect the list of IP addresses, domain names, subnets needed for your app into a file and use the -F flag (see example below)
 
 ```bash
 echo "google.com" > /tmp/allowed_ips
-echo "8.8.8.8" >> /tm[/allowed_ips // we wanna have access to the DNS
+echo "8.8.8.8" >> /tmp/allowed_ips // we wanna have access to the DNS
 mini-tapbox -x -F /tmp/allowed_ips -- /bin/bash
 ping google.com  // google.com - succeed
 ping wikipedia.com   // will fail !
