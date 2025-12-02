@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2025 Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * SPDX-License-Identifier: MIT
+ */
 
 #include "src/main/tools/error_handling.h"
 #include "src/main/tools/process-tools.h"

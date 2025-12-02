@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2025 Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * SPDX-License-Identifier: MIT
+ */
+
+
 #include "error_handling.h"
 #include "src/main/tools/logging.h"
 #include "src/main/tools/linux-sandbox-options.h"

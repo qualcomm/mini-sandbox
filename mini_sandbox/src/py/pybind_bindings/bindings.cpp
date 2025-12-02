@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2025 Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * SPDX-License-Identifier: MIT
+ */
 #include <pybind11/pybind11.h>
 #include "linux-sandbox-api.h"
 
