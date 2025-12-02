@@ -19,3 +19,10 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+Additional Notice:
+This project includes code derived from an Apache-licensed project, i.e., Bazel
+(https://github.com/bazelbuild/bazel).
+Such code remains under the terms of the Apache License, Version 2.0. A copy of 
+the Apache License can be found at:
+http://www.apache.org/licenses/LICENSE-2.0
