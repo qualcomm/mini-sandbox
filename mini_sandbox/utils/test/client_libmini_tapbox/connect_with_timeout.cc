@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2025 Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * SPDX-License-Identifier: MIT
+ */
 #include "connect_with_timeout.h"
 
 int connect_with_timeout(int sockfd, struct sockaddr *addr, socklen_t addrlen, int timeout_sec) {

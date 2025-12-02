@@ -1,5 +1,8 @@
+#
 # Copyright (c) 2025 Qualcomm Technologies, Inc. and/or its subsidiaries.
 # SPDX-License-Identifier: MIT
+#
+
 
 
 def is_in_user_namespace():

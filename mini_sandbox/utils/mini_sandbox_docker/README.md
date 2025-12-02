@@ -1,3 +1,7 @@
+<!--
+Copyright (c) 2025 Qualcomm Technologies, Inc. and/or its subsidiaries.
+SPDX-License-Identifier: MIT
+-->
 # How to run
 
 This is a sample Dockerfile to run mini-sandbox. Build with:

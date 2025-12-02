@@ -1,3 +1,7 @@
+<!--
+Copyright (c) 2025 Qualcomm Technologies, Inc. and/or its subsidiaries.
+SPDX-License-Identifier: MIT
+-->
 # Update g++ to g++-11
 
 - sudo add-apt-repository ppa:ubuntu-toolchain-r/test

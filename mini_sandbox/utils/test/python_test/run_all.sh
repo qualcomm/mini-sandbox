@@ -1,4 +1,8 @@
 #!/bin/bash
+##
+## Copyright (c) 2025 Qualcomm Technologies, Inc. and/or its subsidiaries.
+## SPDX-License-Identifier: MIT
+##
 
 SCRIPT_PATH="$(realpath "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"

@@ -1,3 +1,7 @@
+<!--
+Copyright (c) 2025 Qualcomm Technologies, Inc. and/or its subsidiaries.
+SPDX-License-Identifier: MIT
+-->
 # Run the tests
 
 Before starting the `test_all.sh` script make sure that:

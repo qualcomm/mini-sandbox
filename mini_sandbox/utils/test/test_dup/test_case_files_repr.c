@@ -1,4 +1,9 @@
 /*
+ * Copyright (c) 2025 Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * SPDX-License-Identifier: MIT
+ */
+
+/*
 This test makes sure that the filedescriptors opened before the libmini* are carried over and are meaningful after mini_sandbox start
 The expected result is a file called "test_open" containing
 testing out \n
