@@ -1,4 +1,9 @@
 #!/bin/bash
+##
+## Copyright (c) 2025 Qualcomm Technologies, Inc. and/or its subsidiaries.
+## SPDX-License-Identifier: MIT
+##
+
 set -e
 
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
@@ -59,10 +64,6 @@ install() {
         cp "$RELEASE_DIR/lib/"* /usr/local/lib/
     fi;
 
-    #echo "Installing Python packages to user site-packages..."
-    #PYTHON_SITE=$(python3 -m site --user-site)
-    #mkdir -p "$PYTHON_SITE"
-    #cp "$RELEASE_DIR/python/"*.py "$PYTHON_SITE/"
 }
 
 # Main logic
