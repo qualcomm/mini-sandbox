@@ -76,3 +76,7 @@ This project is heavily inspired by few other open-source projects that have bee
 | Bubblewrap | ✅ | ✅ | :x: | :x: | :x: | ✅ | :x: |
 | **mini-sandbox** | ✅ | ✅ |✅ | :x: | ✅ | :x: | :x: |
 | **mini-tapbox** | ✅ | ✅ |✅ | ✅ | ✅ | :x: | :x: |
+
+## License
+
+mini-sandbox is licensed under [MIT License](LICENSE.txt)
