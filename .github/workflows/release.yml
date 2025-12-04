@@ -46,3 +46,17 @@ jobs:
             .
 
 
+
+      - name: Run container (privileged) and export artifact
+        run: |
+          mkdir -p dist
+          # Your ENTRYPOINT runs tests and copies /app/.../release -> /rel
+          docker run --rm --privileged \
+            -e VERSION="${TAG}" \
+            -v "$PWD/dist:/rel" \
+            mini-sandbox:"${TAG}"
+
+          echo "Contents of dist after container run:"
+          ls -lah dist
+          test -d dist/release || { echo "Expected dist/release not found"; exit 1; }
+
