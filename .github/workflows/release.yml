@@ -27,8 +27,8 @@ jobs:
            pip3 install --no-cache-dir requests
       
 
-      - name: Checkout repo into /app/mini-sandbox
-        uses: actions/checkout@v4
+      - name: Checkout repo into /app
+        uses: actions/checkout@v3
         with:
           path: /app/
 
