@@ -13,6 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
         image: ubuntu:18.04
+        options: --privileged
     steps:
       - name: Prepare apt & deps
         run: |
@@ -23,5 +24,43 @@ jobs:
             python3 python3-pip \
             iptables-nftables-compat iptables vim && \
           apt-get clean
-          pip3 install --no-cache-dir requests
+           pip3 install --no-cache-dir requests
+      
+
+      - name: Checkout repo into /app/mini-sandbox
+        uses: actions/checkout@v4
+        with:
+          path: /app/
+
+
+      - name: Install Go
+        env:
+          GO_VERSION: 1.25.3
+        run: |
+          wget "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz"
+          tar -C /usr/local -xzf "go${GO_VERSION}.linux-amd64.tar.gz"
+          rm "go${GO_VERSION}.linux-amd64.tar.gz"
+          echo "/usr/local/go/bin" >> "$GITHUB_PATH"
+
+
+      - name: Build, pre-flight test, and export artifact
+        env:
+          VER: ${{ github.ref_name }}   # tag name (or branch if manual)
+        run: |
+          set -euxo pipefail
+          export VERSION="${VER}"
+          export PATH="/app/mini-sandbox/mini_sandbox/src/main/tools/out/:${PATH}"
+          export PYTHON=python3
+          export WORKSPACE="/app/mini-sandbox/"
+          export MINI_SANDBOX_DOCKER_PRIVILEGED=1
+          mkdir -p /rel dist
+          /app/mini-sandbox/clean.sh
+          /app/mini-sandbox/build.sh --release
+
+         
+          cp -r /app/mini-sandbox/QCBuildSandbox/release dist/release
+          tar -C dist -czf "dist/mini-sandbox-${VER}.tar.gz" release
+          ls -lah dist
+
+
  
