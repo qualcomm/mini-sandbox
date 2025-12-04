@@ -52,6 +52,8 @@ jobs:
           mkdir -p dist
           # Your ENTRYPOINT runs tests and copies /app/.../release -> /rel
           docker run --rm --privileged \
+            --security-opt seccomp=unconfined \
+            --security-opt apparmor=unconfined \
             -e VERSION="${TAG}" \
             -v "$PWD/dist:/rel" \
             mini-sandbox:"${TAG}"
