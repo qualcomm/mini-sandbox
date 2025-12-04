@@ -1,13 +1,12 @@
-name: Release builder
+
+name: Release
 on:
-  workflow_dispatch:     # Allows manual triggering
-  # pull_request hook must be removed once the PR looks good.
-  pull_request:
-    paths:
-      - ".github/workflows/release-artifact-builder.yaml"
+  pull_request_target:
+    branches: [ main ]
   push:
-    branches:
-      - main
+    branches: [ main ]
+  workflow_dispatch:
+
 
 jobs:
   test:
