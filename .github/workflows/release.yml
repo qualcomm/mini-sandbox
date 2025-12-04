@@ -1,5 +1,12 @@
-me: Test Actions
-on: workflow_dispatch
+
+name: Release
+on:
+  pull_request_target:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
 
 jobs:
   test:
