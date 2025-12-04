@@ -1,4 +1,4 @@
-me: Test Actions
+name: Release
 on: workflow_dispatch
 
 jobs:
