@@ -10,7 +10,17 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
-    steps:
-        - run: echo "✅ GitHub Actions is working"
+    runs-on: ubuntu-18.04
 
+    steps:
+      - name: Prepare apt & deps
+        run: |
+          apt-get update && \
+          apt-get install -y \
+            software-properties-common \
+            build-essential clang iputils-ping wget \
+            python3 python3-pip \
+            iptables-nftables-compat iptables vim && \
+          apt-get clean
+          pip3 install --no-cache-dir requests
+ 
