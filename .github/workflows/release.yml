@@ -63,3 +63,26 @@ jobs:
           ls -lah dist
           test -d dist/release || { echo "Expected dist/release not found"; exit 1; }
 
+
+      - name: Package tarball
+        run: |
+          tar -C dist -czf "dist/mini-sandbox-${TAG}.tar.gz" release
+          ls -lah dist
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum "mini-sandbox-${TAG}.tar.gz" > SHA256SUMS.txt
+          ls -lah
+
+      - name: Create GitHub Release and upload assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          name: ${{ env.TAG }}
+          generate_release_notes: true
+          files: |
+            dist/mini-sandbox-${{ env.TAG }}.tar.gz
+            dist/SHA256SUMS.txt
+        env:
+
