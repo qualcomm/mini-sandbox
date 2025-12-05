@@ -8,57 +8,30 @@ RUN apt-get update && \
         iptables-nftables-compat iptables vim && \
         apt-get clean
 
+# install "iptables-nftables-compat" for ubuntu:18.04 to install iptables-nft subsystem
 RUN pip3 install --no-cache-dir requests
 
 
 WORKDIR /app/
 RUN mkdir /app/mini-sandbox
+RUN mkdir /rel
 
-
-# install "iptables-nftables-compat" for ubuntu:18.04 to install iptables-nft subsystem
-ARG DOCKER_USER=user
-ARG DOCKER_UID=10001
-ARG DOCKER_GID=10001
-
-#RUN addgroup --system --gid $DOCKER_GID users2 && adduser --system --uid $DOCKER_UID --gid $DOCKER_GID $DOCKER_USER
 
 ARG VER
 ENV VERSION=$VER
 
-#ENV PACKAGE_DIR="/app/mini-sandbox/release/"
-
 ENV GO_VERSION=1.25.3
 ENV DOCKER_BUILD=1
-
 
 RUN wget "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" && \
     tar -C /usr/local -xzf go${GO_VERSION}.linux-amd64.tar.gz && \
     rm go${GO_VERSION}.linux-amd64.tar.gz
 
-
 ENV PATH="/usr/local/go/bin:${PATH}"
-
-RUN mkdir /rel
-
-#RUN chown -R $DOCKER_USER:users2 /rel
-#RUN mkdir /app/rand_folder
-#RUN mkdir /app/zrand_folder
 
 COPY ./ /app/mini-sandbox
 
-
 ENV PATH="/app/mini-sandbox/mini_sandbox/src/main/tools/out/:${PATH}"
-#WORKDIR /app/
-
-#RUN chown -R $DOCKER_USER:users2 /app
-
-
-#RUN mkdir /app/root_folder
-#RUN chmod 700 /app/root_folder
-#RUN chown -R root:root /app/root_folder
-
-
-#USER $DOCKER_USER
 
 
 RUN /app/mini-sandbox/clean.sh
@@ -70,6 +43,7 @@ ENV MINI_SANDBOX_DOCKER_PRIVILEGED=1
 ENV PATH="/app/mini-sandbox/mini_sandbox/src/main/tools/out/:${PATH}"
 ENV PYTHON=python3
 ENV WORKSPACE="/app/mini-sandbox"
+#ENV PACKAGE_DIR="/app/mini-sandbox/release/"
 
 
 ENTRYPOINT ["sh", "-c", "set -e && whoami && id && /app/mini-sandbox/mini_sandbox/utils/test/test_all.sh && cp -r /app/mini-sandbox/release /rel"]
