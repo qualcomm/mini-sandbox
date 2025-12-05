@@ -20,7 +20,7 @@ ARG DOCKER_USER=user
 ARG DOCKER_UID=10001
 ARG DOCKER_GID=10001
 
-RUN addgroup --system --gid $DOCKER_GID users2 && adduser --system --uid $DOCKER_UID --gid $DOCKER_GID $DOCKER_USER
+#RUN addgroup --system --gid $DOCKER_GID users2 && adduser --system --uid $DOCKER_UID --gid $DOCKER_GID $DOCKER_USER
 
 ARG VER
 ENV VERSION=$VER
@@ -40,7 +40,7 @@ ENV PATH="/usr/local/go/bin:${PATH}"
 
 RUN mkdir /rel
 
-RUN chown -R $DOCKER_USER:users2 /rel
+#RUN chown -R $DOCKER_USER:users2 /rel
 #RUN mkdir /app/rand_folder
 #RUN mkdir /app/zrand_folder
 
@@ -50,7 +50,7 @@ COPY ./ /app/mini-sandbox
 ENV PATH="/app/mini-sandbox/mini_sandbox/src/main/tools/out/:${PATH}"
 #WORKDIR /app/
 
-RUN chown -R $DOCKER_USER:users2 /app
+#RUN chown -R $DOCKER_USER:users2 /app
 
 
 #RUN mkdir /app/root_folder
@@ -58,7 +58,7 @@ RUN chown -R $DOCKER_USER:users2 /app
 #RUN chown -R root:root /app/root_folder
 
 
-USER $DOCKER_USER
+#USER $DOCKER_USER
 
 
 RUN /app/mini-sandbox/clean.sh
