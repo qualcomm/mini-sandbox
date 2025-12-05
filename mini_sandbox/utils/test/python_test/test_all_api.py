@@ -72,6 +72,8 @@ if __name__ == "__main__":
         assert (res == 0)
         res = mn_sbx.mini_sandbox_allow_ipv4_subnet("10.49.88.124") #DNS resolver
         assert (res == 0)
+        res = mn_sbx.mini_sandbox_allow_ipv4("8.8.8.8")
+        assert (res == 0)
         res = mn_sbx.mini_sandbox_allow_ipv4_subnet("142.0.0.0/8") # With this and previous, google connection should go through
         assert (res == 0)
 

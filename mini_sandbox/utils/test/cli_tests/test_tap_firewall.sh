@@ -8,6 +8,12 @@ SCRIPT_PATH="$(realpath "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
 IP_RULES="$SCRIPT_DIR/ip.list"
 
+cat "/etc/resolv.conf" | grep -e "nameserver\ [0-9]*" | awk '{print $2}' >> $IP_RULES
+
+echo "Using following IP rules"
+cat $IP_RULES
+
+
 which minitap
 
 if [[ $? -ne 0 ]]; then

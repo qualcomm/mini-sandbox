@@ -1,16 +1,91 @@
 
 name: Release
 on:
-  pull_request_target:
-    branches: [ main ]
   push:
-    branches: [ main ]
-  workflow_dispatch:
+    tags: [ 'v*' ]
+
+
+permissions:
+  contents: write        # required for creating release
 
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    steps:
-        - run: echo "✅ GitHub Actions is working"
 
+    steps:
+      
+      - name: Install GitHub CLI
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y gh
+ 
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Derive TAG for this run
+        id: meta
+        run: |
+          # If this run is on a tag push, use the tag name.
+          # If it's a manual run, use the provided input or fallback to 'manual'.
+          TAG="${{ github.ref_type == 'tag' && github.ref_name || '' }}"
+          if [ -z "$TAG" ]; then
+            TAG="${{ github.event.inputs.version }}"
+          fi
+          if [ -z "$TAG" ]; then TAG="manual"; fi
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Using TAG=$TAG"
+
+      - name: Build Docker image (parameterized non-root user)
+        run: |
+          # Match the container user to the runner's uid/gid to avoid root-owned artifacts
+          UIDNUM="$(id -u)"
+          GIDNUM="$(id -g)"
+          echo "UID: ${UIDNUM}"
+
+          docker build \
+            --build-arg DOCKER_USER=app \
+            --build-arg DOCKER_UID="${UIDNUM}" \
+            --build-arg DOCKER_GID="${GIDNUM}" \
+            --build-arg VER="${TAG}" \
+            -t mini-sandbox:"${TAG}" \
+            .
+
+      - name: Run container (privileged) and export artifact
+        run: |
+          mkdir -p dist
+          # Your ENTRYPOINT runs tests and copies /app/.../release -> /rel
+          docker run --rm --privileged \
+            --security-opt seccomp=unconfined \
+            --security-opt apparmor=unconfined \
+            -e VERSION="${TAG}" \
+            -v "$PWD/dist:/rel" \
+            mini-sandbox:"${TAG}"
+
+          echo "Contents of dist after container run:"
+          ls -lah dist
+          test -d dist/release || { echo "Expected dist/release not found"; exit 1; }
+
+
+      - name: Package tarball
+        run: |
+          tar -C dist -czf "dist/mini-sandbox-${TAG}.tar.gz" release
+          ls -lah dist
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum "mini-sandbox-${TAG}.tar.gz" > SHA256SUMS.txt
+          ls -lah
+
+
+      - name: Create GitHub Release and upload assets (gh)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Create/publish the release for the current tag and upload assets
+          gh release create "${TAG}" \
+            "dist/mini-sandbox-${TAG}.tar.gz" \
+            "dist/SHA256SUMS.txt" \
+      
