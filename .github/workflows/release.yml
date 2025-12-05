@@ -9,11 +9,21 @@ on:
 
 
 
+permissions:
+  contents: write        # required for creating release
+
+
 jobs:
   test:
     runs-on: ubuntu-latest
 
     steps:
+      
+      - name: Install GitHub CLI
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y gh
+ 
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -73,13 +83,13 @@ jobs:
           sha256sum "mini-sandbox-${TAG}.tar.gz" > SHA256SUMS.txt
           ls -lah
 
-      - name: Create GitHub Release and upload assets
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ env.TAG }}
-          name: ${{ env.TAG }}
-          generate_release_notes: true
-          files: |
-            dist/mini-sandbox-${{ env.TAG }}.tar.gz
-            dist/SHA256SUMS.txt
 
+      - name: Create GitHub Release and upload assets (gh)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Create/publish the release for the current tag and upload assets
+          gh release create "${TAG}" \
+            "dist/mini-sandbox-${TAG}.tar.gz" \
+            "dist/SHA256SUMS.txt" \
+      
