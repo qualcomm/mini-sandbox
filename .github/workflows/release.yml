@@ -36,11 +36,12 @@ jobs:
           # Match the container user to the runner's uid/gid to avoid root-owned artifacts
           UIDNUM="$(id -u)"
           GIDNUM="$(id -g)"
+          echo "UID: ${UIDNUM}"
 
           docker build \
-            --build-arg APP_USER=app \
-            --build-arg APP_UID="${UIDNUM}" \
-            --build-arg APP_GID="${GIDNUM}" \
+            --build-arg DOCKER_USER=app \
+            --build-arg DOCKER_UID="${UIDNUM}" \
+            --build-arg DOCKER_GID="${GIDNUM}" \
             --build-arg VER="${TAG}" \
             -t mini-sandbox:"${TAG}" \
             .
