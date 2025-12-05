@@ -46,8 +46,6 @@ jobs:
             -t mini-sandbox:"${TAG}" \
             .
 
-
-
       - name: Run container (privileged) and export artifact
         run: |
           mkdir -p dist
@@ -84,5 +82,4 @@ jobs:
           files: |
             dist/mini-sandbox-${{ env.TAG }}.tar.gz
             dist/SHA256SUMS.txt
-        env:
 
