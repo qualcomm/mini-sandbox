@@ -72,7 +72,7 @@ ENV PYTHON=python3
 ENV WORKSPACE="/app/mini-sandbox"
 
 
-ENTRYPOINT ["sh", "-c", "set -e && /app/mini-sandbox/mini_sandbox/utils/test/test_all.sh && cp -r /app/mini-sandbox/release /rel"]
+ENTRYPOINT ["sh", "-c", "set -e && whoami && id && /app/mini-sandbox/mini_sandbox/utils/test/test_all.sh && cp -r /app/mini-sandbox/release /rel"]
 #ENTRYPOINT ["sh", "-c", "cd /app && /bin/bash"]
 
 
