@@ -46,7 +46,7 @@ ENV WORKSPACE="/app/mini-sandbox"
 #ENV PACKAGE_DIR="/app/mini-sandbox/release/"
 
 
-ENTRYPOINT ["sh", "-c", "set -e && cat /etc/resolv.conf && /app/mini-sandbox/mini_sandbox/utils/test/cli_tests/run_all.sh && cp -r /app/mini-sandbox/release /rel"]
+ENTRYPOINT ["sh", "-c", "set -e && host www.google.com && cat /etc/resolv.conf && /app/mini-sandbox/mini_sandbox/utils/test/cli_tests/run_all.sh && cp -r /app/mini-sandbox/release /rel"]
 #ENTRYPOINT ["sh", "-c", "cd /app && /bin/bash"]
 
 
