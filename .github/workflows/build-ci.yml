@@ -2,15 +2,24 @@
 name: CI Build
 on:
   pull_request_target:
-    branches: [ main ]
+    branches:
+      - '**'
   push:
-    branches: [ main ]
+    branches:
+      - '**'
   workflow_dispatch:
 
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+
 jobs:
-  test:
+  build-and-test:
     runs-on: ubuntu-latest
+    permissions:
+        contents: read
 
     steps:
       
@@ -21,6 +30,14 @@ jobs:
  
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}
+          ref:        ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha         || github.sha }}
+          # Do not persist the repo token in the git config (prevents accidental use)
+          persist-credentials: false
+          # Optional: full history if you need tags/describe/versioning
+          fetch-depth: 0
+
 
       - name: Derive TAG for this run
         id: meta
