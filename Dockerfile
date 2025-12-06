@@ -4,7 +4,7 @@ RUN apt-get update && \
     apt-get install -y \
         software-properties-common \
         build-essential clang iputils-ping wget \
-        python3 python3-pip \
+        python3 python3-pip bind9-host \
         iptables-nftables-compat iptables vim && \
         apt-get clean
 
