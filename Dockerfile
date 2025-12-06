@@ -4,7 +4,7 @@ RUN apt-get update && \
     apt-get install -y \
         software-properties-common \
         build-essential clang iputils-ping wget \
-        python3 python3-pip \
+        python3 python3-pip bind9-host \
         iptables-nftables-compat iptables vim && \
         apt-get clean
 
@@ -46,7 +46,7 @@ ENV WORKSPACE="/app/mini-sandbox"
 #ENV PACKAGE_DIR="/app/mini-sandbox/release/"
 
 
-ENTRYPOINT ["sh", "-c", "set -e && cat /etc/resolv.conf && /app/mini-sandbox/mini_sandbox/utils/test/cli_tests/run_all.sh && cp -r /app/mini-sandbox/release /rel"]
+ENTRYPOINT ["sh", "-c", "set -e && /app/mini-sandbox/mini_sandbox/utils/test/test_all.sh && cp -r /app/mini-sandbox/release /rel"]
 #ENTRYPOINT ["sh", "-c", "cd /app && /bin/bash"]
 
 

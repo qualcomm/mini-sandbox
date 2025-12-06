@@ -67,11 +67,11 @@ count=$(ls $PWD/../ | wc -l)
 check_ls_count $count 1
 
 echo -e "\nTest showing the network is available"
-wget google.com -T 1
+ping -c 1 8.8.8.8 
 check_last_command
 
 echo -e "\nTest showing the network is unavailable"
-wget qualcomm.com --tries=1 --timeout=1
+wget qualcomm.com --tries=3 --timeout=1
 check_last_command_failed
 
 EOF

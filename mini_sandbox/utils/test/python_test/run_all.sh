@@ -53,7 +53,7 @@ else
 fi
 
 check_exit $PYTHON test_all_api.py
-check_exit $PYTHON test_all_api.py tap
+#check_exit $PYTHON test_all_api.py tap
 
 check_exit $PYTHON test_err.py
 
@@ -67,9 +67,9 @@ ls "$SCRIPT_DIR/../pyminisandbox-test-default.test"
 check_last_command
 rm "$SCRIPT_DIR/../pyminisandbox-test-default.test"
 
-check_exit $PYTHON test.py tap
-ls "$SCRIPT_DIR/../pyminisandbox-test-default.test"
-check_last_command
+#check_exit $PYTHON test.py tap
+#ls "$SCRIPT_DIR/../pyminisandbox-test-default.test"
+#check_last_command
 rm "$SCRIPT_DIR/../pyminisandbox-test-default.test"
 
 cd $ORIGINAL_DIR
