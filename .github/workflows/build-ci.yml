@@ -34,11 +34,8 @@ jobs:
         with:
           repository: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}
           ref:        ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha         || github.sha }}
-          # Do not persist the repo token in the git config (prevents accidental use)
           persist-credentials: false
-          # Optional: full history if you need tags/describe/versioning
           fetch-depth: 0
-
 
       - name: Derive TAG for this run
         id: meta
@@ -72,7 +69,6 @@ jobs:
       - name: Run container (privileged) and export artifact
         run: |
           mkdir -p dist
-          # Your ENTRYPOINT runs tests and copies /app/.../release -> /rel
           docker run --rm --privileged \
             --security-opt seccomp=unconfined \
             --security-opt apparmor=unconfined \
