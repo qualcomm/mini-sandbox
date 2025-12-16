@@ -1,229 +1,41 @@
-
-
 package main
 
 import (
-        "C"
-        "unsafe"
+	"C"
 	"context"
 	"errors"
 	"fmt"
+	"github.com/vishvananda/netlink"
+	"golang.org/x/sys/unix"
+	"gvisor.dev/gvisor/pkg/tcpip"
+	"gvisor.dev/gvisor/pkg/tcpip/adapters/gonet"
+	"gvisor.dev/gvisor/pkg/tcpip/header"
+	"gvisor.dev/gvisor/pkg/tcpip/link/fdbased"
+	"gvisor.dev/gvisor/pkg/tcpip/link/tun"
+	"gvisor.dev/gvisor/pkg/tcpip/network/ipv4"
+	"gvisor.dev/gvisor/pkg/tcpip/network/ipv6"
+	"gvisor.dev/gvisor/pkg/tcpip/stack"
+	"gvisor.dev/gvisor/pkg/tcpip/transport/icmp"
+	"gvisor.dev/gvisor/pkg/tcpip/transport/tcp"
+	"gvisor.dev/gvisor/pkg/tcpip/transport/udp"
+	"gvisor.dev/gvisor/pkg/waiter"
 	"log"
 	"net"
 	"os"
 	"os/exec"
 	"runtime"
-	"syscall"
-        "golang.org/x/sys/unix"
+	"os/signal"
 	"strings"
-        "bufio"
-        "sync"
-
-	"github.com/vishvananda/netlink"
-	"gvisor.dev/gvisor/pkg/tcpip"
-	"gvisor.dev/gvisor/pkg/tcpip/adapters/gonet"
-	"gvisor.dev/gvisor/pkg/tcpip/header"
-	"gvisor.dev/gvisor/pkg/tcpip/link/fdbased"
-	"gvisor.dev/gvisor/pkg/tcpip/network/ipv4"
-	"gvisor.dev/gvisor/pkg/tcpip/network/ipv6"
-	"gvisor.dev/gvisor/pkg/tcpip/stack"
-        "gvisor.dev/gvisor/pkg/tcpip/link/tun"
-	"gvisor.dev/gvisor/pkg/tcpip/transport/icmp"
-	"gvisor.dev/gvisor/pkg/tcpip/transport/tcp"
-	"gvisor.dev/gvisor/pkg/tcpip/transport/udp"
-	"gvisor.dev/gvisor/pkg/waiter"
+	"syscall"
 )
 
-const (
-	dumpPacketsToSubprocess   = false
-	dumpPacketsFromSubprocess = false
-	ttl                       = 10
-)
-
-var isVerbose bool = false;
-
-type FirewallTool int
 
 
-type FirewallRules struct {
-        Rules []string
-        Count int
-}
-
-const (
-        NONE FirewallTool = iota
-        IPTABLES_NFT
-        NFT
-)
-
-const (
-        NFT_RULESET        = "/tmp/nft-ruleset.conf"
-        MAX_ARGS           = 64
-        SUCCESS            = 0
-        ERR_EXEC_FAILED    = -1
-        ERR_FILE_NOT_FOUND = -2
-)
-
-var Tool FirewallTool = NONE
-
-var (
-    fwRules FirewallRules
-    mu      sync.Mutex
-)
-
+var isVerbose bool = false
 
 func fileExists(path string) bool {
-    info, err := os.Stat(path)
-    return err == nil && !info.IsDir()
-}
-
-
-func MiniTapSetupFirewallRule(rule string) {
-    mu.Lock()
-    defer mu.Unlock()
-    fwRules.Rules = append(fwRules.Rules, rule)
-    fwRules.Count++
-}
-
-
-func ReadFirewallRules(firewall_rules string) {
-    file, err := os.Open(firewall_rules)
-    if err != nil {
-        fmt.Printf("Failed to open file: %s\n", err)
-        return
-    }
-    defer file.Close()
-
-    scanner := bufio.NewScanner(file)
-    for scanner.Scan() {
-        rule := scanner.Text()
-        MiniTapSetupFirewallRule(rule)
-    }
-
-    if err := scanner.Err(); err != nil {
-        fmt.Printf("Error reading file: %s\n", err)
-    }
-}
-
-
-func whichNFTFirewall() FirewallTool {
-        if Tool != NONE {
-                return Tool
-        }
-
-        if envTool := os.Getenv("FIREWALL_TOOL"); envTool != "" {
-                switch envTool {
-                case "IPTABLES_NFT":
-                        Tool = IPTABLES_NFT
-                case "NFT":
-                        Tool = NFT
-                default:
-                        Tool = NONE
-                }
-                return Tool
-        }
-
-        if _, err := os.Stat("/usr/sbin/iptables-nft"); err == nil {
-                Tool = IPTABLES_NFT
-        } else if _, err := os.Stat("/usr/sbin/nft"); err == nil {
-                Tool = NFT
-        } else {
-                Tool = NONE
-        }
-        return Tool
-}
-
-func executeFirewallRule(rule string) int {
-        args := append([]string{"iptables-nft"}, strings.Fields(rule)...)
-        cmd := exec.Command(args[0], args[1:]...)
-        if err := cmd.Run(); err != nil {
-                fmt.Fprintf(os.Stderr, "Execution failed: %v\n", err)
-                return ERR_EXEC_FAILED
-        }
-        return SUCCESS
-}
-
-func setupNFTFile() (*os.File, int) {
-        fp, err := os.Create(NFT_RULESET)
-        if err != nil {
-                fmt.Fprintf(os.Stderr, "Failed to open file: %v\n", err)
-                return nil, ERR_FILE_NOT_FOUND
-        }
-        fp.WriteString("table ip pasta {\n")
-        fp.WriteString("    chain output {\n")
-        fp.WriteString("        type filter hook output priority 0;\n")
-        fp.WriteString("        policy drop;\n")
-        return fp, SUCCESS
-}
-
-func writeFirewallRule(fp *os.File, rule string) int {
-        if fp != nil {
-                fp.WriteString(fmt.Sprintf("        %s;\n", rule))
-                return SUCCESS
-        }
-        return ERR_FILE_NOT_FOUND
-}
-
-func closeNFTFile(fp *os.File) {
-        fp.WriteString("    }\n")
-        fp.WriteString("}\n")
-        fp.Close()
-}
-
-func executeNFT(path string) {
-        if path == "" {
-                fmt.Fprintln(os.Stderr, "Error: ruleset path is NULL.")
-                os.Exit(1)
-        }
-        cmd := exec.Command("/usr/sbin/nft", "-f", path)
-        if err := cmd.Run(); err != nil {
-                fmt.Fprintf(os.Stderr, "execv failed: %v\n", err)
-                os.Exit(1)
-        }
-}
-
-
-func ExecuteFirewallRules() {
-        if fwRules.Count == 0 {
-                return
-        }
-
-        tool := whichNFTFirewall()
-        if tool == NONE {
-                fmt.Println("Warning: no nft based firewall (iptables-nft or nft). Couldn’t set up firewall in namespace")
-                return
-        }
-
-        var fp *os.File
-        if tool == NFT {
-                var res int
-                fp, res = setupNFTFile()
-                if res < 0 {
-                        return
-                }
-        }
-
-        for i := fwRules.Count - 1; i >= 0; i-- {
-                rule := fwRules.Rules[i]
-                fmt.Printf("Executing rule: %s, Rule index %d\n", rule, i)
-                var result int
-                switch tool {
-                case IPTABLES_NFT:
-                        result = executeFirewallRule(rule)
-                case NFT:
-                        result = writeFirewallRule(fp, rule)
-                default:
-                        result = ERR_FILE_NOT_FOUND
-                }
-                if result != SUCCESS {
-                        fmt.Fprintf(os.Stderr, "Failed to setup rule: %s\n", rule)
-                }
-        }
-
-        if tool == NFT {
-                closeNFTFile(fp)
-                executeNFT(NFT_RULESET)
-        }
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
 }
 
 func verbose(msg string) {
@@ -238,132 +50,83 @@ func verbosef(fmt string, parts ...interface{}) {
 	}
 }
 
-
 func errorf(s string, parts ...interface{}) {
 	if !strings.HasSuffix(s, "\n") {
 		s += "\n"
 	}
-        fmt.Printf("Error:")
-        fmt.Printf(s)
-        
+	fmt.Printf("Error:")
+	fmt.Printf(s)
+
 }
 
-
 func setEnv(envVars []string) {
-        
-   for _, env := range envVars {
-        parts := strings.SplitN(env, "=", 2)
-        if len(parts) != 2 {
-            fmt.Printf("Invalid env format: %s\n", env)
-            continue
-        }
 
-        key := parts[0]
-        value := parts[1]
+	for _, env := range envVars {
+		parts := strings.SplitN(env, "=", 2)
+		if len(parts) != 2 {
+			fmt.Printf("Invalid env format: %s\n", env)
+			continue
+		}
 
-        err := os.Setenv(key, value)
-        if err != nil {
-            fmt.Printf("Failed to set %s: %v\n", key, err)
-        }
-    }
+		key := parts[0]
+		value := parts[1]
+
+		err := os.Setenv(key, value)
+		if err != nil {
+			fmt.Printf("Failed to set %s: %v\n", key, err)
+		}
+	}
 }
 
 type cfg struct {
-	Tun                string 
-	Subnet             string 
-	Gateway            string 
-	UID                int
-	GID                int
-	HTTPPorts          []int  
-	HTTPSPorts         []int  
+	Tun        string
+	Subnet     string
+	Gateway    string
+	UID        int
+	GID        int
+	HTTPPorts  []int
+	HTTPSPorts []int
 }
-
 
 var config = cfg{
-    Tun:        "",
-    Subnet:     "",
-    Gateway:    "",
-    UID:        -1,
-    GID:        -1,
-    HTTPPorts:  nil,
-    HTTPSPorts: nil,
-}
-
-//export MiniTapSetTun
-func MiniTapSetTun(tun *C.char) {
-    config.Tun = C.GoString(tun)
-}
-
-//export MiniTapSetSubnet
-func MiniTapSetSubnet(subnet *C.char) {
-    config.Subnet = C.GoString(subnet)
-}
-
-//export MiniTapSetGateway
-func MiniTapSetGateway(gateway *C.char) {
-    config.Gateway = C.GoString(gateway)
-}
-
-//export MiniTapSetUID
-func MiniTapSetUID(uid C.int) {
-    config.UID = int(uid)
-}
-
-//export MiniTapSetGID
-func MiniTapSetGID(gid C.int) {
-    config.GID = int(gid)
-}
-
-//export MiniTapSetHTTP
-func MiniTapSetHTTP(ports *C.int, length C.int) {
-    slice := unsafe.Slice(ports, length)
-    config.HTTPPorts = make([]int, length)
-    for i := 0; i < int(length); i++ {
-        config.HTTPPorts[i] = int(slice[i])
-    }
-}
-
-//export MiniTapSetHTTPS
-func MiniTapSetHTTPS(ports *C.int, length C.int) {
-    slice := unsafe.Slice(ports, length)
-    config.HTTPSPorts = make([]int, length)
-    for i := 0; i < int(length); i++ {
-        config.HTTPSPorts[i] = int(slice[i])
-    }
+	Tun:        "",
+	Subnet:     "",
+	Gateway:    "",
+	UID:        -1,
+	GID:        -1,
+	HTTPPorts:  nil,
+	HTTPSPorts: nil,
 }
 
 func DefaultInit() {
-    if config.HTTPPorts  == nil {
-        config.HTTPPorts = []int{80}
-    }
-    if config.HTTPSPorts == nil {
-        config.HTTPSPorts = []int{443}
-    }
-    if config.Tun == "" {
-        config.Tun = "mini-tun0"
-    }
-    if config.Subnet == "" {
-        config.Subnet = "10.1.1.100/24"
-    }
-    if config.Gateway == "" {
-    	config.Gateway = "10.1.1.1"
-    }
+	if config.HTTPPorts == nil {
+		config.HTTPPorts = []int{80}
+	}
+	if config.HTTPSPorts == nil {
+		config.HTTPSPorts = []int{443}
+	}
+	if config.Tun == "" {
+		config.Tun = "mini-tun0"
+	}
+	if config.Subnet == "" {
+		config.Subnet = "10.1.1.100/24"
+	}
+	if config.Gateway == "" {
+		config.Gateway = "10.1.1.1"
+	}
 }
-
 
 func SetPingGroupRange() error {
-    path := "/proc/sys/net/ipv4/ping_group_range"
-    content := []byte("0 0\n")
+	path := "/proc/sys/net/ipv4/ping_group_range"
+	content := []byte("0 0\n")
 
-    err := os.WriteFile(path, content, 0644)
-    if err != nil {
-        return fmt.Errorf("failed to write to %s: %w", path, err)
-    }
+	err := os.WriteFile(path, content, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write to %s: %w", path, err)
+	}
 
-    return nil
+	return nil
 }
-
-
 
 func RunNetwork() (int, error) {
 
@@ -371,18 +134,17 @@ func RunNetwork() (int, error) {
 	if err := unix.Prctl(unix.PR_SET_PDEATHSIG, uintptr(syscall.SIGKILL), 0, 0, 0); err != nil {
 		log.Fatalf("prctl failed: %v", err)
 	}
-     
 
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
-        DefaultInit()
+	DefaultInit()
 	//// create a new network namespace
 	if err := unix.Unshare(unix.CLONE_NEWNET); err != nil {
 		return -1, fmt.Errorf("error creating network namespace: %w", err)
 	}
 
-        fd, err := tun.Open(config.Tun)
+	fd, err := tun.Open(config.Tun)
 	if err != nil {
 		return -1, fmt.Errorf("error creating tun device: %w", err)
 	}
@@ -402,13 +164,11 @@ func RunNetwork() (int, error) {
 	}
 
 	// parse the subnet that we will assign to the interface within the namespace
-        
 
 	linksubnet, err := netlink.ParseIPNet(config.Subnet)
 	if err != nil {
 		return -1, fmt.Errorf("error parsing subnet: %w", err)
 	}
-
 
 	// assign the address we just parsed to the link, which will change the routing table
 	err = netlink.AddrAdd(link, &netlink.Addr{
@@ -463,6 +223,8 @@ func RunNetwork() (int, error) {
 	// the application-level thing is the mux, which distributes new connections according to patterns
 	var mux mux
 
+	// set default dns before start dns handling
+	setUpstreamDNS()
 	// handle DNS queries by calling net.Resolve
 	mux.HandleUDP(":53", func(conn net.Conn) {
 		defer conn.Close()
@@ -498,7 +260,6 @@ func RunNetwork() (int, error) {
 		proxyConn("udp", dst, conn)
 	})
 
-
 	// create the stack with udp and tcp protocols
 	s := stack.New(stack.Options{
 		NetworkProtocols:   []stack.NetworkProtocolFactory{ipv4.NewProtocol, ipv6.NewProtocol},
@@ -507,7 +268,7 @@ func RunNetwork() (int, error) {
 
 	// create a link endpoint based on the TUN device
 	endpoint, err := fdbased.New(&fdbased.Options{
-                FDs: []int{fd},
+		FDs: []int{fd},
 		MTU: uint32(link.Attrs().MTU),
 	})
 	if err != nil {
@@ -535,7 +296,6 @@ func RunNetwork() (int, error) {
 		verbosef("at UDP forwarder: %v:%v => %v:%v",
 			r.ID().RemoteAddress, r.ID().RemotePort,
 			r.ID().LocalAddress, r.ID().LocalPort)
-
 
 		var wq waiter.Queue
 		ep, err := r.CreateEndpoint(&wq)
@@ -583,54 +343,62 @@ func RunNetwork() (int, error) {
 		},
 	})
 
-        SetPingGroupRange()
-        ExecuteFirewallRules()
-      	ppid := syscall.Getppid();
-        syscall.Kill(ppid, syscall.SIGUSR1)
-        fmt.Println("Done with the config of tcp/ip");
-        select {}
+	SetPingGroupRange()
+	InitFirewall()
+	ppid := syscall.Getppid()
+	syscall.Kill(ppid, syscall.SIGUSR1)
+        verbosef("Done with the config of tcp/ip")
 
+	// Create a channel to listen for termination signals
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+
+	// Run a goroutine to handle shutdown
+	go func() {
+		<-sigChan // Wait for a signal
+		verbosef("Denied domains %s", deniedDomainMap)
+		os.Exit(0)
+	}()
+
+	select {}
 }
-
 
 //export MiniTapUserTCPIP
 func MiniTapUserTCPIP() C.int {
-  res, err := RunNetwork()
-  if err != nil {
-    fmt.Println("RunNetwork error:", err)
-    return -1;
-  }
-  return C.int(res);
+	res, err := RunNetwork()
+	if err != nil {
+		fmt.Println("RunNetwork error:", err)
+		return -1
+	}
+	return C.int(res)
 }
-
-
 
 func ParseArg(args []string) {
-    var firewall_rules string
+	var firewall_rules string
 
-    if len(args) > 1 {
-        argPath := args[1]
-        if fileExists(argPath) {
-            firewall_rules = argPath
-        }
-    }
-    if firewall_rules == "" && fileExists("/tmp/firewall.rules") {
-        firewall_rules = "/tmp/firewall.rules"
-    }
+	if len(args) > 1 {
+		argPath := args[1]
+		if fileExists(argPath) {
+			firewall_rules = argPath
+		}
+	}
+	if firewall_rules == "" && fileExists("/tmp/firewall.rules") {
+		firewall_rules = "/tmp/firewall.rules"
+	}
 
-    if firewall_rules == "" {
-        fmt.Println("No valid firewall rules file found.")
-        return
-    }
+	if firewall_rules == "" {
+		fmt.Println("No valid firewall rules file found.")
+		return
+	}
 
-    ReadFirewallRules(firewall_rules)
+	ReadFirewallRules(firewall_rules)
 }
-
 
 func main() {
 	log.SetOutput(os.Stdout)
 	log.SetFlags(0)
-        ParseArg(os.Args)
+	ParseArg(os.Args)
 	_, err := RunNetwork()
 	if err != nil {
 		// if we exit due to a subprocess returning with non-zero exit code then do not

@@ -4,6 +4,8 @@
 ## SPDX-License-Identifier: MIT
 ##
 
+set -x
+
 SCRIPT_PATH="$(realpath "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
 PARENT_FOLDER="$(dirname "$SCRIPT_DIR")"

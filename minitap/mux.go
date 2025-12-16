@@ -6,7 +6,6 @@ import (
 	"sync"
 )
 
-// match a listen pattern to an address string of the form HOST:PORT
 func patternMatches(pattern string, addr net.Addr) bool {
 	if pattern == "*" {
 		return true
@@ -46,30 +45,6 @@ type udpHandlerFunc func(net.Conn)
 type udpMuxEntry struct {
 	handler udpHandlerFunc
 	pattern string
-}
-
-// ListenTCP returns a net.Listener that intercepts connections according to a filter pattern.
-//
-// Pattern can a hostname, a :port, a hostname:port, or "*" for everything". For example:
-//   - "example.com"
-//   - "example.com:80"
-//   - ":80"
-//   - "*"
-//
-// Later this will be like net.ListenTCP
-func (s *mux) ListenTCP(pattern string) net.Listener {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	listener := tcpListener{pattern: pattern, connections: make(chan net.Conn, 64)}
-	s.HandleTCPRequest(pattern, func(r TCPRequest) {
-		conn, err := r.Accept()
-		if err != nil {
-			return
-		}
-		listener.connections <- conn
-	})
-	return &listener
 }
 
 // HandleTCP register a handler to be called each time a new connection is intercepted matching the
@@ -131,7 +106,8 @@ func (s *mux) notifyTCP(req TCPRequest) {
 	defer s.mu.Unlock()
 
 	for _, entry := range s.tcpHandlers {
-		if patternMatches(entry.pattern, req.LocalAddr()) {
+		verbosef(" listening for tcp to %v", req.LocalAddr())
+		if patternMatches(entry.pattern, req.LocalAddr()) &&  firewallConnection(req.LocalAddr()) {
 			go entry.handler(req)
 			return
 		}
@@ -147,47 +123,11 @@ func (s *mux) notifyUDP(conn net.Conn) {
 	defer s.mu.Unlock()
 
 	for _, entry := range s.udpHandlers {
-		if patternMatches(entry.pattern, conn.LocalAddr()) {
+		if patternMatches(entry.pattern, conn.LocalAddr()) &&  firewallConnection(conn.LocalAddr()) {
 			go entry.handler(conn)
 			return
 		}
 	}
 
 	verbosef("nobody listening for udp to %v, dropping!", conn.LocalAddr())
-}
-
-// udpResponder is the interface for writing back UDP packets
-type udpResponder interface {
-	// write a UDP packet back to the subprocess
-	Write(payload []byte) (n int, err error)
-}
-
-// tcpListener implements net.Listener for connections dispatched by a mux
-type tcpListener struct {
-	pattern     string
-	connections chan net.Conn
-}
-
-// Accept accepts an intercepted connection. This implements net.Listener.Accept
-func (l *tcpListener) Accept() (net.Conn, error) {
-	stream := <-l.connections
-	if stream == nil {
-		// this means the channel is closed, which means the tcpStack was shut down
-		return nil, net.ErrClosed
-	}
-	return stream, nil
-}
-
-// for net.Listener interface
-func (l *tcpListener) Close() error {
-	// TODO: unregister from the stack, then close(l.connections)
-	verbose("tcpListener.Close() not implemented, ignoring")
-	return nil
-}
-
-// for net.Listener interface, returns our side of the connection
-func (l *tcpListener) Addr() net.Addr {
-	verbose("tcpListener.Addr() was called, returning bogus address 0.0.0.0:0")
-	// in truth we do not have a real address -- we listen for anything going anywhere
-	return &net.TCPAddr{IP: net.IPv4(0, 0, 0, 0), Port: 0}
 }

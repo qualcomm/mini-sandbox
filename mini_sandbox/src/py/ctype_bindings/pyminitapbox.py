@@ -49,10 +49,17 @@ def mini_sandbox_setup_custom(overlayfs_dir, sandbox_root):
        return -1
     return lib.mini_sandbox_setup_custom(overlayfs_dir.encode(), sandbox_root.encode())
 
-def mini_sandbox_mount_parents_write():
+def mini_sandbox_mount_parents_write(num_of_parents = -1):
     if lib is None:
         return -1
-    return lib.mini_sandbox_mount_parents_write()
+    if num_of_parents == -1:
+        return lib.mini_sandbox_mount_parents_write()
+    if num_of_parents > 0:
+        upper_lvls = "".join("../" for i in range(num_of_parents))
+        parent = os.path.abspath(upper_lvls)
+        if parent is not None:
+            return lib.mini_sandbox_mount_write(parent.encode())
+    return -1
 
 def mini_sandbox_setup_hermetic(sandbox_root):
     if lib is None:

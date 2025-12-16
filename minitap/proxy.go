@@ -3,7 +3,6 @@ package main
 import (
 	"io"
 	"net"
-        "fmt"
 )
 
 // proxyConn proxies data received on one TCP connection to the world, and back the other way.
@@ -16,33 +15,40 @@ func proxyConn(network, addr string, subprocess net.Conn) {
 		subprocess.Close()
 		return
 	}
-	
-	go proxyBytes(subprocess, world, 0)
-	go proxyBytes(world, subprocess, 1)
+
+	verbosef(
+		"subprocess type=%T local=%s remote=%s\n",
+		subprocess,
+		subprocess.LocalAddr(),
+		subprocess.RemoteAddr(),
+	)
+
+	go proxyBytes(subprocess, world)
+	go proxyBytes(world, subprocess)
 }
 
 // proxyBytes copies data between the world and the subprocess
-func proxyBytes(w io.Writer, r io.Reader, p int) {
-
+func proxyBytes(w io.Writer, r io.Reader) {
 
 	buf := make([]byte, 1<<20)
 	for {
 		n, err := r.Read(buf)
 		if err == io.EOF {
-			// how to indicate to outside world that we're done?
 			return
 		}
 		if err != nil {
-			// how to indicate to outside world that the read failed?
-			errorf("error reading in proxyBytes: %v, abandoning", err)
-                        fmt.Println(p)
+			//Usually we end up in this branch if the process is killed before we complete the write (e.g. wget smth | head -n1)
+			//We don't want to print the error verbosely so we use verbosef
+			verbosef("error reading in proxyBytes: %v, abandoning", err)
 			return
 		}
 
 		// send packet to channel, drop on failure
 		_, err = w.Write(buf[:n])
 		if err != nil {
-			errorf("error writing in proxyBytes: %v, dropping %d bytes", err, n)
+			//Usually we end up in this branch if the process is killed before we complete the write (e.g. wget smth | head -n1)
+			//We don't want to print the error verbosely so we use verbosef
+			verbosef("error writing in proxyBytes: %s, dropping %d bytes", err, n)
 		}
 	}
 }

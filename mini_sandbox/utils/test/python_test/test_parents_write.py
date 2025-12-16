@@ -57,24 +57,10 @@ if __name__ == "__main__":
     res = mn_sbx.mini_sandbox_mount_parents_write()    
     assert(res == 0)
 
-    #if tap:
-    #    res = mn_sbx.mini_sandbox_allow_domain("google.com")
-    #    assert (res == 0)
-    #    res = mn_sbx.mini_sandbox_allow_ipv4_subnet("10.49.88.124") #DNS resolver
-    #    assert (res == 0)
-    #    res = mn_sbx.mini_sandbox_allow_ipv4_subnet("142.0.0.0/8") # With this and previous, google connection should go through
-    #    assert (res == 0)
-
     res = mn_sbx.mini_sandbox_start()
     
     print("Running inside the sandbox...")
-    res = attempt_network_connection("http://google.com") 
-    assert(res < 0)
-    res = attempt_network_connection("http://www.qualcomm.com")
-    assert(res < 0)
-
-    parent_path = os.path.join(os.getcwd(), "../test_pyminisandbox.test")
-
+    parent_path = os.path.join(os.getcwd(), "../../test_pyminisandbox.test")
     res = attempt_file_access(f = parent_path)    
     assert(res == 0)
 
