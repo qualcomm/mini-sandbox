@@ -60,7 +60,7 @@ if __name__ == "__main__":
     res = mn_sbx.mini_sandbox_start()
     
     print("Running inside the sandbox...")
-    parent_path = os.path.join(os.getcwd(), "../test_pyminisandbox.test")
+    parent_path = os.path.join(os.getcwd(), "../../test_pyminisandbox.test")
     res = attempt_file_access(f = parent_path)    
     assert(res == 0)
 
