@@ -106,6 +106,7 @@ void Cleanup();
 
 int MiniSbxSetInternalEnv();
 int MiniSbxGetInternalEnv();
+std::string GetFirstFolder(const std::string& path);
 
 
 

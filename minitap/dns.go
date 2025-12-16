@@ -1,17 +1,18 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
 	"net"
-	"sync"
-        "os"
-        "bufio"
-        "strings"
-        
+	"os"
+	"strings"
+
 	"github.com/miekg/dns"
 )
+
+var domainMap = make(map[string][]string)
 
 // dnsCall is a summary of a dns request/response exposed to the application level observers
 type dnsCall struct {
@@ -48,35 +49,6 @@ func (p dnsPairA) Answers() []string {
 	return answers
 }
 
-// dnsWatcher receives information about each intercepted DNS query, and the response provided
-type dnsWatcher func(*dnsCall)
-
-// the listeners waiting for HTTPCalls
-var dnsWatchers []dnsWatcher
-
-// the mutex that protects the above slice
-var dnsMu sync.Mutex
-
-// add a watcher that will called for each DNS request/response
-func watchDNS(w dnsWatcher) {
-	dnsMu.Lock()
-	defer dnsMu.Unlock()
-
-	dnsWatchers = append(dnsWatchers, w)
-}
-
-// call each DNS watcher
-func notifyDNSWatchers(call *dnsCall) {
-	dnsMu.Lock()
-	defer dnsMu.Unlock()
-
-	verbosef("notifying DNS watchers (%d query/response pairs)", len(call.queries))
-
-	for _, w := range dnsWatchers {
-		w(call)
-	}
-}
-
 // handle a DNS query payload here is the application-level UDP payload
 func handleDNS(ctx context.Context, w io.Writer, payload []byte) {
 	var req dns.Msg
@@ -90,6 +62,7 @@ func handleDNS(ctx context.Context, w io.Writer, payload []byte) {
 		errorf("ignoring a dns query with non-query opcode (%v)", req.Opcode)
 		return
 	}
+	verbosef("DNS query  sending a response with empty answer %s", req)
 
 	// resolve the query
 	rrs, err := handleDNSQuery(ctx, &req)
@@ -299,64 +272,56 @@ func dnsTypeCode(t uint16) string {
 	}
 }
 
-// TCP connections to this hostname will be routed to localhost on the host network
-const specialHostName = "host.httptap.local"
-
-// TCP connections to this IP address will be routed to localhost on the host network
-const specialHostIP = "169.254.77.65"
-
-// this map contains hardcoded DNS names
-var specialAddresses = map[string]net.IP{
-	specialHostName + ".": {169, 254, 77, 65},
-}
-
 var upstreamDNS string
 
-
 func ReadFirstDNSServerWithPort() (string, error) {
-    file, err := os.Open("/etc/resolv.conf")
-    if err != nil {
-        return "", fmt.Errorf("failed to open /etc/resolv.conf: %w", err)
-    }
-    defer file.Close()
+	file, err := os.Open("/etc/resolv.conf")
+	if err != nil {
+		return "", fmt.Errorf("failed to open /etc/resolv.conf: %w", err)
+	}
+	defer file.Close()
 
-    scanner := bufio.NewScanner(file)
-    for scanner.Scan() {
-        line := scanner.Text()
-        if strings.HasPrefix(line, "nameserver") {
-            fields := strings.Fields(line)
-            if len(fields) >= 2 {
-                return fields[1] + ":53", nil
-            }
-        }
-    }
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "nameserver") {
+			fields := strings.Fields(line)
+			if len(fields) >= 2 {
+				return fields[1] + ":53", nil
+			}
+		}
+	}
 
-    if err := scanner.Err(); err != nil {
-        return "", fmt.Errorf("error reading /etc/resolv.conf: %w", err)
-    }
+	if err := scanner.Err(); err != nil {
+		return "", fmt.Errorf("error reading /etc/resolv.conf: %w", err)
+	}
 
-    return "", fmt.Errorf("no nameserver found in /etc/resolv.conf")
+	return "", fmt.Errorf("no nameserver found in /etc/resolv.conf")
 }
 
+func setUpstreamDNS() {
+	if upstreamDNS == "" {
+		dns, err := ReadFirstDNSServerWithPort()
+		if err != nil {
+			fmt.Println("Warning: could not read DNS from resolv.conf, using default.")
+			upstreamDNS = "8.8.8.8:53"
+		} else {
+			upstreamDNS = dns
+		}
+		verbosef("Using %s as DNS", upstreamDNS)
+		if host, _, err := net.SplitHostPort(upstreamDNS); err == nil {
+			allowedIps[host] = 1
+		}
+	}
+}
 
 // handleDNSQuery answers DNS queries according to:
 //
 //	net.DefaultResolver if the DNS request is A or AAAA
 //	cloudflare DNS for other DNS requests
 //
-// It always returns the special IP 169.254.77.65 for the special name host.httptap.local.
-// Traffic sent to this address is routed to the loopback interface on the host (different
-// from the loopback device seen by the subprocess)
+
 func handleDNSQuery(ctx context.Context, req *dns.Msg) ([]dns.RR, error) {
-        if upstreamDNS  == "" {          
-          dns, err := ReadFirstDNSServerWithPort()
-          if err != nil {
-              fmt.Println("Warning: could not read DNS from resolv.conf, using default.")
-              upstreamDNS = "8.8.8.8:53"
-          } else {
-              upstreamDNS = dns
-          }
-        }
 
 	if len(req.Question) == 0 {
 		return nil, nil // this means no answer, no error, which is fine
@@ -369,21 +334,18 @@ func handleDNSQuery(ctx context.Context, req *dns.Msg) ([]dns.RR, error) {
 	// the DNS call will be sent to watchers later
 	var call dnsCall
 
-
 	// handle the request ourselves
 	switch question.Qtype {
 	case dns.TypeA:
 		var ips []net.IP
-		if ip, ok := specialAddresses[question.Name]; ok {
-			ips = append(ips, ip)
-		} else {
-			var err error
-			ips, err = net.DefaultResolver.LookupIP(ctx, "ip4", question.Name)
-			if err != nil {
-				return nil, fmt.Errorf("for an A record the default resolver said: %w", err)
-			}
+		var err error
+		if !firewallDns(question.Name) {
+			return nil, fmt.Errorf("Request denied")
 		}
-
+		ips, err = net.DefaultResolver.LookupIP(ctx, "ip4", question.Name)
+		if err != nil {
+			return nil, fmt.Errorf("for an A record the default resolver said: %w", err)
+		}
 		call.queries = append(call.queries, dnsPairA{
 			typ:     dns.TypeA,
 			query:   question.Name,
@@ -400,57 +362,9 @@ func handleDNSQuery(ctx context.Context, req *dns.Msg) ([]dns.RR, error) {
 			}
 			rrs = append(rrs, rr)
 		}
-
-		// notify DNS watchers of the request/response pairs
-		notifyDNSWatchers(&call)
-
-		return rrs, nil
-
-	case dns.TypeAAAA:
-		ips, err := net.DefaultResolver.LookupIP(ctx, "ip6", question.Name)
-		if err != nil {
-			return nil, fmt.Errorf("for an AAAA record the default resolver said (AAAA record): %w", err)
-		}
-
-		call.queries = append(call.queries, dnsPairA{
-			typ:     dns.TypeAAAA,
-			query:   question.Name,
-			answers: ips,
-		})
-
-		verbosef("resolved %v to %v with default resolver", question.Name, ips)
-
-		var rrs []dns.RR
-		for _, ip := range ips {
-			rr, err := dns.NewRR(fmt.Sprintf("%s AAAA %s", question.Name, ip))
-			if err != nil {
-				return nil, fmt.Errorf("error constructing rr: %w", err)
-			}
-			rrs = append(rrs, rr)
-		}
-
-		// notify DNS watchers of the request/response pairs
-		notifyDNSWatchers(&call)
+		updateFirewall(question.Name, ips)
 
 		return rrs, nil
 	}
-
-	verbosef("proxying %s request to upstream DNS server...", questionType)
-
-	// proxy the request to another server
-	request := new(dns.Msg)
-	req.CopyTo(request)
-	request.Question = []dns.Question{question}
-
-	dnsClient := new(dns.Client)
-	dnsClient.Net = "udp"
-	response, _, err := dnsClient.Exchange(request, upstreamDNS)
-	if err != nil {
-		return nil, fmt.Errorf("error in DNS message exchange: %w", err)
-	}
-
-	verbosef("got answer from upstream dns server with %d answers", len(response.Answer))
-
-	// note that we might have 0 answers here: this means there were no records for the query, which is not an error
-	return response.Answer, nil
+	return nil, fmt.Errorf("Not an A request")
 }

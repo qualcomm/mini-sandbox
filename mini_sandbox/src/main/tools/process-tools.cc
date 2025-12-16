@@ -479,3 +479,16 @@ int MiniSbxGetInternalEnv() {
   } 
   return -1;
 }
+
+std::string GetFirstFolder(const std::string& path) {
+    if (path.empty() || path[0] != '/' || path == "/") {
+        return "";
+    }
+
+    std::size_t secondSlash = path.find('/', 1);
+    if (secondSlash != std::string::npos) {
+        return path.substr(0, secondSlash);
+    } else {
+        return path;
+    }
+}

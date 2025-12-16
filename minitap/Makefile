@@ -11,4 +11,4 @@ test-unshare: default
 test: test-unshare
 
 clean: 
-	rm out/*
+	rm -rf out/*

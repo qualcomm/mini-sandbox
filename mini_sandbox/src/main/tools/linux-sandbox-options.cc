@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -545,23 +544,14 @@ int MiniSbxAllowAllDomains() {
 int MiniSbxAllowDomain(const std::string& domain) {
   const char* domain_str = domain.c_str();
   PRINT_DEBUG("allow domain %s", domain_str);
-
-  struct hostent *host = gethostbyname(domain_str);
-  if (host == NULL)
-    return -1;
-  char *ip_address = inet_ntoa(*(struct in_addr *)host->h_addr_list[0]);
-  return MiniSbxAllowIpv4(std::string(ip_address));
+  set_firewall_rule(domain_str, &(opt.fw_rules));
+  return 0;
 }
 
 int MiniSbxAllowIpv4(const std::string& ip) {
   const char* ip_str = ip.c_str();
   PRINT_DEBUG("allow ip %s", ip_str);
-  if (strlen(ip_str) > MAX_IP_LEN)
-    return -1;
-  char* ip_rule = format_rule_from_ipv4(ip_str);
-
-  set_firewall_rule(ip_rule, &(opt.fw_rules));
-  free(ip_rule);
+  set_firewall_rule(ip_str, &(opt.fw_rules));
   return 0;
 }
 

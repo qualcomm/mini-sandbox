@@ -8,8 +8,7 @@ SCRIPT_PATH="$(realpath "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
 IP_RULES="$SCRIPT_DIR/ip.list"
 
-cat "/etc/resolv.conf" | grep -e "nameserver\ [0-9]*" | awk '{print $2}' >> $IP_RULES
-
+#cat "/etc/resolv.conf" | grep -e "nameserver\ [0-9]*" | awk '{print $2}' >> $IP_RULES
 echo "Using following IP rules"
 cat $IP_RULES
 
@@ -67,7 +66,7 @@ count=$(ls $PWD/../ | wc -l)
 check_ls_count $count 1
 
 echo -e "\nTest showing the network is available"
-ping -c 1 8.8.8.8 
+wget www.google.com -T 1
 check_last_command
 
 echo -e "\nTest showing the network is unavailable"
