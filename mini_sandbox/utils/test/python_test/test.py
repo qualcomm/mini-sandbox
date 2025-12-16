@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: MIT
 #
 
+
 import requests
 import sys
 import os
@@ -62,13 +63,10 @@ if __name__ == "__main__":
     assert (res == 0)
 
     if tap:
-        # rules_path = os.path.join(script_dir, "../../utils/firewall_example_rules/rules.bak")
 
-        res = mn_sbx.mini_sandbox_allow_domain("google.com")
+        res = mn_sbx.mini_sandbox_allow_domain("www.google.com")
         assert (res == 0)
         res = mn_sbx.mini_sandbox_allow_ipv4_subnet("10.49.88.124") #DNS resolver
-        assert (res == 0)
-        res = mn_sbx.mini_sandbox_allow_ipv4_subnet("8.8.8.8") #DNS resolver
         assert (res == 0)
         res = mn_sbx.mini_sandbox_allow_ipv4_subnet("142.0.0.0/8") # With this and previous, google connection should go through
         assert (res == 0)
@@ -80,7 +78,7 @@ if __name__ == "__main__":
     assert (res == 0)
     
     print("Running inside the sandbox...")
-    res = attempt_network_connection("http://google.com") 
+    res = attempt_network_connection("http://www.google.com") 
     if tap:
         assert (res == 0)
     else:

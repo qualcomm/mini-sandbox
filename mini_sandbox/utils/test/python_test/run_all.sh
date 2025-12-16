@@ -1,8 +1,11 @@
 #!/bin/bash
+
 ##
 ## Copyright (c) 2025 Qualcomm Technologies, Inc. and/or its subsidiaries.
 ## SPDX-License-Identifier: MIT
 ##
+
+set -ex
 
 SCRIPT_PATH="$(realpath "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
@@ -53,23 +56,23 @@ else
 fi
 
 check_exit $PYTHON test_all_api.py
-#check_exit $PYTHON test_all_api.py tap
+check_exit $PYTHON test_all_api.py tap
 
 check_exit $PYTHON test_err.py
 
 check_exit $PYTHON test_parents_write.py
-ls "$SCRIPT_DIR/../test_pyminisandbox.test"
+ls "$SCRIPT_DIR/../../test_pyminisandbox.test"
 check_last_command
-rm "$SCRIPT_DIR/../test_pyminisandbox.test"
+rm "$SCRIPT_DIR/../../test_pyminisandbox.test"
 
 check_exit $PYTHON test.py
 ls "$SCRIPT_DIR/../pyminisandbox-test-default.test"
 check_last_command
 rm "$SCRIPT_DIR/../pyminisandbox-test-default.test"
 
-#check_exit $PYTHON test.py tap
-#ls "$SCRIPT_DIR/../pyminisandbox-test-default.test"
-#check_last_command
+check_exit $PYTHON test.py tap
+ls "$SCRIPT_DIR/../pyminisandbox-test-default.test"
+check_last_command
 rm "$SCRIPT_DIR/../pyminisandbox-test-default.test"
 
 cd $ORIGINAL_DIR
