@@ -2,6 +2,7 @@
  * Copyright (c) 2025 Qualcomm Technologies, Inc. and/or its subsidiaries.
  * SPDX-License-Identifier: MIT
  */
+
 // This header contains the APIs for C++ only and thus we can 
 // use std::string and iostream
 

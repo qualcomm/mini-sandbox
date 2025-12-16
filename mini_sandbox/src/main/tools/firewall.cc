@@ -64,20 +64,7 @@ static FirewallTool which_nft_firewall() {
 
 
 int set_firewall_rule(const char *rule, FirewallRules *fw_rules) {
-  FirewallTool tool = which_nft_firewall();
-  if (tool == NONE)
-      return ERR_FILE_NOT_FOUND;
   size_t rule_len = strlen(rule);
-  if (rule_len >= MAX_RULE_LENGTH)
-    return RULE_LEN_OVERFLOW;
-  if (fw_rules->count >= MAX_RULES)
-    return RULES_OVERFLOW;
-  if (fw_rules->count == 0 && tool == IPTABLES_NFT) {
-    // we add the DENY_ALL rule only if we're using iptables-nft . For nft
-    // we just have the `policy drop` rule in the template
-    memcpy(fw_rules->rules[fw_rules->count], DENY_ALL, sizeof(DENY_ALL));
-    fw_rules->count++;
-  }
   memcpy(fw_rules->rules[fw_rules->count], rule, rule_len);
   fw_rules->count++;
 

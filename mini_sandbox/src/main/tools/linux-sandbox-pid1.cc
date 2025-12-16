@@ -137,6 +137,7 @@ static int global_child_pid __attribute__((unused));
 extern DockerMode docker_mode;
 std::string home_dir;
 std::set<std::string> ReadOnlyPaths;
+std::set<std::string> AutoFSRoots;
 
 void MountAllOverlayFs(std::vector<std::string> list_of_dirs, int depth);
 void MountOverlayFs(std::string lowerdir, int depth);
@@ -145,8 +146,6 @@ bool isSubpath(const fs::path &base, const fs::path &sub);
 bool alreadyMounted(const char *str, std::vector<std::string> overlay_dirs);
 
 static bool isDevPath(const char *str) { return std::strcmp(str, "/dev") == 0; }
-static bool isSysPath(const char *str) { return std::strcmp(str, "/sys") == 0; }
-static bool isRunPath(const char *str) { return std::strcmp(str, "/run") == 0; }
 
 
 bool isXFS(const std::string &path) {
@@ -438,7 +437,7 @@ void MountOverlayFs(std::string lowerdir, int depth) {
   CreateTarget(destinationdir.c_str(), true);
 
   std::string data = "lowerdir=" + lowerdir + ",upperdir=" + upperdir +
-                     ",workdir=" + workingdir;
+                     ",workdir=" + workingdir ;
   PRINT_DEBUG("mount(\"overlay\", %s, overlay, MS_MGC_VAL, %s",
               destinationdir.c_str(), data.c_str());
   int error = mount("overlay", destinationdir.c_str(), "overlay", MS_MGC_VAL,
@@ -656,10 +655,10 @@ static void MakeFilesystemPartiallyReadOnly(bool need_mount, std::vector<std::st
 
     std::string mnt_dir(ent->mnt_dir);
     if (need_mount) {
-      if (alreadyMounted(ent->mnt_dir, overlay_dirs)) {
-        PRINT_DEBUG("YES already mounted (or soon to be mounted)\n");
+      bool has_been_mounted = alreadyMounted(ent->mnt_dir, overlay_dirs);
+      PRINT_DEBUG("already mounted -> %d\n", has_been_mounted);
+      if (has_been_mounted)
         continue;
-      }
     }
 
     const std::string full_sandbox_path( opt.sandbox_root + std::string(ent->mnt_dir));
@@ -692,8 +691,13 @@ static void MakeFilesystemPartiallyReadOnly(bool need_mount, std::vector<std::st
     if (need_mount) {
 
       std::string type(ent->mnt_type);
-      if (type.compare("autofs") == 0 || type.compare("nfs") == 0)
+      if (type.compare("autofs") == 0 || type.compare("nfs") == 0) {
+        std::string base = GetFirstFolder(ent->mnt_dir);
+        PRINT_DEBUG("%s mounted in autofs/nfs. Deferring mount of %s\n", ent->mnt_dir, base.c_str());
+        if (base != "")
+          AutoFSRoots.insert(base);
         continue;
+      }
 
       bool IsDirectory = true;
       if (CreateTarget(full_sandbox_path.c_str(), IsDirectory) < 0) { 
@@ -1051,6 +1055,9 @@ static int RemountRO(const std::string &path,
 
 
 static void MountAndRemountRO(const std::string& full_sandbox_path, const std::string& item) {
+
+  PRINT_DEBUG("%s mount: %s -> %s\n", __func__, item.c_str(),   
+              full_sandbox_path.c_str());
   struct stat sb;
   if (stat(item.c_str(), &sb) < 0)
     DIE("stat");
@@ -1079,9 +1086,16 @@ static void MountReadOnly(const Container& container) {
   
     if (fs::exists(full_sandbox_path)) {
       const char* item_str = item.c_str();
-      if (isDevPath(item_str) || isRunPath(item_str) || isSysPath(item_str)) 
-          continue;
-      PRINT_DEBUG("%s already exists (%s). Mounting again\n", full_sandbox_path.c_str(), item.c_str());      
+
+      std::string first_folder = GetFirstFolder(item);
+      if (! ( AutoFSRoots.find(first_folder) != AutoFSRoots.end())) {
+        PRINT_DEBUG("%s already exists (%s). Not mounting again\n", full_sandbox_path.c_str(), item_str);      
+        continue;
+      }
+      else {
+        PRINT_DEBUG("%s already exists (%s) But mounting again cause in the AutoFSRoots\n", full_sandbox_path.c_str(), 
+                        item_str); 
+      }
     }
     MountAndRemountRO(full_sandbox_path, item);
   }
@@ -1194,14 +1208,13 @@ void MountAllOverlayFs(std::vector<std::string> list_of_dirs, int depth) {
       PRINT_DEBUG("Caught filesystem error when MountOverlayFS \n");
       std::string msg = e.what();
       PRINT_DEBUG("%s", msg.c_str());
-      break;
     }
   }
 }
 
 std::vector<std::string> GenerateListForOverlayFS() {
   std::vector<std::string> paths = {"/boot",   "/etc",  "/lib", "/usr",
-                                    "/lib64", "/mnt",    "/root", "/sbin",
+                                    "/lib64", "/mnt", "/sbin",
                                     "/srv",   "/bin",    "/cm",   "/emul",
                                     "/lib32", "/libx32",  "/dev/shm"};
 
@@ -1354,8 +1367,9 @@ static void MountWorkingDirMountPoint(const std::string& mount_point) {
   }
 
   int res = 0;
-  if ( mount_point != "/" && !isSubpath(mount_point, home_dir))
-    res = MiniSbxMountOverlay(mount_point);
+
+  //if ( mount_point != "/" && !isSubpath(mount_point, home_dir))
+  //  res = MiniSbxMountOverlay(mount_point);
 
   if (opt.parents_writable)
     res += MiniSbxMountWrite(top_level);

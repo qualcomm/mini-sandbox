@@ -30,7 +30,6 @@ def attempt_network_connection(domain):
         print("The request timed out after 3 seconds")
         res = -1
     except Exception as e: 
-        print("Connection failed as expected !")
         print(e)
         res = -2
     return res
@@ -53,9 +52,6 @@ if __name__ == "__main__":
     
     res = mn_sbx.mini_sandbox_setup_default()
     assert(res == 0)
-    # Not testing cause other tests will use this
-    #res = mn_sbx.mini_sandbox_mount_write("/usr2")
-    #assert(res == 0)
     res = mn_sbx.mini_sandbox_enable_log("/tmp/log-pyminisandbox")
     assert(res == 0)
     res = mn_sbx.mini_sandbox_mount_bind("/bin")
@@ -68,23 +64,18 @@ if __name__ == "__main__":
         res = mn_sbx.mini_sandbox_share_network()
         assert(res == 0)
     else:
-        res = mn_sbx.mini_sandbox_allow_domain("google.com")
+        res = mn_sbx.mini_sandbox_allow_domain("www.google.com")
         assert (res == 0)
         res = mn_sbx.mini_sandbox_allow_ipv4_subnet("10.49.88.124") #DNS resolver
         assert (res == 0)
-        res = mn_sbx.mini_sandbox_allow_ipv4("8.8.8.8")
-        assert (res == 0)
         res = mn_sbx.mini_sandbox_allow_ipv4_subnet("142.0.0.0/8") # With this and previous, google connection should go through
         assert (res == 0)
-
-
-        # mn_sbx.mini_sandbox_allow_all_domains() # With this all the connection should go through
 
     res = mn_sbx.mini_sandbox_start()
     assert (res == 0)
     
     print("Running inside the sandbox...")
-    res = attempt_network_connection("http://google.com") 
+    res = attempt_network_connection("http://www.google.com") 
     assert (res == 0)
     res = attempt_network_connection("http://www.qualcomm.com")
     if tap:
