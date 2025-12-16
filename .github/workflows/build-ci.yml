@@ -75,3 +75,29 @@ jobs:
             -e VERSION="${TAG}" \
             -v "$PWD/dist:/rel" \
             mini-sandbox:"${TAG}" 
+
+
+      - name: Inspect dist contents (debug)
+        run: |
+          echo "Dist contents after first run:"
+          ls -la dist || true
+
+      - name: Build Ubuntu 24 image using dist as input
+        run: |
+          # Ensure dist is included in build context (and not .dockerignored)
+          test -d dist || (echo "dist/ missing" && exit 1)
+
+          docker build \
+            -f mini_sandbox/utils/mini_sandbox_docker/Dockerfile.ubuntu24 \
+            --build-arg V=dist \
+            -t mini-sandbox-ubuntu24:"${TAG}" \
+            .
+
+      - name: Run second container (tests)
+        run: |
+          # Add --privileged if your tests require iptables or nested container ops
+          docker run --rm --privileged \
+            --security-opt seccomp=unconfined \
+            --security-opt apparmor=unconfined \
+            mini-sandbox-ubuntu24:"${TAG}"
+

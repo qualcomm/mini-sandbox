@@ -1,0 +1,49 @@
+
+FROM ubuntu:24.04
+
+
+RUN apt-get update && \
+    apt-get install -y \
+        xfsprogs \
+        sudo \
+        wget \
+        vim \
+        make \
+        clang \
+        gcc \
+        g++ \
+        binutils \
+        libc6-dev \
+        which \
+        iptables \
+        python3 \
+        python3-pip \
+	python3-requests && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+
+#pip install --no-cache-dir requests && \
+
+WORKDIR /app
+RUN mkdir /app/mini-sandbox
+ARG V=dist
+COPY ${V}/ /app/
+
+COPY ./ /app/mini-sandbox
+
+RUN /app/mini-sandbox/clean.sh
+
+ENV MINI_SANDBOX_DOCKER_PRIVILEGED=1
+ENV PATH="/app/release/bin:$PATH"
+ENV LD_LIBRARY_PATH="/app/release/lib"
+ENV PYTHON=python3
+ENV PYTHONPATH="/app/release/python/"
+ENV PACKAGE_DIR="/app/release"
+ENV LDFLAGS="-lstdc++fs"
+ENV WORKSPACE="/app/mini-sandbox"
+
+
+ENTRYPOINT ["sh", "-c", "set -e && /app/mini-sandbox/mini_sandbox/utils/test/test_all.sh"]
+#ENTRYPOINT ["sh", "-c", "cd /app && /bin/bash"]
+
+
