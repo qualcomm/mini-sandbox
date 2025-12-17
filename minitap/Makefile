@@ -6,7 +6,8 @@ bin:
 
 test-unshare: default
 	gcc test/unshare-bash.c test/utils.c -Itest/ -o test/unshare.bin
-	test/unshare.bin wget google.com
+	echo "www.google.com" > /tmp/firewall.rules
+	test/unshare.bin wget www.google.com
 
 test: test-unshare
 
