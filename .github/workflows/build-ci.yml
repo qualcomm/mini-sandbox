@@ -112,7 +112,8 @@ jobs:
 
       - name: Run SUSE container
         run: | 
-          docker run -it \
+          docker run --rm --privileged \
+          --security-opt seccomp=unconfined \
+          --security-opt apparmor=unconfined \
           -e HOST_UID=$(id -u) -e HOST_GID=$(id -g) \
-          --privileged \
-          mini-sandbox-suse:"${TAG}" 
+          mini-sandbox-suse:"${TAG}"
