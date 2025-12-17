@@ -1,0 +1,39 @@
+
+FROM opensuse/tumbleweed
+
+RUN zypper --non-interactive ref && \
+    zypper --non-interactive install xfsprogs sudo wget vim make clang \
+    make \
+    clang \
+    gcc \
+    gcc-c++ \
+    binutils \
+    glibc-devel \
+    which \
+    iptables-nft \
+    python3 \
+    python3-pip \
+    python313-requests && \
+    zypper clean -a
+
+#RUN pip install --no-cache-dir requests
+
+WORKDIR /app
+RUN mkdir /app/mini-sandbox
+ARG V=dist
+COPY ${V}/ /app/
+COPY ./ /app/mini-sandbox
+
+RUN /app/mini-sandbox/clean.sh
+ENV MINI_SANDBOX_DOCKER_PRIVILEGED=1
+ENV PATH="/app/release/bin:$PATH"
+ENV LD_LIBRARY_PATH="/app/release/lib"
+ENV PYTHON=python3
+ENV PYTHONPATH="/app/release/python/"
+ENV PACKAGE_DIR="/app/release"
+
+ENTRYPOINT ["/bin/bash","-c","set -e; dd if=/dev/zero of=/xfs.img bs=1M count=500; mkfs.xfs -f -m crc=0 /xfs.img; mkdir -p /mnt/xfs; mount -o loop /xfs.img /mnt/xfs; groupadd -g \"$HOST_GID\" hostgroup || true; useradd -u \"$HOST_UID\" -g \"$HOST_GID\" -m hostuser || true; touch /app/sample_to_read; mkdir -p /mnt/xfs/test/folder/work; chown -R hostuser:hostgroup /mnt/; exec env OTHER_PATH=/mnt/xfs/test:/mnt/xfs/test/folder/work/ /app/mini-sandbox/mini_sandbox/utils/test/test_all.sh"]
+#ENTRYPOINT ["sh", "-c", "/bin/bash"]
+
+
+
