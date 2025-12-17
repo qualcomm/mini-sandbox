@@ -93,11 +93,26 @@ jobs:
             -t mini-sandbox-ubuntu24:"${TAG}" \
             .
 
-      - name: Run second container (tests)
+      - name: Run Ubuntu24 container (tests)
         run: |
-          # Add --privileged if your tests require iptables or nested container ops
           docker run --rm --privileged \
             --security-opt seccomp=unconfined \
             --security-opt apparmor=unconfined \
             mini-sandbox-ubuntu24:"${TAG}"
 
+     - name: Build SUSE container
+       run: |
+          test -d dist || (echo "dist/ missing" && exit 1)
+
+          docker build \
+            -f mini_sandbox/utils/mini_sandbox_docker/Dockerfile.suse \
+            --build-arg V=dist \
+            -t mini-sandbox-suse:"${TAG}" \
+            .
+
+     - name: Run SUSE container
+       run: | 
+          docker run -it \
+          -e HOST_UID=$(id -u) -e HOST_GID=$(id -g) \
+          --privileged \
+          mini-sandbox-suse:"${TAG}" 
