@@ -100,8 +100,8 @@ jobs:
             --security-opt apparmor=unconfined \
             mini-sandbox-ubuntu24:"${TAG}"
 
-     - name: Build SUSE container
-       run: |
+      - name: Build SUSE container
+        run: |
           test -d dist || (echo "dist/ missing" && exit 1)
 
           docker build \
@@ -110,8 +110,8 @@ jobs:
             -t mini-sandbox-suse:"${TAG}" \
             .
 
-     - name: Run SUSE container
-       run: | 
+      - name: Run SUSE container
+        run: | 
           docker run -it \
           -e HOST_UID=$(id -u) -e HOST_GID=$(id -g) \
           --privileged \
