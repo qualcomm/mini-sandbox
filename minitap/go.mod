@@ -1,4 +1,4 @@
-module github.com/monasticacademy/httptap
+module github.com/mini-sandbox
 
 go 1.23.1
 

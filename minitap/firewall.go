@@ -10,6 +10,8 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 	"net"
 	"os"
 	"sync"
@@ -20,6 +22,7 @@ import (
 type FirewallRules struct {
 	Rules []string
 	Count int
+        MaxConnections int
 }
 
 var (
@@ -29,7 +32,6 @@ var (
 
 var allowedIps =make(map[string]int)
 var deniedDomainMap []string
-var maxConnections int = -1
 var connections int = 0
 
 func MiniTapSetupFirewallRule(rule string) {
@@ -37,6 +39,13 @@ func MiniTapSetupFirewallRule(rule string) {
 	defer mu.Unlock()
 	fwRules.Rules = append(fwRules.Rules, rule)
 	fwRules.Count++
+}
+
+func MiniTapSetupMaxConnections(max_connections int) {
+	mu.Lock()
+	defer mu.Unlock()
+        fwRules.MaxConnections = max_connections
+        verbosef("MaxNumberConnections: %d\n", max_connections)
 }
 
 func ReadFirewallRules(firewall_rules string) {
@@ -47,10 +56,21 @@ func ReadFirewallRules(firewall_rules string) {
 	}
 	defer file.Close()
 
+        lineno := 0
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		rule := scanner.Text()
-		MiniTapSetupFirewallRule(rule)
+		line := strings.TrimSpace(scanner.Text())
+                if lineno == 0 {
+			lineno++
+			n, err := strconv.ParseInt(line, 10, 64)
+         		if err != nil {
+                		fmt.Printf("Invalid header (expected signed integer): %q, err: %v\n", line, err)
+                		return
+            		}
+			MiniTapSetupMaxConnections(int(n))
+                } else {
+		      MiniTapSetupFirewallRule(line)
+		}
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -60,7 +80,6 @@ func ReadFirewallRules(firewall_rules string) {
 
 func InitFirewall() {
         // TODO make the argument flow to this point
-        maxConnections = 5 
 	if fwRules.Count == 0 {
 		return
 	}
@@ -131,13 +150,23 @@ func firewallConnection(addr net.Addr) bool {
 		//We ignore connections that are not either TCP or UDP
 		return false
 	}
-        fmt.Println("Inside firewallConnection\n\n")
+
 	if fwRules.Count == 0 {
-		if connections < maxConnections {
-                        verbosef("connection number: %d, remaining: %d\n", connections, maxConnections);
+		// In this case we didn't specify any fw rule and any max connections
+		// we just let the connection go through cause that's what the user wants
+		if fwRules.MaxConnections < 0 {
+			return true;
+		}
+		
+		// In this case we didn't specify any fw rule BUT we have a max number 
+		// of connections allowed. We respect that policy 
+		if connections < fwRules.MaxConnections {
+                        verbosef("connection number: %d, max allowed: %d\n", connections + 1,  fwRules.MaxConnections);
                 	connections ++;
 			return true;
                 }
+
+		// If we end up here we exceeded the number of connections allowed. Block everything else
 		return false;
 	}
 
