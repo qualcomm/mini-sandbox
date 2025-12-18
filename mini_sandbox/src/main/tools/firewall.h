@@ -35,13 +35,15 @@ typedef enum {
     NONE
 } FirewallTool;
 
-typedef struct {
+struct FirewallRules {
     char rules[MAX_RULES][MAX_RULE_LENGTH];
     size_t count;
-} FirewallRules;
+    int max_connections = -1;
+};
 
 int read_firewall_rules(const char* filepath, FirewallRules* fw_rules);
 int set_firewall_rule(const char* rule, FirewallRules* fw_rules);
+int set_max_connections(int max_connections, FirewallRules* fw_rules);
 #ifdef __cplusplus
 extern "C" {
 #endif

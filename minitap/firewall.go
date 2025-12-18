@@ -29,6 +29,8 @@ var (
 
 var allowedIps =make(map[string]int)
 var deniedDomainMap []string
+var maxConnections int = -1
+var connections int = 0
 
 func MiniTapSetupFirewallRule(rule string) {
 	mu.Lock()
@@ -57,6 +59,8 @@ func ReadFirewallRules(firewall_rules string) {
 }
 
 func InitFirewall() {
+        // TODO make the argument flow to this point
+        maxConnections = 5 
 	if fwRules.Count == 0 {
 		return
 	}
@@ -74,6 +78,7 @@ func InitFirewall() {
 		}
 
 	}
+
 	verbosef("AllowedIps: %s,\n", allowedIps)
 	verbosef("DomainMap: %s,\n", domainMap)
 
@@ -125,6 +130,15 @@ func firewallConnection(addr net.Addr) bool {
 	default:
 		//We ignore connections that are not either TCP or UDP
 		return false
+	}
+        fmt.Println("Inside firewallConnection\n\n")
+	if fwRules.Count == 0 {
+		if connections < maxConnections {
+                        verbosef("connection number: %d, remaining: %d\n", connections, maxConnections);
+                	connections ++;
+			return true;
+                }
+		return false;
 	}
 
 	//Fast path,if we hit here, we don't need to query the dns again

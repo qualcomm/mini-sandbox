@@ -68,17 +68,17 @@ int main(int argc, char* argv[]) {
     assert(res == 0);
     res = mini_sandbox_mount_write(getenv("HOME"));
     assert(res == 0);
-
-    // Old style API to set firewall
-    //mini_sandbox_set_firewall_rule("-A OUTPUT -d 142.250.189.14 -j ACCEPT");
-
     // New style API to set firewall
+#ifdef MAX_CONN
+    res = mini_sandbox_allow_max_connections(1);
+#else
     res = mini_sandbox_allow_ipv4("8.8.8.8"); // DNS is always useful :)
     assert(res == 0);
     res = mini_sandbox_allow_ipv4(ALLOWED_IP);
     assert(res == 0);
     res = mini_sandbox_allow_domain(ALLOWED_DOMAIN);
     assert(res == 0);
+#endif
     res = mini_sandbox_start();
     assert(res == 0);
     

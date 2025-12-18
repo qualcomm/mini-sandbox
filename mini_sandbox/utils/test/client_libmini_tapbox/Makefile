@@ -27,15 +27,19 @@ ifeq ($(HAS_FILESYSTEM),no)
         LDFLAGS += -lstdc++fs
 endif
 
-TARGET = client.bin
+TARGET_A = client.bin
 TARGET_SO = client.so.bin
+TARGET_MAX_CONN = client_max_connection.bin
 SRC = client.cc connect_with_timeout.cc
 SO_NAME = mini-tapbox
 
-all: $(TARGET) $(TARGET_SO)
+all: $(TARGET_A) $(TARGET_SO) $(TARGET_MAX_CONN)
 
-$(TARGET): $(SRC)
-	$(CXX) $(FLAGS) $(CXXFLAGS) -I$(MINI) $(SRC) $(LIBS) -o $(TARGET) $(LDFLAGS)
+$(TARGET_MAX_CONN): $(SRC)
+	$(CXX) $(FLAGS) -DMAX_CONN $(CXXFLAGS) -I$(MINI) $(SRC) $(LIBS) -o $(TARGET_MAX_CONN) $(LDFLAGS)
+
+$(TARGET_A): $(SRC)
+	$(CXX) $(FLAGS) $(CXXFLAGS) -I$(MINI) $(SRC) $(LIBS) -o $(TARGET_A) $(LDFLAGS)
 
 $(TARGET_SO): $(SRC)
 	$(CXX) $(FLAGS) $(CXXFLAGS) -I$(MINI) $(SRC) -L$(SO_PATH) -l$(SO_NAME) -o $(TARGET_SO) $(LDFLAGS)

@@ -50,6 +50,7 @@ int mini_sandbox_share_network();
 
 #ifdef MINITAP
 int mini_sandbox_allow_connections(const std::string& path);
+int mini_sandbox_allow_max_connections(int max_connections);
 int mini_sandbox_allow_ipv4(const std::string& ip);
 int mini_sandbox_allow_domain(const std::string& domain);
 int mini_sandbox_allow_all_domains();

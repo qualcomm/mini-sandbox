@@ -119,6 +119,7 @@ int MiniSbxShareNetNamespace() ;
 
 #ifdef MINITAP
 int MiniSbxAllowConnections(const std::string& path);
+int MiniSbxAllowMaxConnections(int max_connections);
 int MiniSbxAllowIpv4(const std::string& ip);
 int MiniSbxAllowDomain(const std::string& domain);
 int MiniSbxAllowAllDomains();

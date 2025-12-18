@@ -49,6 +49,7 @@ int mini_sandbox_share_network();
 
 #ifdef MINITAP
 int mini_sandbox_allow_connections(const char* path);
+int mini_sandbox_allow_max_connections(int max_connections);
 int mini_sandbox_allow_ipv4(const char* ip);
 int mini_sandbox_allow_domain(const char* domain);
 int mini_sandbox_allow_all_domains();
