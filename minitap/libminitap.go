@@ -31,7 +31,7 @@ import (
 
 
 
-var isVerbose bool = true
+var isVerbose bool = false
 
 func fileExists(path string) bool {
 	info, err := os.Stat(path)
