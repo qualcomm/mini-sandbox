@@ -58,7 +58,7 @@ rm -f $HOME/test2
 check_exit $SCRIPT_DIR/client_max_connection.bin
 ls "$HOME/test2"
 check_last_command
-
+rm -f $HOME/test2
 
 # THis is going to use the dynamic linker so if the lib is not installed system-wide
 # You'll have to export LD_LIBRARY_PATH=/path/to/libs/
