@@ -319,7 +319,7 @@ static int ValidateOptions() {
   }
   else {
     for (auto writable_file : opt.writable_files) {
-      if (ValidateOverlayOutOfFolder(opt.tmp_overlayfs, writable_file) < 0)
+      if (opt.use_overlayfs && ValidateOverlayOutOfFolder(opt.tmp_overlayfs, writable_file) < 0)
         return MiniSbxReportError(__func__, ErrorCode::IllegalConfiguration);
     }
   }
