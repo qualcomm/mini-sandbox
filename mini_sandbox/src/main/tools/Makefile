@@ -31,7 +31,9 @@ LIBMINITAP = $(MINITAP_OUT)/libminitap.a
 MINITAP_BIN = $(MINITAP_OUT)/minitap
 
 SRCS = linux-sandbox.cc linux-sandbox-options.cc linux-sandbox-pid1.cc logging.cc process-tools.cc docker_support.cc linux-sandbox-api.cc error_handling.cc
-MINITAP_SRCS = $(SRCS) firewall.cc minitap-interface.cc
+CLI_SRCS = linux-sandbox-main.cc $(SRCS) 
+MINITAP_CLI_SRCS = $(CLI_SRCS) firewall.cc minitap-interface.cc
+MINITAP_LIB_SRCS = $(SRCS) firewall.cc minitap-interface.cc
 
 OUT_DIR = out
 BUILD_mini_sandbox = $(OUT_DIR)/.mini-sandbox
@@ -39,10 +41,10 @@ BUILD_libmini_sandbox = $(OUT_DIR)/.libmini-sandbox
 BUILD_mini_tapbox = $(OUT_DIR)/.mini-tapbox
 BUILD_libmini_tapbox = $(OUT_DIR)/.libmini-tapbox
 
-OBJS_mini_sandbox = $(addprefix $(BUILD_mini_sandbox)/, $(SRCS:.cc=.o))
+OBJS_mini_sandbox = $(addprefix $(BUILD_mini_sandbox)/, $(CLI_SRCS:.cc=.o))
 OBJS_libmini_sandbox = $(addprefix $(BUILD_libmini_sandbox)/, $(SRCS:.cc=.o))
-OBJS_mini_tapbox = $(addprefix $(BUILD_mini_tapbox)/, $(MINITAP_SRCS:.cc=.o))
-OBJS_libmini_tapbox = $(addprefix $(BUILD_libmini_tapbox)/, $(MINITAP_SRCS:.cc=.o))
+OBJS_mini_tapbox = $(addprefix $(BUILD_mini_tapbox)/, $(MINITAP_CLI_SRCS:.cc=.o))
+OBJS_libmini_tapbox = $(addprefix $(BUILD_libmini_tapbox)/, $(MINITAP_LIB_SRCS:.cc=.o))
 
 BIN_mini_sandbox = $(OUT_DIR)/mini-sandbox
 LIB_mini_sandbox = $(OUT_DIR)/libmini-sandbox
