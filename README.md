@@ -28,11 +28,10 @@ If you need to open network connections in your app/package check out the `TAP m
 By leveraging the gVisor framework by Google, we manage to use a tap interface and a TCP/IP network stack to be able to run a firewall inside our sandbox. To have this feature you need to build the `mini-tapbox` binary (see `docs/build.md`). Once the binary has been built usage is straightforward -- just collect the list of IP addresses, domain names, subnets needed for your app into a file and use the -F flag (see example below)
 
 ```bash
-echo "google.com" > /tmp/allowed_ips
-echo "8.8.8.8" >> /tmp/allowed_ips // we wanna have access to the DNS
+echo "www.google.com" > /tmp/allowed_ips
 mini-tapbox -x -F /tmp/allowed_ips -- /bin/bash
-ping google.com  // google.com - succeed
-ping wikipedia.com   // will fail !
+wget www.google.com  # success !
+wget wikipedia.com   # will fail !
 ```
 
 

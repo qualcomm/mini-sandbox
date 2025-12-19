@@ -48,7 +48,7 @@ inline std::string GetErrorMessage(ErrorCode code) {
     case ErrorCode::SandboxRootNotUnique:
       return " : Only one sandbox root directory is allowed";
     case ErrorCode::InvalidFolder:
-      return " : Specify a valid directory for the sandbox root";
+      return " : Specify a valid directory";
     case ErrorCode::OverlayOptionNotSet:
       return " : Overlay option not enabled";
     case ErrorCode::PathDoesNotExist:

@@ -2,7 +2,7 @@
 
 All the observations reported here can be generalized to the various tools compiled in this repository (mini-sandbox, libminisandbox, mini-tapbox, etc.)
 
-mini-sandbox runs inside Docker only when run with --privileged. The reason is that Docker by default sets up seccomp filter that block the use of clone and unshare to create usernamesapces. The problem is well known in the community and other projects have the same issue (e.g., bazel, etc.) but nevertheless no real solution exists except for having the upstream Docker changing the seccomp profile.
+mini-sandbox runs inside Docker only when run with --privileged. The reason is that Docker by default sets up seccomp filter that block the use of clone and unshare to create usernamesapces. The problem is well known in the community and other projects have the same issue (e.g., bazel, etc.) but nevertheless no real solution exists except for changing the seccomp profile or run with --privileged.
 
 If you need to run mini-sandbox inside a privileged Docker container you want to export the environment variable `MINI_SANDBOX_DOCKER_PRIVILEGED=1`. This way, mini-sandbox will set up the environment in a slightly different way compared to a bare-metal host machine keeping into account the fact that is already running on a pre-existing overlayfs and few other aspects.
 
