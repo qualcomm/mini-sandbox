@@ -33,7 +33,6 @@ release() {
     cp "$BUILD_DIR/minitap" "$RELEASE_DIR/lib/" || true
 
     echo "Copying headers (.h)..."
-    cp "$HEADER_DIR/linux-sandbox-api-c.h" "$RELEASE_DIR/include" || true
     cp "$HEADER_DIR/linux-sandbox-api.h" "$RELEASE_DIR/include" || true
      
 
@@ -41,6 +40,7 @@ release() {
     PY_SRC="$SCRIPT_DIR/mini_sandbox/src/py/ctype_bindings"
     cp "$PY_SRC/pyminisandbox.py" "$RELEASE_DIR/python/" || true
     cp "$PY_SRC/pyminitapbox.py" "$RELEASE_DIR/python/" || true
+    cp "$PY_SRC/internal_mini_sandbox.py" "$RELEASE_DIR/python/" || true
     cp "$BUILD_DIR/minitap" "$RELEASE_DIR/python/" || true
     find "$BUILD_DIR" -maxdepth 1 -type f -name "*.so" -exec cp {} "$RELEASE_DIR/python/" \;
 
