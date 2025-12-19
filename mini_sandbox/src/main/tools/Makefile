@@ -30,7 +30,7 @@ MINISANDBOX := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 LIBMINITAP = $(MINITAP_OUT)/libminitap.a
 MINITAP_BIN = $(MINITAP_OUT)/minitap
 
-SRCS = linux-sandbox.cc linux-sandbox-options.cc linux-sandbox-pid1.cc logging.cc process-tools.cc docker_support.cc linux-sandbox-api.cc linux-sandbox-api-c.cc error_handling.cc
+SRCS = linux-sandbox.cc linux-sandbox-options.cc linux-sandbox-pid1.cc logging.cc process-tools.cc docker_support.cc linux-sandbox-api.cc error_handling.cc
 MINITAP_SRCS = $(SRCS) firewall.cc minitap-interface.cc
 
 OUT_DIR = out

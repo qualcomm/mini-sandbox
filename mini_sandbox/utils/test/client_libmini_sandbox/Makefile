@@ -9,7 +9,9 @@ else
 endif
 
 CXX = clang++
-FLAGS = -DLIBMINISANDBOX -g -lpthread -Wno-writable-strings -std=c++17
+CC = clang
+COMMON_FLAGS = -DLIBMINISANDBOX -g -lpthread -Wno-writable-strings
+FLAGS = $(COMMON_FLAGS) -std=c++17
 LDFLAGS ?= ""
 
 ifeq (4.3,$(firstword $(sort $(MAKE_VERSION) 4.3)))
@@ -30,18 +32,19 @@ TARGET_HERMETIC = client_cxx_hermetic.bin
 TARGET_DEFAULT_WRITE_PARENTS = client_cxx_default_write_parents.bin
 TARGET = $(TARGET_CXX) $(TARGET_CC) $(TARGET_DEFAULT) $(TARGET_DEFAULT_WRITE_PARENTS) $(TARGET_CUSTOM) $(TARGET_HERMETIC)
 SRC_CXX = client.cc
+SRC_C = client.c
 
 
 
 all: $(TARGET)
 
-$(TARGET): $(SRC_CXX)
+$(TARGET): $(SRC_CXX) $(SRC_C)
 	$(CXX) $(FLAGS) $(CXXFLAGS) -I$(MINI) $(SRC_CXX) $(LIBS) -o $(TARGET_CXX) $(LDFLAGS)
 	$(CXX) $(FLAGS) $(CXXFLAGS) -DDEFAULT -I$(MINI) $(SRC_CXX) $(LIBS) -o $(TARGET_DEFAULT) $(LDFLAGS)
 	$(CXX) $(FLAGS) $(CXXFLAGS) -DDEFAULT -DDEFAULT_WRITE_PARENTS -I$(MINI) $(SRC_CXX) $(LIBS) -o $(TARGET_DEFAULT_WRITE_PARENTS) $(LDFLAGS)
 	$(CXX) $(FLAGS) $(CXXFLAGS) -DCUSTOM -I$(MINI) $(SRC_CXX) $(LIBS) -o $(TARGET_CUSTOM) $(LDFLAGS)
 	$(CXX) $(FLAGS) $(CXXFLAGS) -DHERMETIC -I$(MINI) $(SRC_CXX) $(LIBS) -o $(TARGET_HERMETIC) $(LDFLAGS)
-	$(CXX) $(FLAGS) $(CFLAGS) -I$(MINI) $(SRC_CXX) $(LIBS) -o $(TARGET_CC) $(LDFLAGS)
+	$(CC) $(COMMON_FLAGS) $(CFLAGS) -I$(MINI) $(SRC_C) -lstdc++ $(LIBS) -o $(TARGET_CC)
 
 clean:
 	rm -f $(TARGET)
