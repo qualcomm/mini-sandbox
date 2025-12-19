@@ -194,6 +194,16 @@ func firewallConnection(addr net.Addr) bool {
 }
 
 func firewallDns(addr string) bool{
+	if fwRules.Count == 0 {
+		if fwRules.MaxConnections < 0 {
+			return true;
+		}
+		if connections < fwRules.MaxConnections {
+                        verbosef("connection number: %d, max allowed: %d\n", connections + 1,  fwRules.MaxConnections);
+			return true;
+                }
+                return false;
+	}
 	_, ok := domainMap[dns.Fqdn(addr)]
 	return ok
 }

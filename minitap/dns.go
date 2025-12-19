@@ -340,7 +340,7 @@ func handleDNSQuery(ctx context.Context, req *dns.Msg) ([]dns.RR, error) {
 		var ips []net.IP
 		var err error
 		if !firewallDns(question.Name) {
-			return nil, fmt.Errorf("Request denied")
+			return nil, fmt.Errorf("Request denied by custom firewall")
 		}
 		ips, err = net.DefaultResolver.LookupIP(ctx, "ip4", question.Name)
 		if err != nil {
