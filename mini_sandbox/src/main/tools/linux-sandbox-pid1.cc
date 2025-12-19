@@ -18,7 +18,7 @@
  */
 
 #include "src/main/tools/linux-sandbox-pid1.h"
-#include "src/main/tools/docker_support.h"
+#include "src/main/tools/docker-support.h"
 
 #include <errno.h>
 #include <fcntl.h>

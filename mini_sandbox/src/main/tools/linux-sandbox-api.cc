@@ -5,7 +5,7 @@
 #if LIBMINISANDBOX
 
 #include "linux-sandbox-api.h"
-#include "error_handling.h"
+#include "error-handling.h"
 #include "src/main/tools/linux-sandbox-options.h"
 #include "src/main/tools/linux-sandbox.h"
 

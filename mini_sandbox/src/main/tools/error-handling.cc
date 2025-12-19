@@ -4,7 +4,7 @@
  */
 
 
-#include "error_handling.h"
+#include "error-handling.h"
 #include "src/main/tools/logging.h"
 #include "src/main/tools/linux-sandbox-options.h"
 #include "src/main/tools/process-tools.h"

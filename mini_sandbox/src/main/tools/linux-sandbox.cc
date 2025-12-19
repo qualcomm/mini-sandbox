@@ -38,13 +38,13 @@
  */
 
 #include "src/main/tools/linux-sandbox.h"
-#include "src/main/tools/docker_support.h"
+#include "src/main/tools/docker-support.h"
 #include "src/main/tools/linux-sandbox-options.h"
 #include "src/main/tools/linux-sandbox-pid1.h"
 #include "src/main/tools/logging.h"
 #include "src/main/tools/minitap-interface.h"
 #include "src/main/tools/process-tools.h"
-#include "src/main/tools/error_handling.h"
+#include "src/main/tools/error-handling.h"
 #include "src/main/tools/firewall.h"
 #include <ctype.h>
 #include <dirent.h>

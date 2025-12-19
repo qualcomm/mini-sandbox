@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "docker_support.h"
+#include "docker-support.h"
 
 static bool isDockerEnvPresent() {
   fs::path path("/.dockerenv");

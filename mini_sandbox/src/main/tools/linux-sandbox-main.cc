@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "src/main/tools/docker_support.h"
+#include "src/main/tools/docker-support.h"
 #include "src/main/tools/linux-sandbox-options.h"
 #include "src/main/tools/linux-sandbox.h"
 

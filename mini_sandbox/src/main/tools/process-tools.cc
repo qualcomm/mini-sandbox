@@ -14,7 +14,7 @@
 
 #include "src/main/tools/process-tools.h"
 #include "src/main/tools/logging.h"
-#include "src/main/tools/error_handling.h"
+#include "src/main/tools/error-handling.h"
 #include "src/main/tools/linux-sandbox-options.h"
 
 #include <mntent.h>

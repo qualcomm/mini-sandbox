@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "src/main/tools/error_handling.h"
+#include "src/main/tools/error-handling.h"
 #include "src/main/tools/process-tools.h"
 
 #include <sys/types.h>
