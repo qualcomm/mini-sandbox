@@ -161,10 +161,10 @@ func firewallConnection(addr net.Addr) bool {
 		// In this case we didn't specify any fw rule BUT we have a max number 
 		// of connections allowed. We respect that policy 
 		if connections < fwRules.MaxConnections {
-                        verbosef("connection number: %d, max allowed: %d\n", connections + 1,  fwRules.MaxConnections);
-                	connections ++;
+            verbosef("connection number: %d, max allowed: %d\n", connections + 1,  fwRules.MaxConnections);
+            connections ++;
 			return true;
-                }
+        }
 
 		// If we end up here we exceeded the number of connections allowed. Block everything else
 		return false;
@@ -199,10 +199,10 @@ func firewallDns(addr string) bool{
 			return true;
 		}
 		if connections < fwRules.MaxConnections {
-                        verbosef("connection number: %d, max allowed: %d\n", connections + 1,  fwRules.MaxConnections);
+            verbosef("connection number: %d, max allowed: %d\n", connections + 1,  fwRules.MaxConnections);
 			return true;
-                }
-                return false;
+        }
+        return false;
 	}
 	_, ok := domainMap[dns.Fqdn(addr)]
 	return ok
