@@ -11,7 +11,7 @@ import env
 
 script_dir = os.path.abspath(os.path.dirname(__file__))
 
-import pyminitapbox as mn_sbx
+import pyminisandbox.pyminitapbox as mn_sbx
 
 def attempt_network_connection(domain):
     res = 0

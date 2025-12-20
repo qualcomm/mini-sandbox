@@ -1,0 +1,42 @@
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "mini-sandbox"
+version = "0.1.0"
+description = "Linux-only Python bindings for mini-sandbox with bundled shared libraries"
+readme = "README.md"
+requires-python = ">=2.7"
+license = { file = "LICENSE" }
+authors = [{ name = "Alessandro Mantovani", email = "alessandro.mantova@qti.qualcomm.com" }]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Operating System :: POSIX :: Linux",
+    "License :: OSI Approved :: MIT License"
+]
+
+
+# -----------------------------
+# setuptools configuration
+# -----------------------------
+
+[tool.setuptools]
+zip-safe = false
+include-package-data = true
+
+# Your package(s) live under src/py/
+[tool.setuptools.packages.find]
+where = ["ctype_bindings/"]
+
+# Include prebuilt .so binaries inside the wheel
+[tool.setuptools.package-data]
+ctype_bindings = [
+       "libmini-sandbox.so",
+       "libmini-tapbox.so",
+       "minitap"
+]
+

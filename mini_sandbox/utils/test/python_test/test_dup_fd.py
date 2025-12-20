@@ -9,7 +9,7 @@ import sys
 import os
 import env
 
-import pyminisandbox as mn_sbx
+import pyminisandbox.pyminisandbox as mn_sbx
 
 stderr_fd_copy = os.dup(sys.stderr.fileno())
 raw_open_with_fd=stderr_fd_copy

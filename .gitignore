@@ -14,3 +14,7 @@ overlay_fs_dir/
 *.pyc
 release/
 *.test
+.venv/
+.venv*/
+*.egg-info/
+dist/
