@@ -79,7 +79,11 @@ int mini_sandbox_share_network() {
 #endif
 
 #ifdef MINITAP
-int mini_sandbox_allow_connections(const char* path) {
+int mini_sandbox_allow_max_connections(int max_connections) {
+  return MiniSbxAllowMaxConnections(max_connections);
+}
+
+int mini_sandbox_allow_connections(const std::string& path) {
   return MiniSbxAllowConnections(path);
 }
 

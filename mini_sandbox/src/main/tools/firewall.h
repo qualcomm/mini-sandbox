@@ -14,6 +14,7 @@
 #include <string>
 #include <iostream>
 
+
 struct FirewallRules {
     char rules[MAX_RULES][MAX_RULE_LENGTH];
     size_t count;

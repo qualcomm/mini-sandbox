@@ -9,6 +9,7 @@
 *.swp
 *.a
 *.bin
+*.log
 
 **/secrets/*
 !**/secrets/*.encrypted

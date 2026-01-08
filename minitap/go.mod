@@ -1,4 +1,5 @@
-module github.com/mini-sandbox
+
+module github.com/qualcomm/mini-sandbox
 
 go 1.23.1
 
