@@ -852,7 +852,7 @@ static void drop_caps_ep_except(uint64_t keep) {
 
 void DropCapabilities() {
   std::cout << "Warning: Sandbox cannot be fully enabled cause we are running in an unprivileged Docker "
-          "container. Will drop the capabilities of the current process but cannot provide advanced"
+          "container. Will drop the capabilities of the current process but cannot provide advanced "
           "features such as usernamespace, overlayfs, rootless firewall, etc." << std::endl;
 
   uint64_t keep;
