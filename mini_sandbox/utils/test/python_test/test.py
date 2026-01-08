@@ -14,10 +14,10 @@ tap = False
 script_dir = os.path.abspath(os.path.dirname(__file__))
 
 if len(sys.argv) > 1 and sys.argv[1] == "tap":
-    import pyminitapbox as mn_sbx
+    import pyminisandbox.pyminitapbox as mn_sbx
     tap = True
 else:
-    import pyminisandbox as mn_sbx
+    import pyminisandbox.pyminisandbox as mn_sbx
 
 
 def attempt_network_connection(domain):
