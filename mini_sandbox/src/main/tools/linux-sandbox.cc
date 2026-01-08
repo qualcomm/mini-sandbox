@@ -38,13 +38,13 @@
  */
 
 #include "src/main/tools/linux-sandbox.h"
-#include "src/main/tools/docker_support.h"
+#include "src/main/tools/docker-support.h"
 #include "src/main/tools/linux-sandbox-options.h"
 #include "src/main/tools/linux-sandbox-pid1.h"
 #include "src/main/tools/logging.h"
 #include "src/main/tools/minitap-interface.h"
 #include "src/main/tools/process-tools.h"
-#include "src/main/tools/error_handling.h"
+#include "src/main/tools/error-handling.h"
 #include "src/main/tools/firewall.h"
 #include <ctype.h>
 #include <dirent.h>
@@ -319,7 +319,7 @@ static int ValidateOptions() {
   }
   else {
     for (auto writable_file : opt.writable_files) {
-      if (ValidateOverlayOutOfFolder(opt.tmp_overlayfs, writable_file) < 0)
+      if (opt.use_overlayfs && ValidateOverlayOutOfFolder(opt.tmp_overlayfs, writable_file) < 0)
         return MiniSbxReportError(__func__, ErrorCode::IllegalConfiguration);
     }
   }
@@ -342,24 +342,20 @@ static int ValidateOptions() {
 }
 
 
-#if LIBMINISANDBOX
+
 int MiniSbxStart() {
-#else
-int main(int argc, char *argv[]) {
-#endif
   int res;
 
+#ifdef LIBMINISANDBOX
   docker_mode = CheckDockerMode();   
+#endif
 
   // Ask the kernel to kill us with SIGKILL if our parent dies.
   if (prctl(PR_SET_PDEATHSIG, SIGKILL) < 0) {
     MiniSbxReport("prctl");
   }
 
-#if (!(LIBMINISANDBOX))
-  // Parse our command-line options.
-  ParseOptions(argc, argv);
-#else
+
   if (opt.working_dir.empty()) {
     char *working_dir = getcwd(nullptr, 0);
     if (working_dir == nullptr) {
@@ -367,7 +363,7 @@ int main(int argc, char *argv[]) {
     }
     opt.working_dir = working_dir;
   }
-#endif
+
 
   if (MiniSbxGetInternalEnv() == 0) {
     PRINT_DEBUG("Already running inside mini-sandbox. Not nesting another sandbox\n");

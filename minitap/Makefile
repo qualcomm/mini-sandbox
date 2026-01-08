@@ -10,7 +10,6 @@ test-firewall-rule: default
 	echo "www.google.com" >> /tmp/firewall.rules
 	test/unshare.bin bash -c 'wget --timeout=1 --tries=1 www.google.com ; R1=$$? ; wget --timeout=1 --tries=1 www.qualcomm.com ; [ $$? -ne "$$R1" ] && echo "Only one connection worked! (Expected)" || echo "Something went wrong (Not Expected)" ' >> test.log
 
-
 test-one-connection: default
 	gcc test/unshare-bash.c test/utils.c -Itest/ -o test/unshare.bin
 	echo "1" > /tmp/firewall.rules

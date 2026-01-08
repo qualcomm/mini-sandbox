@@ -12,10 +12,10 @@ import env
 tap = False
 
 if len(sys.argv) > 1 and sys.argv[1] == "tap":
-    import pyminitapbox as mn_sbx
+    import pyminisandbox.pyminitapbox as mn_sbx
     tap = True
 else:
-    import pyminisandbox as mn_sbx
+    import pyminisandbox.pyminisandbox as mn_sbx
 
 if __name__ == "__main__":
     print("Running outside of the sandbox...")

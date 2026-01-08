@@ -12,8 +12,8 @@
 // limitations under the License.
 
 #include "src/main/tools/linux-sandbox-options.h"
-#include "src/main/tools/docker_support.h"
-#include "error_handling.h"
+#include "src/main/tools/docker-support.h"
+#include "error-handling.h"
 
 #include <errno.h>
 #include <fstream>

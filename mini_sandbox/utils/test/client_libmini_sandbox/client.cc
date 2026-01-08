@@ -18,11 +18,9 @@
 #include <libgen.h>
 #include <assert.h>
 
-#ifdef __cplusplus
 #include "linux-sandbox-api.h"
-#else
-#include "linux-sandbox-api-c.h"
-#endif
+
+
 
 int try_file_write(const char* dst) {
     int res = 0;

@@ -18,7 +18,7 @@
  */
 
 #include "src/main/tools/linux-sandbox-pid1.h"
-#include "src/main/tools/docker_support.h"
+#include "src/main/tools/docker-support.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -852,7 +852,7 @@ static void drop_caps_ep_except(uint64_t keep) {
 
 void DropCapabilities() {
   std::cout << "Warning: Sandbox cannot be fully enabled cause we are running in an unprivileged Docker "
-          "container. Will drop the capabilities of the current process but cannot provide advanced"
+          "container. Will drop the capabilities of the current process but cannot provide advanced "
           "features such as usernamespace, overlayfs, rootless firewall, etc." << std::endl;
 
   uint64_t keep;

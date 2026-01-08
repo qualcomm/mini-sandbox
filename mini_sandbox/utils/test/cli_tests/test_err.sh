@@ -9,7 +9,7 @@ exit 1
 EOF
 
 if [ $? -ne 1 ]; then
-	echo "Failed"
+	echo "Failed (exited with $?)"
 	exit 1;
 else
 	echo "Success"

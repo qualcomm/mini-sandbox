@@ -203,10 +203,10 @@ func firewallDns(addr string) bool{
 			return true;
 		}
 		if connections < fwRules.MaxConnections {
-            verbosef("connection number: %d, max allowed: %d\n", connections + 1,  fwRules.MaxConnections);
+                	verbosef("connection number: %d, max allowed: %d\n", connections + 1,  fwRules.MaxConnections);
 			return true;
-        }
-        return false;
+		}
+        	return false;
 	}
 	_, ok := domainMap[dns.Fqdn(addr)]
 	return ok

@@ -9,11 +9,16 @@ set -e
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 BUILD_DIR="$SCRIPT_DIR/mini_sandbox/src/main/tools/out"
 HEADER_DIR="$SCRIPT_DIR/mini_sandbox/src/main/tools"
+PYTHON_BINDINGS="$SCRIPT_DIR/mini_sandbox/src/py/ctype_bindings/pyminisandbox/"
 RELEASE_DIR="$SCRIPT_DIR/release"
 
 
 build() {
+    $SCRIPT_DIR/clean.sh
     MINITAP="$SCRIPT_DIR/minitap" make -j -C "$SCRIPT_DIR/mini_sandbox/src/main/tools" all
+    cp "$BUILD_DIR/libmini-sandbox.so" $PYTHON_BINDINGS
+    cp "$BUILD_DIR/libmini-tapbox.so" $PYTHON_BINDINGS
+    cp "$BUILD_DIR/minitap" $PYTHON_BINDINGS 
 }
 
 
@@ -33,16 +38,17 @@ release() {
     cp "$BUILD_DIR/minitap" "$RELEASE_DIR/lib/" || true
 
     echo "Copying headers (.h)..."
-    cp "$HEADER_DIR/linux-sandbox-api-c.h" "$RELEASE_DIR/include" || true
     cp "$HEADER_DIR/linux-sandbox-api.h" "$RELEASE_DIR/include" || true
      
 
     echo "Copying Python bindings..."
-    PY_SRC="$SCRIPT_DIR/mini_sandbox/src/py/ctype_bindings"
-    cp "$PY_SRC/pyminisandbox.py" "$RELEASE_DIR/python/" || true
-    cp "$PY_SRC/pyminitapbox.py" "$RELEASE_DIR/python/" || true
-    cp "$BUILD_DIR/minitap" "$RELEASE_DIR/python/" || true
-    find "$BUILD_DIR" -maxdepth 1 -type f -name "*.so" -exec cp {} "$RELEASE_DIR/python/" \;
+    PY_SRC="$SCRIPT_DIR/mini_sandbox/src/py/ctype_bindings/pyminisandbox/"
+    cp -r $PY_SRC "$RELEASE_DIR/python/"
+    #cp "$PY_SRC/pyminisandbox.py" "$RELEASE_DIR/python/" || true
+    #cp "$PY_SRC/pyminitapbox.py" "$RELEASE_DIR/python/" || true
+    #cp "$PY_SRC/internal_mini_sandbox.py" "$RELEASE_DIR/python/" || true
+    #cp "$BUILD_DIR/minitap" "$RELEASE_DIR/python/" || true
+    #find "$BUILD_DIR" -maxdepth 1 -type f -name "*.so" -exec cp {} "$RELEASE_DIR/python/" \;
 
 }
 
