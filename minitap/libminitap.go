@@ -357,7 +357,6 @@ func RunNetwork() (int, error) {
 	// Run a goroutine to handle shutdown
 	go func() {
 		<-sigChan // Wait for a signal
-		verbosef("Denied domains %s", deniedDomainMap)
 		os.Exit(0)
 	}()
 

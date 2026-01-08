@@ -43,7 +43,7 @@ void write_map(const char *path, int inside_id, int outside_id) {
 volatile sig_atomic_t signal_received = 0;
 void handler(int sig) {
     signal_received = 1;
-    printf("Received SIGUSR1\n");
+
 }
 
 int run_tcpip() {
@@ -66,7 +66,7 @@ int run_tcpip() {
 
 
 int child_func(char** cmd_argv) {
-    printf("%s PID: %d (inside new namespaces)\n", __func__, getpid());
+
     pid_t p = fork();
     if (p == 0) {
 
@@ -100,7 +100,7 @@ static int JoinNetNs(pid_t p) {
 }
 
 int main(int argc, char* argv[]) {
-    printf("Starting with pid==%d\n", getpid());
+
     uid_t uid = getuid();
     gid_t gid = getgid();
 

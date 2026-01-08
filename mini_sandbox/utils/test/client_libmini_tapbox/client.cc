@@ -68,17 +68,18 @@ int main(int argc, char* argv[]) {
     assert(res == 0);
     res = mini_sandbox_mount_write(getenv("HOME"));
     assert(res == 0);
-
-    // Old style API to set firewall
-    //mini_sandbox_set_firewall_rule("-A OUTPUT -d 142.250.189.14 -j ACCEPT");
-
     // New style API to set firewall
+#ifdef MAX_CONN
+    res = mini_sandbox_allow_max_connections(1);
+    assert(res == 0);
+#else
     res = mini_sandbox_allow_ipv4("8.8.8.8"); // DNS is always useful :)
     assert(res == 0);
     res = mini_sandbox_allow_ipv4(ALLOWED_IP);
     assert(res == 0);
     res = mini_sandbox_allow_domain(ALLOWED_DOMAIN);
     assert(res == 0);
+#endif
     res = mini_sandbox_start();
     assert(res == 0);
     
@@ -113,9 +114,12 @@ int main(int argc, char* argv[]) {
         server.sin_addr.s_addr = inet_addr(NOT_ALLOWED_IP);
         int timeout = 2;
 
-        if (connect_with_timeout(sock, (struct sockaddr *)&server, sizeof(server), timeout ) == 0)  {
+        bool conn = connect_with_timeout(sock, (struct sockaddr *)&server, sizeof(server), timeout ) == 0;
+
+        if (conn)  {
             printf("[---] Connection to %s (%s) succeeded (not expected) [---]\n", NOT_ALLOWED_IP, NOT_ALLOWED_DOMAIN);
             abort();
+
         }
         else {
             printf("[+++] Connection to %s (%s) failed (as expected) [+++]", NOT_ALLOWED_IP, NOT_ALLOWED_DOMAIN);

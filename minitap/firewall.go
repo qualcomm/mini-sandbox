@@ -10,6 +10,8 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 	"net"
 	"os"
 	"sync"
@@ -20,6 +22,7 @@ import (
 type FirewallRules struct {
 	Rules []string
 	Count int
+        MaxConnections int
 }
 
 var (
@@ -27,14 +30,22 @@ var (
 	mu      sync.Mutex
 )
 
-var allowedIps =make(map[string]int)
+var allowedIps = make(map[string]int)
 var deniedDomainMap []string
+var connections int = 0
 
 func MiniTapSetupFirewallRule(rule string) {
 	mu.Lock()
 	defer mu.Unlock()
 	fwRules.Rules = append(fwRules.Rules, rule)
 	fwRules.Count++
+}
+
+func MiniTapSetupMaxConnections(max_connections int) {
+	mu.Lock()
+	defer mu.Unlock()
+        fwRules.MaxConnections = max_connections
+        verbosef("MaxNumberConnections: %d\n", max_connections)
 }
 
 func ReadFirewallRules(firewall_rules string) {
@@ -45,10 +56,21 @@ func ReadFirewallRules(firewall_rules string) {
 	}
 	defer file.Close()
 
+        lineno := 0
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		rule := scanner.Text()
-		MiniTapSetupFirewallRule(rule)
+		line := strings.TrimSpace(scanner.Text())
+                if lineno == 0 {
+			lineno++
+			n, err := strconv.ParseInt(line, 10, 64)
+         		if err != nil {
+                		fmt.Printf("Invalid header (expected signed integer): %q, err: %v\n", line, err)
+                		return
+            		}
+			MiniTapSetupMaxConnections(int(n))
+                } else {
+		      MiniTapSetupFirewallRule(line)
+		}
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -57,6 +79,7 @@ func ReadFirewallRules(firewall_rules string) {
 }
 
 func InitFirewall() {
+        // TODO make the argument flow to this point
 	if fwRules.Count == 0 {
 		return
 	}
@@ -74,6 +97,7 @@ func InitFirewall() {
 		}
 
 	}
+
 	verbosef("AllowedIps: %s,\n", allowedIps)
 	verbosef("DomainMap: %s,\n", domainMap)
 
@@ -126,31 +150,64 @@ func firewallConnection(addr net.Addr) bool {
 		//We ignore connections that are not either TCP or UDP
 		return false
 	}
+        
+	if fwRules.MaxConnections >= 0 {
+	        // In this case we didn't specify any fw rule BUT we have a max number 
+	        // of connections allowed. We respect that policy 
+		if connections < fwRules.MaxConnections {
 
-	//Fast path,if we hit here, we don't need to query the dns again
-	ip, ok := allowedIps[destination_ip.To4().String()]
-	if ok { 
-		verbosef("Hit ip: %s in allowedIps\n", ip)
-		return true
-	}else{
-		//Slow path, we query dns and next time we use the fast path
-		//We update all the domain names
-		for domain := range domainMap {
-			verbosef("Domain: %s\n", domain)
-			solveDomainName(domain)
+        	        verbosef("connection number: %d, max allowed: %d\n", connections + 1,  fwRules.MaxConnections);
+        	      	connections ++;
+			return true;
+        	}
+
+		// If we end up here we exceeded the number of connections allowed. Block everything else
+		return false
+	} else {
+		// In this branch we handle the firewall rules policy and we don't
+		// care about the number of connections
+		
+		if fwRules.Count == 0 {
+			// If we end up in this branch we haven't specified any network policy 
+			// so we'll just let all the connections go through
+			return true;
 		}
 
+		//Fast path,if we hit here, we don't need to query the dns again
 		ip, ok := allowedIps[destination_ip.To4().String()]
-
 		if ok { 
-			verbosef("Hit ip: %s in allowedIps after dns query\n", ip)
+			verbosef("Hit ip: %s in allowedIps\n", ip)
 			return true
+		}else{
+			//Slow path, we query dns and next time we use the fast path
+			//We update all the domain names
+			for domain := range domainMap {
+				verbosef("Domain: %s\n", domain)
+				solveDomainName(domain)
+			}
+
+			ip, ok := allowedIps[destination_ip.To4().String()]
+
+			if ok { 
+				verbosef("Hit ip: %s in allowedIps after dns query\n", ip)
+				return true
+			}
 		}
+		return false
 	}
-	return false
 }
 
 func firewallDns(addr string) bool{
+	if fwRules.Count == 0 {
+		if fwRules.MaxConnections < 0 {
+			return true;
+		}
+		if connections < fwRules.MaxConnections {
+            verbosef("connection number: %d, max allowed: %d\n", connections + 1,  fwRules.MaxConnections);
+			return true;
+        }
+        return false;
+	}
 	_, ok := domainMap[dns.Fqdn(addr)]
 	return ok
 }

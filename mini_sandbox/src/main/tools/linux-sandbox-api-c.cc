@@ -84,6 +84,11 @@ int mini_sandbox_allow_connections(const char* path) {
 }
 
 
+int mini_sandbox_allow_max_connections(int max_connections) {
+  return MiniSbxAllowMaxConnections(max_connections);
+}
+
+
 int mini_sandbox_allow_ipv4(const char* ip) {
   return MiniSbxAllowIpv4(ip);
 }

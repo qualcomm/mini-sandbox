@@ -96,7 +96,10 @@ def mini_sandbox_mount_empty_output_file(path):
         return -1
     return lib.mini_sandbox_mount_empty_output_file(path.encode())
 
-
+def mini_sandbox_allow_max_connections(max_connections):
+    if lib is None:
+        return -1
+    return lib.mini_sandbox_allow_max_connections(max_connections)
 
 def mini_sandbox_allow_connections(path):
     if hasattr(lib, "mini_sandbox_allow_connections"):

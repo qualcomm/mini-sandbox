@@ -61,6 +61,10 @@ static FirewallTool which_nft_firewall() {
   return Tool;
 }
 
+int set_max_connections(int max_connections, FirewallRules* fw_rules) {
+  fw_rules->max_connections = max_connections;
+  return 0;
+}
 
 
 int set_firewall_rule(const char *rule, FirewallRules *fw_rules) {
@@ -266,7 +270,13 @@ char* format_rule_from_ipv4(const char* ip) {
 }
 
 
-void DumpRules(FirewallRules* fw_rules, std::string& filepath) {
+// This method dumps the policy that the minitap backend binary
+// will use to setup the firewall rules and, if specified, 
+// the max number of connections
+// The two policies are exclusive, i.e., either you set up
+// a maximum number of connections OR you set up the firewall 
+// rules, at least for now.
+void DumpRules(FirewallRules* fw_rules, std::string& filepath) { 
 
     if (fw_rules == NULL || filepath.empty()) {
         return;
@@ -278,10 +288,22 @@ void DumpRules(FirewallRules* fw_rules, std::string& filepath) {
         return;
     }
 
-    for (size_t i = 0; i < fw_rules->count; ++i) {
-        if (fw_rules->rules[i] != NULL) {
-            fprintf(file, "%s\n", fw_rules->rules[i]);
-        }
+    // The first line stores the number of connections allowed in the sandbox. 
+    // A negative number means the value will be ignored
+    fprintf(file, "%d\n", fw_rules->max_connections);
+
+    // if max_connections >= 0 we only enforce the `max_connections` policy. 
+    // if max_connections < 0 (which is the default value) we look at the firewall
+    // rules and dump them
+    if (fw_rules->max_connections < 0) {
+
+      // Then we dump all the IP addresses/ domain names / subnets we wanna 
+      // allow in the new network
+      for (size_t i = 0; i < fw_rules->count; ++i) {
+          if (fw_rules->rules[i] != NULL) {
+              fprintf(file, "%s\n", fw_rules->rules[i]);
+          }
+      }
     }
 
     fclose(file);

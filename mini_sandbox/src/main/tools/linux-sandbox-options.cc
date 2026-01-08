@@ -535,6 +535,10 @@ int MiniSbxAllowConnections(const std::string& path) {
     return res;
 }
 
+int MiniSbxAllowMaxConnections(int max_connections) {
+  return set_max_connections(max_connections, &(opt.fw_rules));
+}
+
 int MiniSbxAllowAllDomains() {
   PRINT_DEBUG("Allow all domains");
   reset_firewall_rules(&opt.fw_rules);

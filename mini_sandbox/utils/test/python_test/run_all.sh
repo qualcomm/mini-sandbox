@@ -75,4 +75,7 @@ ls "$SCRIPT_DIR/../pyminisandbox-test-default.test"
 check_last_command
 rm "$SCRIPT_DIR/../pyminisandbox-test-default.test"
 
+check_exit $PYTHON test_any_connection.py
+check_exit $PYTHON test_one_shot_connection.py
+
 cd $ORIGINAL_DIR
