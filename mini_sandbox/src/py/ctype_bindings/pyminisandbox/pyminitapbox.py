@@ -6,7 +6,3 @@
 from .internal_mini_sandbox import *
 
 init(tap_mode = True)
-
-
-
-

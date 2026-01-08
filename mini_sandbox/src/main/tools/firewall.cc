@@ -44,6 +44,9 @@ int reset_firewall_rules(FirewallRules *fw_rules) {
 // This method dumps the policy that the minitap backend binary
 // will use to setup the firewall rules and, if specified, 
 // the max number of connections
+// The two policies are exclusive, i.e., either you set up
+// a maximum number of connections OR you set up the firewall 
+// rules, at least for now.
 void DumpRules(FirewallRules* fw_rules, std::string& filepath) { 
 
     if (fw_rules == NULL || filepath.empty()) {
@@ -60,12 +63,18 @@ void DumpRules(FirewallRules* fw_rules, std::string& filepath) {
     // A negative number means the value will be ignored
     fprintf(file, "%d\n", fw_rules->max_connections);
 
-    // Then we dump all the IP addresses/ domain names / subnets we wanna 
-    // allow in the new network
-    for (size_t i = 0; i < fw_rules->count; ++i) {
-        if (fw_rules->rules[i] != NULL) {
-            fprintf(file, "%s\n", fw_rules->rules[i]);
-        }
+    // if max_connections >= 0 we only enforce the `max_connections` policy. 
+    // if max_connections < 0 (which is the default value) we look at the firewall
+    // rules and dump them
+    if (fw_rules->max_connections < 0) {
+
+      // Then we dump all the IP addresses/ domain names / subnets we wanna 
+      // allow in the new network
+      for (size_t i = 0; i < fw_rules->count; ++i) {
+          if (fw_rules->rules[i] != NULL) {
+              fprintf(file, "%s\n", fw_rules->rules[i]);
+          }
+      }
     }
 
     fclose(file);  
