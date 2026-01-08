@@ -83,13 +83,8 @@ int mini_sandbox_allow_max_connections(int max_connections) {
   return MiniSbxAllowMaxConnections(max_connections);
 }
 
-int mini_sandbox_allow_connections(const std::string& path) {
+int mini_sandbox_allow_connections(const char* path) {
   return MiniSbxAllowConnections(path);
-}
-
-
-int mini_sandbox_allow_max_connections(int max_connections) {
-  return MiniSbxAllowMaxConnections(max_connections);
 }
 
 
