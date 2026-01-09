@@ -60,5 +60,10 @@
 // Initialized to null (no debug logging) in logging.cc.
 // Set in the linux-sandbox.cc main() if the -D command line option is set.
 extern FILE* global_debug;
+void logOSKernel();
+void logOSName();
+void logLibc();
+void logLibstdcpp();
+void logSystem();
 
 #endif  // SRC_MAIN_TOOLS_LOGGING_H_

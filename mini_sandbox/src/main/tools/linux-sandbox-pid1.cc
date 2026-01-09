@@ -1425,7 +1425,7 @@ int Pid1Main(void *args) {
   PRINT_DEBUG("Pid1Main started with pid = %d", getpid());
 
   MiniSbxSetInternalEnv();
-
+  logSystem();
   home_dir = GetHomeDir();
   PRINT_DEBUG("Home dir is %s\n", home_dir.c_str());
   std::vector<std::string> overlay_dirs;
