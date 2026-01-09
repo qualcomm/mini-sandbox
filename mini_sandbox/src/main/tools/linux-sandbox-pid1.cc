@@ -1327,9 +1327,15 @@ static std::string TopLevelRelativeFolder(const std::string& mount_point, const 
 static int MountOverlaySubfolders(std::string& top_level_dir, std::string& workdir) {
   fs::path top_level = top_level_dir;
   fs::path working_dir = workdir;
-
-  top_level = fs::canonical(top_level);
-  working_dir = fs::canonical(working_dir);
+  
+  try {
+    top_level = fs::canonical(top_level);
+    working_dir = fs::canonical(working_dir);
+  } catch (fs::filesystem_error& e) {
+    std::string msg = e.what();
+    PRINT_DEBUG("Could not invoke canonical() %s\n", msg.c_str());
+    return 0;
+  }
 
   PRINT_DEBUG("%s, work dir %s\n", __func__, working_dir.string().c_str());
   PRINT_DEBUG("%s, top level dir %s", __func__, top_level.string().c_str());
@@ -1342,12 +1348,20 @@ static int MountOverlaySubfolders(std::string& top_level_dir, std::string& workd
       if (current == working_dir) {
           break;
       }
+      fs::path rel;
         
+      try {
 #ifndef  _EXPERIMENTAL_FILESYSTEM_
-      fs::path rel = fs::relative(working_dir, current);
+      rel = fs::relative(working_dir, current);
 #else
-      fs::path rel = make_relative(working_dir, current);
+      rel = make_relative(working_dir, current);
 #endif
+      } catch (fs::filesystem_error& e) {
+        std::string msg = e.what();
+        PRINT_DEBUG("Could not invoke relative() %s\n", msg.c_str());
+        rel.clear();
+      }
+
       if (rel.empty() || rel.filename() == fs::path(".") ) 
           break;
       std::string current_str = current.string();
