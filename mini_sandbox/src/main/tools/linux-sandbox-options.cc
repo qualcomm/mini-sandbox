@@ -701,11 +701,20 @@ void SetupDefaultMounts(std::vector<std::string> &bind_mount_sources,
   std::string local_bin = GetLocalBin();
   std::string local_lib = GetLocalLib();
 
-  if (fs::exists(local_bin))
-    default_mounts.push_back(local_bin);
+  try {
+    if (fs::exists(local_bin))
+      default_mounts.push_back(local_bin);
+  } catch (const fs::filesystem_error &e) {
+    PRINT_DEBUG("Filesystem error: %s\n", local_bin.c_str());
+  }
 
-  if (fs::exists(local_lib))
-    default_mounts.push_back(local_lib);
+  try {
+    if (fs::exists(local_lib))
+      default_mounts.push_back(local_lib);
+  } catch (const fs::filesystem_error &e) {
+    PRINT_DEBUG("Filesystem error: %s\n", local_lib.c_str());
+  }
+
 
   for (auto mount : default_mounts) {
     bind_mount_sources.emplace_back(mount);

@@ -1083,8 +1083,9 @@ template <typename Container>
 static void MountReadOnly(const Container& container) {
   for (const auto& item : container) {
     const std::string full_sandbox_path(opt.sandbox_root + item);
+    std::error_code ec;
   
-    if (fs::exists(full_sandbox_path)) {
+    if (fs::exists(full_sandbox_path, ec)) {
       const char* item_str = item.c_str();
 
       std::string first_folder = GetFirstFolder(item);
@@ -1097,7 +1098,8 @@ static void MountReadOnly(const Container& container) {
                         item_str); 
       }
     }
-    MountAndRemountRO(full_sandbox_path, item);
+    if (!ec)
+      MountAndRemountRO(full_sandbox_path, item);
   }
 }
 
@@ -1143,9 +1145,12 @@ static void MountAllMounts() {
     PRINT_DEBUG("writable: %s", writable_file.c_str());
     const std::string full_writable_file_path(opt.sandbox_root + writable_file);
     const char *full_writable_path_str = full_writable_file_path.c_str();
-    PRINT_DEBUG(" WRITABLE MAPPED TO: %s", full_writable_path_str);
-    CreateTarget(full_writable_path_str,
-                 fs::is_directory(writable_file.c_str()));
+    PRINT_DEBUG(" writable mapped to: %s", full_writable_path_str);
+    std::error_code ec;
+    bool isDir = fs::is_directory(writable_file.c_str(), ec);
+    if (ec)
+      continue;
+    CreateTarget(full_writable_path_str, isDir);
     if (mount(writable_file.c_str(), full_writable_path_str, nullptr,
               MS_BIND | MS_REC, nullptr) < 0) {
       DIE("mount(%s, %s, nullptr, MS_BIND | MS_REC, nullptr)",
@@ -1221,14 +1226,25 @@ std::vector<std::string> GenerateListForOverlayFS() {
   std::vector<std::string> existingPaths;
 
   for (const auto &path : paths) {
-    if (fs::exists(path)) {
-      existingPaths.push_back(path);
+    try {
+      if (fs::exists(path)) {
+        existingPaths.push_back(path);
+      }
+    } catch (const fs::filesystem_error &e) {
+      std::string msg = e.what();
+      PRINT_DEBUG("Filesystem error: %s", msg.c_str());
     }
+
   }
 
   for (const auto &path : opt.overlayfsmount) {
-    if (fs::exists(path)) {
-      addIfNotPresent(existingPaths, path.c_str());
+    try {
+      if (fs::exists(path)) {
+        addIfNotPresent(existingPaths, path.c_str());
+      }
+    } catch (const fs::filesystem_error &e) {
+      std::string msg = e.what();
+      PRINT_DEBUG("Filesystem error: %s", msg.c_str());
     }
   }
 
@@ -1278,33 +1294,48 @@ static void dumpOpt() {
 }
 
 static std::string TopLevelRelativeFolder(const std::string& mount_point, const std::string& workdir) {
-  fs::path mount_fs = mount_point;
-  fs::path wd_fs = workdir;
+  try {
+    fs::path mount_fs = mount_point;
+    fs::path wd_fs = workdir;
 
 #ifndef  _EXPERIMENTAL_FILESYSTEM_
-  fs::path rel = fs::relative(wd_fs, mount_fs);
+    fs::path rel = fs::relative(wd_fs, mount_fs);
 #else
-  fs::path rel = make_relative(wd_fs, mount_fs);
+    fs::path rel = make_relative(wd_fs, mount_fs);
 #endif
-  PRINT_DEBUG("Relative path from WorkingDir to MountFS is: %s", rel.string().c_str());
-  auto it = rel.begin();
-  if (std::distance(it, rel.end()) >= 1) {
-    if (rel.filename() == fs::path("."))
+    PRINT_DEBUG("Relative path from WorkingDir to MountFS is: %s", rel.string().c_str());
+    auto it = rel.begin();
+    if (std::distance(it, rel.end()) >= 1) {
+      if (rel.filename() == fs::path("."))
+        return "";
+      fs::path top_level_fs = mount_fs / *it;
+      return fs::absolute(top_level_fs).string();
+    } else {
       return "";
-    fs::path top_level_fs = mount_fs / *it;
-    return fs::absolute(top_level_fs).string();
-  } else {
-    return "";
+    }
+  } catch (const fs::filesystem_error &e) {
+    std::string msg = e.what();
+    PRINT_DEBUG("Filesystem error: %s\n", msg.c_str());
+  } catch (const std::exception &e) {
+    std::string msg = e.what();
+    PRINT_DEBUG("General error: %s\n", msg.c_str());
   }
+  return "";
 }
 
 
 static int MountOverlaySubfolders(std::string& top_level_dir, std::string& workdir) {
   fs::path top_level = top_level_dir;
   fs::path working_dir = workdir;
-
-  top_level = fs::canonical(top_level);
-  working_dir = fs::canonical(working_dir);
+  
+  try {
+    top_level = fs::canonical(top_level);
+    working_dir = fs::canonical(working_dir);
+  } catch (fs::filesystem_error& e) {
+    std::string msg = e.what();
+    PRINT_DEBUG("Could not invoke canonical() %s\n", msg.c_str());
+    return 0;
+  }
 
   PRINT_DEBUG("%s, work dir %s\n", __func__, working_dir.string().c_str());
   PRINT_DEBUG("%s, top level dir %s", __func__, top_level.string().c_str());
@@ -1317,12 +1348,20 @@ static int MountOverlaySubfolders(std::string& top_level_dir, std::string& workd
       if (current == working_dir) {
           break;
       }
+      fs::path rel;
         
+      try {
 #ifndef  _EXPERIMENTAL_FILESYSTEM_
-      fs::path rel = fs::relative(working_dir, current);
+      rel = fs::relative(working_dir, current);
 #else
-      fs::path rel = make_relative(working_dir, current);
+      rel = make_relative(working_dir, current);
 #endif
+      } catch (fs::filesystem_error& e) {
+        std::string msg = e.what();
+        PRINT_DEBUG("Could not invoke relative() %s\n", msg.c_str());
+        rel.clear();
+      }
+
       if (rel.empty() || rel.filename() == fs::path(".") ) 
           break;
       std::string current_str = current.string();
@@ -1400,8 +1439,9 @@ int Pid1Main(void *args) {
   PRINT_DEBUG("Pid1Main started with pid = %d", getpid());
 
   MiniSbxSetInternalEnv();
-
+  logSystem();
   home_dir = GetHomeDir();
+  PRINT_DEBUG("Home dir is %s\n", home_dir.c_str());
   std::vector<std::string> overlay_dirs;
   int mounts = 0;
 
