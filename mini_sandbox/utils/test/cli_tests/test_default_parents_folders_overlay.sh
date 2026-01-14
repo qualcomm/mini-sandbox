@@ -15,7 +15,7 @@ fi
 TOP_LVL="$BASE/top-level"
 WD="$TOP_LVL/working-dir"
 mkdir -p $WD
-echo "mini-sandbox-test" > "$BASE/mini-sandbox-test"
+
 echo "mini-sandbox-test" > "$TOP_LVL/mini-sandbox-test"
 
 pushd $WD || {
@@ -73,14 +73,9 @@ echo "sandbox-test" > $BASE/test.txt
 check_last_command
 
 echo -e "\nTest reading from $BASE"
+ls $BASE/mini-sandbox-test
+check_last_command_failed
 
-if [[ "$BASE" == "$HOME" ]]; then
-	ls $BASE/mini-sandbox-test
-	check_last_command_failed
-else
-	ls $BASE/mini-sandbox-test
-	check_last_command
-fi
 
 echo -e "\nTest reading from $TOP_LVL (top level) dir"
 ls $TOP_LVL/mini-sandbox-test
