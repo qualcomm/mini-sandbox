@@ -634,7 +634,10 @@ AddLeftoverFoldersToBindMounts(std::vector<std::string> &overlay_dirs) {
   return;
 }
 
-
+// The function MakeFilesystemPartiallyReadonly can be invoked to remount the mount points in /proc/self/mounts in
+// read-only. For it to succeed to mount a certain mount point, e.g., /a/b , we need /a/b to be already mounted
+// in the new root. Since this function can be invoked in two different modes, one chroot-ed and the other that 
+// uses the same root, we use the toggle 'need_mount' to state that we need to mount before remounting as read-only.
 static void MakeFilesystemPartiallyReadOnly(bool need_mount, std::vector<std::string>& overlay_dirs, int num_of_mounts) {
 
   FILE *mounts = setmntent("/proc/self/mounts", "r");
@@ -655,6 +658,18 @@ static void MakeFilesystemPartiallyReadOnly(bool need_mount, std::vector<std::st
 
     std::string mnt_dir(ent->mnt_dir);
     if (need_mount) {
+      // We First check if we are dealing with autofs/nfs . In those cases we do not want to mount 
+      // each mount point under the autofs/nfs entry point cause it'd take too much time.
+      std::string type(ent->mnt_type);
+      if (type.compare("autofs") == 0 || type.compare("nfs") == 0) {
+        std::string base = GetFirstFolder(ent->mnt_dir);
+        PRINT_DEBUG("%s mounted in autofs/nfs. Deferring mount of %s\n", ent->mnt_dir, base.c_str());
+        if (base != "")
+          AutoFSRoots.insert(base);
+        continue;
+      }
+
+      // If it wasn't autofs/nfs we check if it's already mounted
       bool has_been_mounted = alreadyMounted(ent->mnt_dir, overlay_dirs);
       PRINT_DEBUG("already mounted -> %d\n", has_been_mounted);
       if (has_been_mounted)
@@ -689,29 +704,17 @@ static void MakeFilesystemPartiallyReadOnly(bool need_mount, std::vector<std::st
 
     const char* target;
     if (need_mount) {
-
-      std::string type(ent->mnt_type);
-      if (type.compare("autofs") == 0 || type.compare("nfs") == 0) {
-        std::string base = GetFirstFolder(ent->mnt_dir);
-        PRINT_DEBUG("%s mounted in autofs/nfs. Deferring mount of %s\n", ent->mnt_dir, base.c_str());
-        if (base != "")
-          AutoFSRoots.insert(base);
-        continue;
-      }
-
       bool IsDirectory = true;
       if (CreateTarget(full_sandbox_path.c_str(), IsDirectory) < 0) { 
         // Here we are mounting filesystems that we might not even need
-        // so if we fail something we'll just try to do our best
+        // so if we fail something we'll just try to move on since probably
+        // we don't need this path.
         continue;
       }
-    
-
       int result = mount(ent->mnt_dir,
                        full_sandbox_path.c_str(),
                        NULL, MS_REC | MS_BIND, 
                        NULL);
-
        PRINT_DEBUG("%s mount: %s -> %s = %d\n", __func__, ent->mnt_dir,
                 full_sandbox_path.c_str(), result);
        if (result < 0)
