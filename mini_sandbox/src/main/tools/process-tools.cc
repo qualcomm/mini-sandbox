@@ -613,6 +613,9 @@ static inline bool is_ubuntu_24(const std::string& name, const std::string& vers
 
 bool UserNamespaceSupported() {
 
+  if (std::getenv("MINI_SANDBOX_FORCE_USER_NAMESPACE") != nullptr)
+    return true;
+
   std::string name, version;
   if (!GetOSName(name, version)) {
     return true;
