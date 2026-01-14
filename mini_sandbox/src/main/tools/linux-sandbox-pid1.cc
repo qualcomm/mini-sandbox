@@ -851,8 +851,8 @@ static void drop_caps_ep_except(uint64_t keep) {
 
 
 void DropCapabilities() {
-  std::cout << "Warning: Sandbox cannot be fully enabled cause we are running in an unprivileged Docker "
-          "container. Will drop the capabilities of the current process but cannot provide advanced "
+  std::cout << "Warning: Sandbox cannot be fully enabled cause (either due to Docker or AppArmor). "
+          "We'll just drop the capabilities of the current process but cannot provide advanced "
           "features such as usernamespace, overlayfs, rootless firewall, etc." << std::endl;
 
   uint64_t keep;
@@ -1491,12 +1491,9 @@ int Pid1Main(void *args) {
       MountWorkingDirMountPoint(mount_point);
       overlay_dirs = GenerateListForOverlayFS();
       MountAllOverlayFs(overlay_dirs, 0);
-
       AddLeftoverFoldersToBindMounts(overlay_dirs);
       MakeFilesystemPartiallyReadOnly(true, overlay_dirs, mounts);
-
       MountAllMounts();
-
       makeEmptyHome();
     } else if (opt.use_overlayfs){
       PRINT_DEBUG("opt.use_overlayfs");
@@ -1513,12 +1510,10 @@ int Pid1Main(void *args) {
     ChangeRoot();
 
   } else {
-    // In this case the sandbox works in best effort mode
+    // In this case the sandbox works in read-only mode
     // doesn't use overlayfs or chroot, it just re-mounts
     // everything as read-only
-    PRINT_DEBUG("Warning: Sandbox enabled in read-only mode. This is not "
-            "recommended for production scenarios. \n");
-
+    PRINT_DEBUG("Sandbox enabled in read-only mode\n");
     MountFilesystems();
     mounts = CountMounts();
     // In this case overlay_dirs will be empty but we need it when

@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "src/main/tools/logging.h"
+#include "src/main/tools/process-tools.h"
 
 #include <sys/utsname.h>
 #include <iostream>
@@ -27,7 +28,8 @@ FILE *global_debug = nullptr;
 
 void logOSKernel() {
   struct utsname buf;
-  if (uname(&buf) == 0) {
+  bool res = GetKernelInfo(&buf);
+  if (res) {
     PRINT_DEBUG("OS: %s\n", buf.sysname );
     PRINT_DEBUG("Kernel: %s\n", buf.release );
     PRINT_DEBUG("Version: %s\n", buf.version );
@@ -53,29 +55,41 @@ void logLibstdcpp() {
 #endif
 }
 
+
 void logOSName() {
-  try {    
-    std::ifstream file("/etc/os-release");
-    if (!file.is_open()) {
-      PRINT_DEBUG("Can't access /etc/os-release");
+  try {
+    std::string pretty, version;
+    const bool ok = GetOSName(pretty, version);
+
+    if (!ok) {
+      PRINT_DEBUG("Can't log OS info: /etc/os-release missing or keys not found");
+      return;
     }
 
-    std::string line;
-    while (std::getline(file, line)) {
-      if (line.find("PRETTY_NAME=") == 0 || line.find("VERSION_ID=") == 0) {
-        PRINT_DEBUG("OS info: %s", line.c_str());
-      }
+    if (!pretty.empty()) {
+      PRINT_DEBUG("OS PRETTY_NAME: %s", pretty.c_str());
+    } else {
+      PRINT_DEBUG("OS PRETTY_NAME not found");
+    }
+
+    if (!version.empty()) {
+      PRINT_DEBUG("OS VERSION_ID: %s", version.c_str());
+    } else {
+      PRINT_DEBUG("OS VERSION_ID not found");
     }
   } catch (const std::exception& e) {
-    PRINT_DEBUG("Can't log OS info");
+    PRINT_DEBUG("Can't log OS info (exception): %s", e.what());
+  } catch (...) {
+    PRINT_DEBUG("Can't log OS info (unknown exception)");
   }
-
 }
+
 
 void logSystem() {
   logOSKernel();
   logOSName();
   logLibc();
   logLibstdcpp();
+  PRINT_DEBUG("User namespaces supported -> %d\n", UserNamespaceSupported());
 }
 
