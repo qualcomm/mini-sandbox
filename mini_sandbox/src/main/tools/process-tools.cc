@@ -31,6 +31,7 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/utsname.h>
 #include <unistd.h>
 #if __has_include(<filesystem>)
 #include <filesystem>
@@ -46,6 +47,8 @@ namespace fs = std::experimental::filesystem;
 #include <string>
 #include <vector>
 #include <memory>
+#include <fstream>
+#include <cctype>
 
 #define MAX_ATTEMPTS 100
 #define INTERNAL_MINI_SANDBOX_ENV "__INTERNAL_MINI_SANDBOX_ON"
@@ -492,3 +495,143 @@ std::string GetFirstFolder(const std::string& path) {
         return path;
     }
 }
+
+
+
+static inline void trim(std::string& s) {
+  auto is_not_space = [](unsigned char ch) { return !std::isspace(ch); };
+  s.erase(s.begin(), std::find_if(s.begin(), s.end(), is_not_space));
+  s.erase(std::find_if(s.rbegin(), s.rend(), is_not_space).base(), s.end());
+}
+
+// Remove surrounding single or double quotes if present
+static inline void unquote(std::string& s) {
+  if (s.size() >= 2 &&
+      ((s.front() == '"' && s.back() == '"') ||
+       (s.front() == '\'' && s.back() == '\''))) {
+    s = s.substr(1, s.size() - 2);
+  }
+}
+
+// Parses /etc/os-release and returns PRETTY_NAME and VERSION_ID via out-params.
+// Returns true iff at least one of the requested keys was found.
+// On failure to read the file or if keys are missing, outputs remain empty.
+bool GetOSName(std::string& printable_name, std::string& version_id) {
+  printable_name.clear();
+  version_id.clear();
+
+  std::ifstream file("/etc/os-release");
+  if (!file.is_open()) {
+    return false; // Could not open the file
+  }
+
+  std::string line;
+  while (std::getline(file, line)) {
+    if (line.empty() || line[0] == '#') continue;
+
+    const auto eq_pos = line.find('=');
+    if (eq_pos == std::string::npos) continue;
+
+    std::string key = line.substr(0, eq_pos);
+    std::string value = line.substr(eq_pos + 1);
+
+    trim(key);
+    trim(value);
+    unquote(value); 
+
+    if (key == "NAME") {
+      printable_name = value;
+    } else if (key == "VERSION_ID") {
+      version_id = value;
+    }
+
+    if (!printable_name.empty() && !version_id.empty()) {
+      break;
+    }
+  }
+  return (!printable_name.empty() || !version_id.empty());
+}
+
+bool GetKernelInfo(struct utsname* buf) {
+  return (uname(buf) == 0);
+}
+
+
+
+
+
+static inline int parse_kernel_major(const std::string& release) {
+  // Examples: "6.8.0-31-generic", "5.15.0-122-generic"
+  int major = 0;
+  size_t i = 0;
+  bool saw_digit = false;
+  while (i < release.size() && std::isdigit(static_cast<unsigned char>(release[i]))) {
+    saw_digit = true;
+    major = major * 10 + (release[i] - '0');
+    ++i;
+  }
+  return saw_digit ? major : 0;
+}
+
+
+static inline bool iequals(const std::string& a, const std::string& b) {
+  if (a.size() != b.size()) return false;
+  for (size_t i = 0; i < a.size(); ++i) {
+    if (std::tolower(static_cast<unsigned char>(a[i])) !=
+        std::tolower(static_cast<unsigned char>(b[i]))) {
+      return false;
+    }
+  }
+  return true;
+}
+
+
+bool parseVersion(const std::string &versionStr, int &major, int &minor) {
+    std::istringstream iss(versionStr);
+    char dot;
+    if (!(iss >> major)) return false;
+    if (!(iss >> dot) || dot != '.') return false;
+    if (!(iss >> minor)) return false;
+    return true;
+}
+
+
+
+static inline bool is_ubuntu_24(const std::string& name, const std::string& version_id) {
+  if (!iequals(name, "Ubuntu")) {
+    return false;
+  }
+  if (version_id.empty())
+    return false;
+
+  int major, minor;
+  if (parseVersion(version_id, major, minor)) 
+    return major >= 24;
+  return false;
+}
+
+
+bool UserNamespaceSupported() {
+
+  if (std::getenv("MINI_SANDBOX_FORCE_USER_NAMESPACE") != nullptr)
+    return true;
+
+  std::string name, version;
+  if (!GetOSName(name, version)) {
+    return true;
+  }
+
+  if (is_ubuntu_24(name, version)) {
+    struct utsname u;
+    if (!GetKernelInfo(&u)) {
+      return true;
+    }
+  
+    const int major = parse_kernel_major(u.release);
+    if (major >= 6) {
+      return false;
+    }
+  }
+  return true;
+}
+

@@ -34,6 +34,7 @@ COPY ./ /app/mini-sandbox
 RUN /app/mini-sandbox/clean.sh
 
 ENV MINI_SANDBOX_DOCKER_PRIVILEGED=1
+ENV MINI_SANDBOX_FORCE_USER_NAMESPACE=1
 ENV PATH="/app/release/bin:$PATH"
 ENV LD_LIBRARY_PATH="/app/release/lib"
 ENV PYTHON=python3

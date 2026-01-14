@@ -86,7 +86,7 @@ $(BUILD_mini_tapbox):
 libmini-sandbox: $(LIB_mini_sandbox).a $(LIB_mini_sandbox).so
 
 $(LIB_mini_sandbox).so: $(OBJS_libmini_sandbox)
-	$(CXX) $(STD) $(FLAGS) $(CXXFLLAGS) -shared -o $@ $(OBJS_libmini_sandbox) $(LDFLAGS)
+	$(CXX) $(STD) $(FLAGS) $(CXXFLAGS) -shared -o $@ $(OBJS_libmini_sandbox) $(LDFLAGS)
 
 $(LIB_mini_sandbox).a: $(OBJS_libmini_sandbox)
 	$(AR) rcs $@ $^
@@ -105,7 +105,7 @@ $(LIB_mini_tapbox).a: $(OBJS_libmini_tapbox) $(MINITAP_BIN)
 	$(RANLIB) $@
 
 $(LIB_mini_tapbox).so: $(OBJS_libmini_tapbox) $(MINITAP_BIN)
-	$(CXX) $(STD) $(FLAGS) $(CXXFLLAGS) -shared -o $@ $(OBJS_libmini_tapbox) $(LDFLAGS)
+	$(CXX) $(STD) $(FLAGS) $(CXXFLAGS) -shared -o $@ $(OBJS_libmini_tapbox) $(LDFLAGS)
 
 $(BUILD_libmini_tapbox)/%.o: %.cc | $(BUILD_libmini_tapbox)
 	$(CXX) $(STD) $(FLAGS) $(CXXFLAGS) -DLIBMINISANDBOX -DMINITAP -I$(INCLUDE_DIR) -I$(MINITAP_OUT) -fPIC -c $< -o $@

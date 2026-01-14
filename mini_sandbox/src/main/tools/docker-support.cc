@@ -4,6 +4,7 @@
  */
 
 #include "docker-support.h"
+#include "src/main/tools/process-tools.h"
 
 static bool isDockerEnvPresent() {
   fs::path path("/.dockerenv");
@@ -38,6 +39,13 @@ enum DockerMode CheckDockerMode() {
     res = UNPRIVILEGED_CONTAINER;
   else 
     res = NO_CONTAINER;
+
+  bool user_namespace = UserNamespaceSupported();
+  // We treat systems where user namespaces are not supported
+  // as unprivileged containers where clone()/unshare() are not accessible
+  // and in those cases our sandbox will work best effort.
+  if (!user_namespace) 
+    res = UNPRIVILEGED_CONTAINER;
 
   return res;
 }

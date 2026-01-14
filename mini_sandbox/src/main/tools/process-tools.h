@@ -107,7 +107,9 @@ void Cleanup();
 int MiniSbxSetInternalEnv();
 int MiniSbxGetInternalEnv();
 std::string GetFirstFolder(const std::string& path);
-
+bool GetOSName(std::string& printable_name, std::string& version_id);
+bool GetKernelInfo(struct utsname* buf);
+bool UserNamespaceSupported();
 
 
 

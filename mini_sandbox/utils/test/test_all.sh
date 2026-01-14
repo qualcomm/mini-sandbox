@@ -6,6 +6,10 @@
 
 set -e 
 
+cat /etc/os-release
+
+uname -a
+
 SCRIPT_PATH="$(realpath "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
 pushd $SCRIPT_DIR > /dev/null
