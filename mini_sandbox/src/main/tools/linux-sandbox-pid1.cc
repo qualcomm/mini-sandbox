@@ -1069,7 +1069,7 @@ static void MountAndRemountRO(const std::string& full_sandbox_path, const std::s
                      full_sandbox_path.c_str(),
                      NULL, MS_REC | MS_BIND, 
                      NULL);
-  PRINT_DEBUG("%s mount: %s -> %s\n", __func__, item.c_str(),
+  PRINT_DEBUG("%s mounted: %s -> %s\n", __func__, item.c_str(),
               full_sandbox_path.c_str());
   result = RemountRO(item, full_sandbox_path);
 
@@ -1206,7 +1206,7 @@ void MountAllOverlayFs(std::vector<std::string> list_of_dirs, int depth) {
     DIE("ERROR: Cannot mount %s", r.c_str());
   }
   for (auto i : list_of_dirs) {
-    PRINT_DEBUG("MOUNTING MountAllOvelrlayFs(%s, %d)", i.c_str(), depth);
+    PRINT_DEBUG("%s(%s, %d)", __func__, i.c_str(), depth);
     try {
       MountOverlayFs(i, depth);
     } catch (const fs::filesystem_error &e) {
@@ -1225,17 +1225,17 @@ std::vector<std::string> GenerateListForOverlayFS() {
 
   std::vector<std::string> existingPaths;
 
-  for (const auto &path : paths) {
-    try {
-      if (fs::exists(path)) {
-        existingPaths.push_back(path);
-      }
-    } catch (const fs::filesystem_error &e) {
-      std::string msg = e.what();
-      PRINT_DEBUG("Filesystem error: %s", msg.c_str());
-    }
+  //for (const auto &path : paths) {
+  //  try {
+  //    if (fs::exists(path)) {
+  //      existingPaths.push_back(path);
+  //    }
+  //  } catch (const fs::filesystem_error &e) {
+  //    std::string msg = e.what();
+  //    PRINT_DEBUG("Filesystem error: %s", msg.c_str());
+  //  }
 
-  }
+  //}
 
   for (const auto &path : opt.overlayfsmount) {
     try {
@@ -1492,8 +1492,10 @@ int Pid1Main(void *args) {
       overlay_dirs = GenerateListForOverlayFS();
       MountAllOverlayFs(overlay_dirs, 0);
       AddLeftoverFoldersToBindMounts(overlay_dirs);
-      MakeFilesystemPartiallyReadOnly(true, overlay_dirs, mounts);
+
       MountAllMounts();
+
+      MakeFilesystemPartiallyReadOnly(true, overlay_dirs, mounts);
       makeEmptyHome();
     } else if (opt.use_overlayfs){
       PRINT_DEBUG("opt.use_overlayfs");
