@@ -45,6 +45,6 @@ ENV WORKSPACE="/app/mini-sandbox"
 
 
 ENTRYPOINT ["sh", "-c", "set -e && /app/mini-sandbox/mini_sandbox/utils/test/test_all.sh"]
-#ENTRYPOINT ["sh", "-c", "cd /app && /bin/bash"]
+
 
 

@@ -133,6 +133,8 @@ fs::path make_relative(const fs::path& target, const fs::path& base) {
 #include "src/main/tools/logging.h"
 #include "src/main/tools/process-tools.h"
 
+#define DEV_LINKS 4
+
 static int global_child_pid __attribute__((unused));
 extern DockerMode docker_mode;
 std::string home_dir;
@@ -472,14 +474,24 @@ void MountOverlayFs(std::string lowerdir, int depth) {
 
 
 static bool ends_with(const char *mnt_dir, const char *suffix) {
+  if (!mnt_dir || !suffix) return false;
   size_t len_dir = strlen(mnt_dir);
   size_t len_suffix = strlen(suffix);
   if (len_dir < len_suffix)
     return false;
-
   return strcmp(mnt_dir + len_dir - len_suffix, suffix) == 0;
 }
 
+
+static bool starts_with(const char* mnt_dir, const char* prefix) {
+  if (!mnt_dir || !prefix) return false;
+  size_t len_dir = strlen(mnt_dir);
+  size_t len_prefix = strlen(prefix);
+  if (len_dir < len_prefix)
+    return false;
+  return strncmp(mnt_dir, prefix, len_prefix) == 0;
+  
+}
 
 
 // We later remount everything read-only, except the paths for which this method
@@ -492,9 +504,11 @@ static bool ShouldBeWritable(const std::string &mnt_dir) {
   if (ends_with(mnt_dir.c_str(), "/proc")) 
     return true;
 
-  if (ends_with(mnt_dir.c_str(), "/tmp")) {
+  if (ends_with(mnt_dir.c_str(), "/tmp"))
     return true;
-  }
+
+  if (starts_with(mnt_dir.c_str(), "/dev"))
+    return true;
 
   if (opt.enable_pty && mnt_dir == "/dev/pts") {
     return true;
@@ -1009,15 +1023,33 @@ static void MountDev() {
     DIE("CreateTarget /dev");
   }
   const char *devs[] = {"/dev/null", "/dev/random", "/dev/urandom", "/dev/zero",
-                        NULL};
+                        "/dev/full", "/dev/tty", "/dev/console", NULL };
+
   for (int i = 0; devs[i] != NULL; i++) {
+    struct stat st;
+    if (stat(devs[i], &st) != 0)
+      continue;
     LinkFile(devs[i] + 1);
     if (mount(devs[i], devs[i] + 1, NULL, MS_BIND, NULL) < 0) {
-      DIE("mount");
+      DIE("mount %s", devs[i]);
     }
   }
-  if (symlink("/proc/self/fd", "dev/fd") < 0) {
-    DIE("symlink");
+ 
+  static const struct {
+      const char *link_path;
+      const char *target;
+  } links[DEV_LINKS] = {
+      { "dev/fd",     "/proc/self/fd"   },
+      { "dev/stdin",  "/proc/self/fd/0" },
+      { "dev/stdout", "/proc/self/fd/1" },
+      { "dev/stderr", "/proc/self/fd/2" },
+  };
+ 
+  for (int i = 0; i < DEV_LINKS; i++) {
+    PRINT_DEBUG("symlink(%s, %s)\n", links[i].target, links[i].link_path);
+    if (symlink(links[i].target, links[i].link_path) < 0) {
+      PRINT_DEBUG("symlink %s", links[i].target);
+    }
   }
 }
 
