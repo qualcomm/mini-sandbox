@@ -401,10 +401,16 @@ static void MountFilesystems() {
   // this is by bind-mounting it upon itself.
   PRINT_DEBUG("working dir: %s", opt.working_dir.c_str());
 
-  if (mount(opt.working_dir.c_str(), opt.working_dir.c_str(), nullptr, MS_BIND,
-            nullptr) < 0) {
-    DIE("mount(%s, %s, nullptr, MS_BIND, nullptr)", opt.working_dir.c_str(),
-        opt.working_dir.c_str());
+  if (mount(opt.working_dir.c_str(), opt.working_dir.c_str(), nullptr,
+            MS_BIND, nullptr) < 0) {
+      // If working_dir is also a mount point we need to remount it via MS_REMOUNT
+      // and can't just bind mount . This is likely the cause of the error. If 
+      // the next mount fails too something else is going on and need to fail
+      if ( mount(opt.working_dir.c_str(), opt.working_dir.c_str(), nullptr,
+            MS_BIND | MS_REMOUNT, nullptr) < 0) {
+          DIE("mount(%s, %s, nullptr, MS_BIND, nullptr)", opt.working_dir.c_str(),
+              opt.working_dir.c_str());
+      }
   }
 }
 
@@ -528,10 +534,6 @@ bool alreadyMounted(const char *str, std::vector<std::string> overlay_dirs) {
     return true;
   }
 
-  if (isDevPath(str)) {
-    return false;
-  }
-
   for (const auto &pathStr : overlay_dirs) {
     fs::path path(pathStr);
     if (isSubpath(path, inputPath) || isSubpath(inputPath, path)) {
@@ -569,9 +571,13 @@ bool alreadyMounted(const char *str, std::vector<std::string> overlay_dirs) {
     return true;
   }
 
-  fs::path dev("/dev");
-  if (isSubpath(dev, inputPath) || isSubpath(inputPath, dev)) {
+  if (isDevPath(str)) {
     return true;
+  }
+
+  fs::path dev("/dev");
+  if (isSubpath(dev, inputPath)) {
+    return false;
   }
 
   return false;
@@ -619,7 +625,7 @@ AddLeftoverFoldersToBindMounts(std::vector<std::string> &overlay_dirs) {
             }
           }
           if (!alreadyInBinds) {
-            PRINT_DEBUG("ADDING %s in InternalReadOnlyPaths", path.c_str());
+            PRINT_DEBUG("ADDING %s in the internal ReadOnlyPaths", path.c_str());
             ReadOnlyPaths.insert(path);
           }
         }
@@ -663,7 +669,7 @@ static void MakeFilesystemPartiallyReadOnly(bool need_mount, std::vector<std::st
       std::string type(ent->mnt_type);
       if (type.compare("autofs") == 0 || type.compare("nfs") == 0) {
         std::string base = GetFirstFolder(ent->mnt_dir);
-        PRINT_DEBUG("%s mounted in autofs/nfs. Deferring mount of %s\n", ent->mnt_dir, base.c_str());
+        PRINT_DEBUG("%s mounted in autofs/nfs. Should already be under %s\n", ent->mnt_dir, base.c_str());
         if (base != "")
           AutoFSRoots.insert(base);
         continue;
@@ -1221,25 +1227,7 @@ void MountAllOverlayFs(std::vector<std::string> list_of_dirs, int depth) {
 }
 
 std::vector<std::string> GenerateListForOverlayFS() {
-  std::vector<std::string> paths = {"/boot",   "/etc",  "/lib", "/usr",
-                                    "/lib64", "/mnt", "/sbin",
-                                    "/srv",   "/bin",    "/cm",   "/emul",
-                                    "/lib32", "/libx32",  "/dev/shm"};
-
   std::vector<std::string> existingPaths;
-
-  //for (const auto &path : paths) {
-  //  try {
-  //    if (fs::exists(path)) {
-  //      existingPaths.push_back(path);
-  //    }
-  //  } catch (const fs::filesystem_error &e) {
-  //    std::string msg = e.what();
-  //    PRINT_DEBUG("Filesystem error: %s", msg.c_str());
-  //  }
-
-  //}
-
   for (const auto &path : opt.overlayfsmount) {
     try {
       if (fs::exists(path)) {
@@ -1250,7 +1238,6 @@ std::vector<std::string> GenerateListForOverlayFS() {
       PRINT_DEBUG("Filesystem error: %s", msg.c_str());
     }
   }
-
   return existingPaths;
 }
 
@@ -1410,9 +1397,6 @@ static void MountWorkingDirMountPoint(const std::string& mount_point) {
 
   int res = 0;
 
-  //if ( mount_point != "/" && !isSubpath(mount_point, home_dir))
-  //  res = MiniSbxMountOverlay(mount_point);
-
   if (opt.parents_writable)
     res += MiniSbxMountWrite(top_level);
   else {   
@@ -1495,9 +1479,7 @@ int Pid1Main(void *args) {
       overlay_dirs = GenerateListForOverlayFS();
       MountAllOverlayFs(overlay_dirs, 0);
       AddLeftoverFoldersToBindMounts(overlay_dirs);
-
       MountAllMounts();
-
       MakeFilesystemPartiallyReadOnly(true, overlay_dirs, mounts);
       makeEmptyHome();
     } else if (opt.use_overlayfs){

@@ -45,3 +45,4 @@ done
 check_exit $SCRIPT_DIR/test_default_write.sh
 check_exit $SCRIPT_DIR/test_default_tap.sh
 check_exit $SCRIPT_DIR/test_tap_firewall.sh
+check_exit $SCRIPT_DIR/test_readonly.sh
