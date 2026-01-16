@@ -139,7 +139,7 @@ static int global_child_pid __attribute__((unused));
 extern DockerMode docker_mode;
 std::string home_dir;
 std::set<std::string> ReadOnlyPaths;
-std::set<std::string> AutoFSRoots;
+
 
 void MountAllOverlayFs(std::vector<std::string> list_of_dirs, int depth);
 void MountOverlayFs(std::string lowerdir, int depth);
@@ -684,8 +684,6 @@ static void MakeFilesystemPartiallyReadOnly(bool need_mount, std::vector<std::st
       if (type.compare("autofs") == 0 || type.compare("nfs") == 0) {
         std::string base = GetFirstFolder(ent->mnt_dir);
         PRINT_DEBUG("%s mounted in autofs/nfs. Should already be under %s\n", ent->mnt_dir, base.c_str());
-        if (base != "")
-          AutoFSRoots.insert(base);
         continue;
       }
 
@@ -1128,16 +1126,8 @@ static void MountReadOnly(const Container& container) {
   
     if (fs::exists(full_sandbox_path, ec)) {
       const char* item_str = item.c_str();
-
-      std::string first_folder = GetFirstFolder(item);
-      if (! ( AutoFSRoots.find(first_folder) != AutoFSRoots.end())) {
-        PRINT_DEBUG("%s already exists (%s). Not mounting again\n", full_sandbox_path.c_str(), item_str);      
-        continue;
-      }
-      else {
-        PRINT_DEBUG("%s already exists (%s) But mounting again cause in the AutoFSRoots\n", full_sandbox_path.c_str(), 
-                        item_str); 
-      }
+      PRINT_DEBUG("%s already exists (%s) But mounting again cause requested by "
+                        "user input\n", full_sandbox_path.c_str(), item_str); 
     }
     if (!ec)
       MountAndRemountRO(full_sandbox_path, item);
