@@ -4,7 +4,6 @@
 ## SPDX-License-Identifier: MIT
 ##
 
-set -ex
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_BASE_DIR=$(realpath "$SCRIPT_DIR/../../../")

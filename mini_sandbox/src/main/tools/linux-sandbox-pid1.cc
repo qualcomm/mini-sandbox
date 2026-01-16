@@ -550,14 +550,14 @@ bool alreadyMounted(const char *str, std::vector<std::string> overlay_dirs) {
 
   for (const auto &pathStr : overlay_dirs) {
     fs::path path(pathStr);
-    if (isSubpath(path, inputPath) || isSubpath(inputPath, path)) {
+    if (isSubpath(path, inputPath)) {
       return true;
     }
   }
 
   for (const auto &pathStr : opt.writable_files) {
     fs::path path(pathStr);
-    if (isSubpath(path, inputPath) || isSubpath(inputPath, path)) {
+    if (isSubpath(path, inputPath)) {
       return true;
     }
   }
@@ -629,7 +629,7 @@ AddLeftoverFoldersToBindMounts(std::vector<std::string> &overlay_dirs) {
             continue;
         }
         bool already_mounted = alreadyMounted(entry_path_str, overlay_dirs); 
-        PRINT_DEBUG(" result of alreadyMonted() == %d\n", already_mounted);
+        PRINT_DEBUG(" result of alreadyMounted() == %d\n", already_mounted);
         if (!already_mounted) {
           bool alreadyInBinds = false;
           for (const auto &s : opt.bind_mount_sources) {
@@ -1168,12 +1168,11 @@ static void MountAllMounts() {
                                         opt.bind_mount_targets[i]);
 
     MountAndRemountRO(full_sandbox_path, opt.bind_mount_sources[i]);
-  }
+  }  
 
   MountReadOnly(ReadOnlyPaths);
 
   for (const std::string &writable_file : opt.writable_files) {
-    PRINT_DEBUG("writable: %s", writable_file.c_str());
     const std::string full_writable_file_path(opt.sandbox_root + writable_file);
     const char *full_writable_path_str = full_writable_file_path.c_str();
     PRINT_DEBUG(" writable mapped to: %s", full_writable_path_str);
@@ -1182,12 +1181,14 @@ static void MountAllMounts() {
     if (ec)
       continue;
     CreateTarget(full_writable_path_str, isDir);
+    PRINT_DEBUG("writable mount: %s", writable_file.c_str());
     if (mount(writable_file.c_str(), full_writable_path_str, nullptr,
               MS_BIND | MS_REC, nullptr) < 0) {
       DIE("mount(%s, %s, nullptr, MS_BIND | MS_REC, nullptr)",
           writable_file.c_str(), full_writable_path_str);
     }
   }
+
   // Make sure that the working directory is writable (unlike most of the rest
   // of the file system, which is read-only by default). The easiest way to do
   // this is by bind-mounting it upon itself.
