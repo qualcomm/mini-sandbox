@@ -578,7 +578,7 @@ bool ToBeMounted(const char *str, std::vector<std::string> overlay_dirs) {
   for (const auto &pathStr : opt.bind_mount_sources) {
     fs::path path(pathStr);
     if (isSubpath(pathStr, inputPath)) {
-      PRINT_DEBUG("bind_mount subpath")
+      PRINT_DEBUG("bind_mount subpath");
       return true;
     }
   }
@@ -641,33 +641,80 @@ void makeEmptyHome() {
 // following functions will make sure to mount it. The goal is to make sure that
 // all system folders are mounted (then we'll make them read-only)
 static void
-AddLeftoverFoldersToBindMounts(std::vector<std::string> &overlay_dirs) {
+AddLeftoverFoldersToReadOnlyPaths(std::vector<std::string> &overlay_dirs) {
 
   std::string root_path = "/";
-  try {
+  std::error_code ec;
 
-    for (const auto &entry : fs::directory_iterator(root_path)) {
-      if (fs::is_directory(entry.status())) {
-        std::string path = entry.path().string();
-        const char *entry_path_str = path.c_str();
-        bool deferred_mount = ToBeMounted(entry_path_str, overlay_dirs); 
-        PRINT_DEBUG(" result of ToBeMounted() == %d\n", deferred_mount);
+  fs::directory_iterator it(
+    root_path,
+    fs::directory_options::skip_permission_denied,
+    ec
+  );
 
-        // If deferred_mount is false it means that nobody have indicated a policy
-        // to mount this folder. We'll add it to our internal ReadOnlyPaths structure
-        // and will mount later as read-only. Otherwise we already have in place the
-        // rules to mount it and the following methods will mount accordingly
-        if (!deferred_mount) {
-            PRINT_DEBUG("ADDING %s in the internal ReadOnlyPaths", path.c_str());
-            ReadOnlyPaths.insert(path);
+  fs::directory_iterator end;
+
+  if (ec) {
+    PRINT_DEBUG("Cant access root /");
+    std::string msg = ec.message();
+    PRINT_DEBUG("%s", msg.c_str());
+    return;
+  }
+
+  for (; it != end; ) {
+      fs::directory_entry entry = *it;
+      entry.symlink_status(ec);
+      if (ec) {
+          PRINT_DEBUG("symlink_status error for %s", entry.path().c_str());
+          ec.clear();
+      } else {
+        if (fs::is_directory(entry.status())) {
+          std::string path = entry.path().string();
+          const char *entry_path_str = path.c_str();
+          bool deferred_mount = ToBeMounted(entry_path_str, overlay_dirs); 
+          PRINT_DEBUG(" result of ToBeMounted() == %d\n", deferred_mount);
+  
+          // If deferred_mount is false it means that nobody have indicated a policy
+          // to mount this folder. We'll add it to our internal ReadOnlyPaths structure
+          // and will mount later as read-only. Otherwise we already have in place the
+          // rules to mount it and the following methods will mount accordingly
+          if (!deferred_mount) {
+              PRINT_DEBUG("ADDING %s in the internal ReadOnlyPaths", path.c_str());
+              ReadOnlyPaths.insert(path);
+          }
         }
       }
-    }
-  } catch (const fs::filesystem_error &e) {
-    std::cerr << "Filesystem error: " << e.what() << std::endl;
-  } catch (const std::exception &e) {
-    std::cerr << "General error: " << e.what() << std::endl;
+      it.increment(ec);
+      if (ec) {
+          PRINT_DEBUG("increment error for %s", entry.path().c_str());
+          ec.clear();
+      }
   }
+// 
+//  try {
+//
+//    for (const auto &entry : fs::directory_iterator(root_path)) {
+//      if (fs::is_directory(entry.status())) {
+//        std::string path = entry.path().string();
+//        const char *entry_path_str = path.c_str();
+//        bool deferred_mount = ToBeMounted(entry_path_str, overlay_dirs); 
+//        PRINT_DEBUG(" result of ToBeMounted() == %d\n", deferred_mount);
+//
+//        // If deferred_mount is false it means that nobody have indicated a policy
+//        // to mount this folder. We'll add it to our internal ReadOnlyPaths structure
+//        // and will mount later as read-only. Otherwise we already have in place the
+//        // rules to mount it and the following methods will mount accordingly
+//        if (!deferred_mount) {
+//            PRINT_DEBUG("ADDING %s in the internal ReadOnlyPaths", path.c_str());
+//            ReadOnlyPaths.insert(path);
+//        }
+//      }
+//    }
+//  } catch (const fs::filesystem_error &e) {
+//    std::cerr << "Filesystem error: " << e.what() << std::endl;
+//  } catch (const std::exception &e) {
+//    std::cerr << "General error: " << e.what() << std::endl;
+//  }
 
   return;
 }
@@ -1533,7 +1580,7 @@ int Pid1Main(void *args) {
       mounts = CountMounts();
       MountWorkingDirMountPoint(mount_point);
       overlay_dirs = GenerateListForOverlayFS();
-      AddLeftoverFoldersToBindMounts(overlay_dirs);
+      AddLeftoverFoldersToReadOnlyPaths(overlay_dirs);
       MountAllMounts();
       MountAllOverlayFs(overlay_dirs, 0);
       MakeFilesystemPartiallyReadOnly(true, overlay_dirs, mounts);
