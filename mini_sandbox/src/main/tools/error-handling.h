@@ -35,6 +35,7 @@ enum class ErrorCode : int {
   LogFileNotUnique = -7,
   IllegalConfiguration = -8,
   FileReadAndWrite = -9,
+  NestedSandbox = -10,
   GeneralOSError = -100,
   Unknown = -1000
 };
@@ -61,6 +62,8 @@ inline std::string GetErrorMessage(ErrorCode code) {
       return " : Illegal configuration. Overlay folder can't be inside a writable directory";
     case ErrorCode::FileReadAndWrite:
       return " : Illegal configuration. File mounted as read and write at the same time";
+    case ErrorCode::NestedSandbox:
+      return " : Cannot nest multiple sandbox. The process is already running inside mini-sandbox.";
     case ErrorCode::GeneralOSError:
       return " : OS Error";
     case ErrorCode::Unknown:
@@ -78,6 +81,7 @@ typedef struct {
 int MiniSbxReport(const char* fmt, ...);
 int MiniSbxReportGenericError(const std::string& msg);
 int MiniSbxReportError(const std::string msg, ErrorCode code);
+int MiniSbxReportRecoverableError(const std::string msg, ErrorCode code);
 MiniSbxError MiniSbxGetError();
 const char* MiniSbxGetErrorMsg();
 int MiniSbxGetErrorCode();

@@ -370,7 +370,7 @@ int MiniSbxStart() {
 #if (!(LIBMINISANDBOX))
     SpawnChild(true);  
 #else
-    return MiniSbxReportGenericRecoverableError("Already running inside mini-sandbox");
+    return MiniSbxReportRecoverableError("Already running inside mini-sandbox",ErrorCode::NestedSandbox);
 #endif
   }
 
