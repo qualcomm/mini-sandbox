@@ -17,9 +17,6 @@
  * mount, UTS, IPC and PID namespace.
  */
 
-#include "src/main/tools/linux-sandbox-pid1.h"
-#include "src/main/tools/docker-support.h"
-
 #include <errno.h>
 #include <fcntl.h>
 #include <grp.h>
@@ -77,6 +74,14 @@ namespace fs = std::experimental::filesystem;
 #include <linux/capability.h>
 #include <sys/syscall.h>
 
+#include "src/main/tools/linux-sandbox-options.h"
+#include "src/main/tools/linux-sandbox.h"
+#include "src/main/tools/logging.h"
+#include "src/main/tools/process-tools.h"
+#include "src/main/tools/linux-sandbox-pid1.h"
+#include "src/main/tools/docker-support.h"
+
+#define DEV_LINKS 4
 #define CAP_VERSION _LINUX_CAPABILITY_VERSION_3
 #define CAP_WORDS   _LINUX_CAPABILITY_U32S_3
 #define BIT(n)                       (1UL << (n))
@@ -128,13 +133,6 @@ fs::path make_relative(const fs::path& target, const fs::path& base) {
 }
 #endif
 
-#include "src/main/tools/linux-sandbox-options.h"
-#include "src/main/tools/linux-sandbox.h"
-#include "src/main/tools/logging.h"
-#include "src/main/tools/process-tools.h"
-
-#define DEV_LINKS 4
-
 static int global_child_pid __attribute__((unused));
 extern DockerMode docker_mode;
 std::string home_dir;
@@ -145,7 +143,7 @@ void MountAllOverlayFs(std::vector<std::string> list_of_dirs, int depth);
 void MountOverlayFs(std::string lowerdir, int depth);
 std::vector<std::string> GenerateListForOverlayFS();
 bool isSubpath(const fs::path &base, const fs::path &sub);
-bool alreadyMounted(const char *str, std::vector<std::string> overlay_dirs);
+bool ToBeMounted(const char *str, std::vector<std::string> overlay_dirs);
 
 static bool isDevPath(const char *str) { return std::strcmp(str, "/dev") == 0; }
 
@@ -534,71 +532,98 @@ bool contains(const std::vector<std::string> &vec, const char *str) {
 }
 
 
-// This checks if sub is a subpath of base
-
-
-bool alreadyMounted(const char *str, std::vector<std::string> overlay_dirs) {
+// When we are running in opt.default mode, we wanna try to mount the filesystem
+// starting from root as read-only. However, we want to do this by taking into 
+// account the user input that tell us how to mount certain locations
+// (i.e, mount as read-only, read-write, overlayfs, tmpfs).
+// This method checks if any of the subpath of the root "/" is going to be mounted 
+// according to a specific policy, or if we should just mount it as read-only, which
+// is our default in most of the cases.
+bool ToBeMounted(const char *str, std::vector<std::string> overlay_dirs) {
 
   fs::path inputPath(str);
   PRINT_DEBUG("is %s already mounted?\n", str);
+  // Now we check if inputPath is supposed to be mounted according to any of 
+  // our internal or user-provided policies
 
-  // This check must be done as early as possible as for home_dir we have a
-  // special logic in the default case
+
+  // The home directory is critical so we handle it and its subfolders
+  // separately later
   if (isSubpath(home_dir, inputPath) || isSubpath(inputPath, home_dir)) {
+    PRINT_DEBUG("home_dir subpath %s", home_dir.c_str());
     return true;
   }
 
+  // If the inputPath is a subpath of a path requested to be mount as
+  // overlay, we'll defer its mount
   for (const auto &pathStr : overlay_dirs) {
     fs::path path(pathStr);
     if (isSubpath(path, inputPath)) {
+      PRINT_DEBUG("overlay subpath");
       return true;
     }
   }
 
+  // If the inputPath is a subpath of a path requested to be mount as
+  // write, we'll defer its mount
   for (const auto &pathStr : opt.writable_files) {
     fs::path path(pathStr);
     if (isSubpath(path, inputPath)) {
+      PRINT_DEBUG("writable subpath");
       return true;
     }
   }
 
+  // Same thing as before for paths requested to be bind mounted
+  for (const auto &pathStr : opt.bind_mount_sources) {
+    fs::path path(pathStr);
+    if (isSubpath(pathStr, inputPath)) {
+      PRINT_DEBUG("bind_mount subpath")
+      return true;
+    }
+  }
+ 
+
+  // These are the paths that are not explicitly requested by the user
+  // and that we mount as read-only . If `inputPath` doesn't fall in 
+  // any categories it'll be added here later so this is just to make sure
+  // we are not adding the same path twice
   for (const auto& ro_path : ReadOnlyPaths) {
     fs::path readable_path(ro_path);
     if (isSubpath(inputPath, readable_path)) {
+      PRINT_DEBUG("ReadOnly subpath");
       return true;
     }
   }
 
-  fs::path overlay_path(opt.tmp_overlayfs);
-  if (isSubpath(overlay_path, inputPath) ||
-      isSubpath(inputPath, overlay_path)) {
-    return true;
-  }
-  fs::path sandbox_root_path(opt.sandbox_root);
-  if (isSubpath(sandbox_root_path, inputPath) ||
-      isSubpath(inputPath, sandbox_root_path)) {
+  // /tmp and all its subpaths have to be excluded cause that's where
+  // we're going to have the sandbox_root and the overlayfs work dir.
+  // We'll have a dedicated policy for mounting /tmp
+  fs::path tmp("/tmp");
+  if (isSubpath(tmp, inputPath)) {
+    PRINT_DEBUG("/tmp subpath");
     return true;
   }
 
+  // We have a dedicated policy for the working dir's subfolders (read/write)
+  // as well as the working dir parent folders (overlay). We'll mount later
+  // accordingly
   fs::path work_dir(opt.working_dir);
   if (isSubpath(work_dir, inputPath) || isSubpath(inputPath, work_dir)) {
+    PRINT_DEBUG("opt.working_dir subpath or parent path");
     return true;
   }
 
+  // MountDev takes care of things under /dev here...
   if (isDevPath(str)) {
+    PRINT_DEBUG("/dev");
     return true;
-  }
-
-  fs::path dev("/dev");
-  if (isSubpath(dev, inputPath)) {
-    return false;
   }
 
   return false;
 }
 
 void makeEmptyHome() {
-
   if (home_dir.empty()) {
     DIE("HOME environment variable not set. Indicate it with -r option");
   }
@@ -618,30 +643,23 @@ void makeEmptyHome() {
 static void
 AddLeftoverFoldersToBindMounts(std::vector<std::string> &overlay_dirs) {
 
-  std::string root_path = "/"; // Root directory
+  std::string root_path = "/";
   try {
 
     for (const auto &entry : fs::directory_iterator(root_path)) {
       if (fs::is_directory(entry.status())) {
         std::string path = entry.path().string();
         const char *entry_path_str = path.c_str();
-        if (ends_with(entry_path_str, "/tmp")) {
-            continue;
-        }
-        bool already_mounted = alreadyMounted(entry_path_str, overlay_dirs); 
-        PRINT_DEBUG(" result of alreadyMounted() == %d\n", already_mounted);
-        if (!already_mounted) {
-          bool alreadyInBinds = false;
-          for (const auto &s : opt.bind_mount_sources) {
-            if (s == path) {
-              alreadyInBinds = true;
-              break;
-            }
-          }
-          if (!alreadyInBinds) {
+        bool deferred_mount = ToBeMounted(entry_path_str, overlay_dirs); 
+        PRINT_DEBUG(" result of ToBeMounted() == %d\n", deferred_mount);
+
+        // If deferred_mount is false it means that nobody have indicated a policy
+        // to mount this folder. We'll add it to our internal ReadOnlyPaths structure
+        // and will mount later as read-only. Otherwise we already have in place the
+        // rules to mount it and the following methods will mount accordingly
+        if (!deferred_mount) {
             PRINT_DEBUG("ADDING %s in the internal ReadOnlyPaths", path.c_str());
             ReadOnlyPaths.insert(path);
-          }
         }
       }
     }
@@ -657,7 +675,7 @@ AddLeftoverFoldersToBindMounts(std::vector<std::string> &overlay_dirs) {
 // The function MakeFilesystemPartiallyReadonly can be invoked to remount the mount points in /proc/self/mounts in
 // read-only. For it to succeed to mount a certain mount point, e.g., /a/b , we need /a/b to be already mounted
 // in the new root. Since this function can be invoked in two different modes, one chroot-ed and the other that 
-// uses the same root, we use the toggle 'need_mount' to state that we need to mount before remounting as read-only.
+// uses the parent's root, we use the toggle 'need_mount' to state that we need to mount before remounting as read-only.
 static void MakeFilesystemPartiallyReadOnly(bool need_mount, std::vector<std::string>& overlay_dirs, int num_of_mounts) {
 
   FILE *mounts = setmntent("/proc/self/mounts", "r");
@@ -678,20 +696,35 @@ static void MakeFilesystemPartiallyReadOnly(bool need_mount, std::vector<std::st
 
     std::string mnt_dir(ent->mnt_dir);
     if (need_mount) {
+      PRINT_DEBUG("%s need to mount %s ?", __func__, ent->mnt_dir);
+
       // We First check if we are dealing with autofs/nfs . In those cases we do not want to mount 
       // each mount point under the autofs/nfs entry point cause it'd take too much time.
       std::string type(ent->mnt_type);
       if (type.compare("autofs") == 0 || type.compare("nfs") == 0) {
-        std::string base = GetFirstFolder(ent->mnt_dir);
-        PRINT_DEBUG("%s mounted in autofs/nfs. Should already be under %s\n", ent->mnt_dir, base.c_str());
+        PRINT_DEBUG("%s mounted in autofs/nfs. Skipping", ent->mnt_dir);
         continue;
       }
 
-      // If it wasn't autofs/nfs we check if it's already mounted
-      bool has_been_mounted = alreadyMounted(ent->mnt_dir, overlay_dirs);
-      PRINT_DEBUG("already mounted -> %d\n", has_been_mounted);
-      if (has_been_mounted)
+      // At this point /proc/self/mounts might contain the new mounts we have done in the mount
+      // namespace. These "new" mount points will start with the sandbox_root path joined with
+      // the original path in the parent's mount namespace. If any of the entries starts with
+      // the sandbox_root , we discard those
+      if (isSubpath(opt.sandbox_root, ent->mnt_dir)) {
+        PRINT_DEBUG("%s is a subpath of the sandbox_root", ent->mnt_dir);
         continue;
+      }
+
+      // Finally we check if the path already exists inside the sandbox, i.e., by concatenating
+      // the sandbox_root with the entry of /proc/self/mounts
+      fs::path p(opt.sandbox_root + std::string(ent->mnt_dir));
+      std::error_code ec;
+      bool exists = fs::exists(p, ec); 
+      if (exists) {
+        PRINT_DEBUG("exists -> %d", exists);
+        continue;
+      }
+      PRINT_DEBUG("%s going to mount %s", __func__, ent->mnt_dir);
     }
 
     const std::string full_sandbox_path( opt.sandbox_root + std::string(ent->mnt_dir));
@@ -1500,9 +1533,9 @@ int Pid1Main(void *args) {
       mounts = CountMounts();
       MountWorkingDirMountPoint(mount_point);
       overlay_dirs = GenerateListForOverlayFS();
-      MountAllOverlayFs(overlay_dirs, 0);
       AddLeftoverFoldersToBindMounts(overlay_dirs);
       MountAllMounts();
+      MountAllOverlayFs(overlay_dirs, 0);
       MakeFilesystemPartiallyReadOnly(true, overlay_dirs, mounts);
       makeEmptyHome();
     } else if (opt.use_overlayfs){
