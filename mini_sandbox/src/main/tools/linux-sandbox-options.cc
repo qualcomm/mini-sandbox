@@ -624,6 +624,8 @@ int MiniSbxMountTmpfs(const std::string &path_c) { // -w
     return res;
   opt.tmpfs_dirs.emplace_back(path);
   PRINT_DEBUG("%s(%s)\n", __func__, path.c_str());
+  printf("%s(%s)\n", __func__, path.c_str());
+
   return res;
 }
 
