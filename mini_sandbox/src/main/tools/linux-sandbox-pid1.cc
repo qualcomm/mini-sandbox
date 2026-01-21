@@ -143,7 +143,7 @@ void MountAllOverlayFs(std::vector<std::string> list_of_dirs, int depth);
 void MountOverlayFs(std::string lowerdir, int depth);
 std::vector<std::string> GenerateListForOverlayFS();
 bool isSubpath(const fs::path &base, const fs::path &sub);
-bool ToBeMounted(const char *str, std::vector<std::string> overlay_dirs);
+bool ToBeMounted(const char *str);
 
 static bool isDevPath(const char *str) { return std::strcmp(str, "/dev") == 0; }
 
@@ -539,7 +539,7 @@ bool contains(const std::vector<std::string> &vec, const char *str) {
 // This method checks if any of the subpath of the root "/" is going to be mounted 
 // according to a specific policy, or if we should just mount it as read-only, which
 // is our default in most of the cases.
-bool ToBeMounted(const char *str, std::vector<std::string> overlay_dirs) {
+bool ToBeMounted(const char *str) {
 
   fs::path inputPath(str);
   PRINT_DEBUG("is %s already mounted?\n", str);
@@ -556,7 +556,7 @@ bool ToBeMounted(const char *str, std::vector<std::string> overlay_dirs) {
 
   // If the inputPath is a subpath of a path requested to be mount as
   // overlay, we'll defer its mount
-  for (const auto &pathStr : overlay_dirs) {
+  for (const auto &pathStr : opt.overlayfsmount) {
     fs::path path(pathStr);
     if (isSubpath(path, inputPath)) {
       PRINT_DEBUG("overlay subpath");
@@ -641,7 +641,7 @@ void makeEmptyHome() {
 // following functions will make sure to mount it. The goal is to make sure that
 // all system folders are mounted (then we'll make them read-only)
 static void
-AddLeftoverFoldersToReadOnlyPaths(std::vector<std::string> &overlay_dirs) {
+AddLeftoverFoldersToReadOnlyPaths() {
 
   std::string root_path = "/";
   std::error_code ec;
@@ -671,7 +671,7 @@ AddLeftoverFoldersToReadOnlyPaths(std::vector<std::string> &overlay_dirs) {
         if (fs::is_directory(entry.status())) {
           std::string path = entry.path().string();
           const char *entry_path_str = path.c_str();
-          bool deferred_mount = ToBeMounted(entry_path_str, overlay_dirs); 
+          bool deferred_mount = ToBeMounted(entry_path_str); 
           PRINT_DEBUG(" result of ToBeMounted() == %d\n", deferred_mount);
   
           // If deferred_mount is false it means that nobody have indicated a policy
@@ -698,7 +698,7 @@ AddLeftoverFoldersToReadOnlyPaths(std::vector<std::string> &overlay_dirs) {
 // read-only. For it to succeed to mount a certain mount point, e.g., /a/b , we need /a/b to be already mounted
 // in the new root. Since this function can be invoked in two different modes, one chroot-ed and the other that 
 // uses the parent's root, we use the toggle 'need_mount' to state that we need to mount before remounting as read-only.
-static void MakeFilesystemPartiallyReadOnly(bool need_mount, std::vector<std::string>& overlay_dirs, int num_of_mounts) {
+static void MakeFilesystemPartiallyReadOnly(bool need_mount, int num_of_mounts) {
 
   FILE *mounts = setmntent("/proc/self/mounts", "r");
   if (mounts == nullptr) {
@@ -1227,6 +1227,8 @@ static void MountAllMounts() {
 
   MountReadOnly(ReadOnlyPaths);
 
+  MountAllOverlayFs(opt.overlayfsmount, 0);
+
   for (const std::string &writable_file : opt.writable_files) {
     const std::string full_writable_file_path(opt.sandbox_root + writable_file);
     const char *full_writable_path_str = full_writable_file_path.c_str();
@@ -1554,11 +1556,9 @@ int Pid1Main(void *args) {
       const std::string mount_point = GetMountPointOf(opt.working_dir);
       mounts = CountMounts();
       MountWorkingDirMountPoint(mount_point);
-      overlay_dirs = GenerateListForOverlayFS();
-      AddLeftoverFoldersToReadOnlyPaths(overlay_dirs);
+      AddLeftoverFoldersToReadOnlyPaths();
       MountAllMounts();
-      MountAllOverlayFs(overlay_dirs, 0);
-      MakeFilesystemPartiallyReadOnly(true, overlay_dirs, mounts);
+      MakeFilesystemPartiallyReadOnly(true, mounts);
       makeEmptyHome();
     } else if (opt.use_overlayfs){
       PRINT_DEBUG("opt.use_overlayfs");
@@ -1584,7 +1584,7 @@ int Pid1Main(void *args) {
     // In this case overlay_dirs will be empty but we need it when
     // we call the same function and we're using the overlayfs at the 
     // same time
-    MakeFilesystemPartiallyReadOnly(false, overlay_dirs, mounts);
+    MakeFilesystemPartiallyReadOnly(false, mounts);
     MountProcAndSys();
   }
 
