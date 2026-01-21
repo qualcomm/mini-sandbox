@@ -690,34 +690,9 @@ AddLeftoverFoldersToReadOnlyPaths(std::vector<std::string> &overlay_dirs) {
           ec.clear();
       }
   }
-// 
-//  try {
-//
-//    for (const auto &entry : fs::directory_iterator(root_path)) {
-//      if (fs::is_directory(entry.status())) {
-//        std::string path = entry.path().string();
-//        const char *entry_path_str = path.c_str();
-//        bool deferred_mount = ToBeMounted(entry_path_str, overlay_dirs); 
-//        PRINT_DEBUG(" result of ToBeMounted() == %d\n", deferred_mount);
-//
-//        // If deferred_mount is false it means that nobody have indicated a policy
-//        // to mount this folder. We'll add it to our internal ReadOnlyPaths structure
-//        // and will mount later as read-only. Otherwise we already have in place the
-//        // rules to mount it and the following methods will mount accordingly
-//        if (!deferred_mount) {
-//            PRINT_DEBUG("ADDING %s in the internal ReadOnlyPaths", path.c_str());
-//            ReadOnlyPaths.insert(path);
-//        }
-//      }
-//    }
-//  } catch (const fs::filesystem_error &e) {
-//    std::cerr << "Filesystem error: " << e.what() << std::endl;
-//  } catch (const std::exception &e) {
-//    std::cerr << "General error: " << e.what() << std::endl;
-//  }
-
   return;
 }
+
 
 // The function MakeFilesystemPartiallyReadonly can be invoked to remount the mount points in /proc/self/mounts in
 // read-only. For it to succeed to mount a certain mount point, e.g., /a/b , we need /a/b to be already mounted
