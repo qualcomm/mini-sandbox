@@ -1558,6 +1558,10 @@ int Pid1Main(void *args) {
   }
 
   if (opt.use_default && !CanIterateRoot()) {
+    // opt.use_default is based on the fact that we can list the / folder but this 
+    // assumption might break in certain environments. If we can't iterate the
+    // root folder we end up in this branch and we'll mount a lighter version of 
+    // the read-only sandbox. 
     PRINT_DEBUG("opt.use_default && !CanIterateRoot\n");
     const std::string mount_point = GetMountPointOf(opt.working_dir);
     MiniSbxMountWrite(mount_point);
