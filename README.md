@@ -78,4 +78,4 @@ This project is heavily inspired by few other open-source projects that have bee
 
 ## License
 
-mini-sandbox is licensed under the [MIT License](https://spdx.org/licenses/MIT.html). See [License.txt](License.txt) for the full license text.
+mini-sandbox is licensed under the [MIT License](https://spdx.org/licenses/MIT.html). See [License.txt](LICENSE.txt) for the full license text.
