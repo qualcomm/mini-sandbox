@@ -18,15 +18,24 @@
 #include "src/main/tools/linux-sandbox-options.h"
 
 #include <mntent.h>
+
+#include <array>
+#include <cerrno>
+#include <csignal>
+#include <cstdlib>
+#include <cstring>
+#include <iostream>
 #include <errno.h>
 #include <fcntl.h>
 #include <math.h>
-#include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/resource.h>
+#include <sys/syscall.h>
+#include <sched.h>
+#include <signal.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -552,37 +561,9 @@ bool GetOSName(std::string& printable_name, std::string& version_id) {
   return (!printable_name.empty() || !version_id.empty());
 }
 
+
 bool GetKernelInfo(struct utsname* buf) {
   return (uname(buf) == 0);
-}
-
-
-
-
-
-static inline int parse_kernel_major(const std::string& release) {
-  // Examples: "6.8.0-31-generic", "5.15.0-122-generic"
-  int major = 0;
-  size_t i = 0;
-  bool saw_digit = false;
-  while (i < release.size() && std::isdigit(static_cast<unsigned char>(release[i]))) {
-    saw_digit = true;
-    major = major * 10 + (release[i] - '0');
-    ++i;
-  }
-  return saw_digit ? major : 0;
-}
-
-
-static inline bool iequals(const std::string& a, const std::string& b) {
-  if (a.size() != b.size()) return false;
-  for (size_t i = 0; i < a.size(); ++i) {
-    if (std::tolower(static_cast<unsigned char>(a[i])) !=
-        std::tolower(static_cast<unsigned char>(b[i]))) {
-      return false;
-    }
-  }
-  return true;
 }
 
 
@@ -596,19 +577,52 @@ bool parseVersion(const std::string &versionStr, int &major, int &minor) {
 }
 
 
+bool HasUserNamespaceSupport() {
+    static const char* const paths[] = {
+        "/proc/self/ns/user",
+        "/proc/self/ns/pid",
+        "/proc/self/ns/net",
+        "/proc/self/ns/ipc",
+    };
 
-static inline bool is_ubuntu_24(const std::string& name, const std::string& version_id) {
-  if (!iequals(name, "Ubuntu")) {
-    return false;
-  }
-  if (version_id.empty())
-    return false;
-
-  int major, minor;
-  if (parseVersion(version_id, major, minor)) 
-    return major >= 24;
-  return false;
+    for (const char* p : paths) {
+        if (access(p, F_OK) == -1) {
+            return false;
+        }
+    }
+    return true;
 }
+
+// Code heavily inspired by 
+//https://github.com/mozilla-firefox/firefox/blob/131497bb1b747587b2b21b1abf14f44ecffad805/security/sandbox/linux/SandboxInfo.cpp
+bool CanCreateUserNamespace() {
+    pid_t pid = static_cast<pid_t>(
+        syscall(__NR_clone, SIGCHLD | CLONE_NEWUSER,
+                nullptr, nullptr, nullptr, nullptr));
+
+    if (pid == 0) {
+        int rv = unshare(CLONE_NEWPID);
+        _exit(rv == 0 ? 0 : 1);
+    }
+
+    if (pid == -1) {
+        return false;
+    }
+
+    int status = 0;
+    pid_t w;
+    do {
+        w = waitpid(pid, &status, 0);
+    } while (w == -1 && errno == EINTR);
+
+    if (w == -1) {
+        return false;
+    }
+
+    bool ok = (WIFEXITED(status) && WEXITSTATUS(status) == 0);
+    return ok;
+}
+
 
 
 bool UserNamespaceSupported() {
@@ -616,22 +630,6 @@ bool UserNamespaceSupported() {
   if (std::getenv("MINI_SANDBOX_FORCE_USER_NAMESPACE") != nullptr)
     return true;
 
-  std::string name, version;
-  if (!GetOSName(name, version)) {
-    return true;
-  }
-
-  if (is_ubuntu_24(name, version)) {
-    struct utsname u;
-    if (!GetKernelInfo(&u)) {
-      return true;
-    }
-  
-    const int major = parse_kernel_major(u.release);
-    if (major >= 6) {
-      return false;
-    }
-  }
-  return true;
+  return HasUserNamespaceSupport() && CanCreateUserNamespace();
 }
 
