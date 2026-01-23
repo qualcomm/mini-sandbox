@@ -41,11 +41,6 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <linux/magic.h>
-
-#ifndef XFS_SUPER_MAGIC
-#define XFS_SUPER_MAGIC 0x58465342
-#endif
-
 #include <algorithm>
 #include <string>
 #include <unordered_set>
@@ -70,7 +65,6 @@ namespace fs = std::experimental::filesystem;
 // from linux/fs.h instead (cf. #2667).
 #include <linux/fs.h>
 #endif
-
 #include <linux/capability.h>
 #include <sys/syscall.h>
 
@@ -81,6 +75,11 @@ namespace fs = std::experimental::filesystem;
 #include "src/main/tools/linux-sandbox-pid1.h"
 #include "src/main/tools/docker-support.h"
 
+#ifndef XFS_SUPER_MAGIC
+#define XFS_SUPER_MAGIC 0x58465342
+#endif
+
+#define ROOT "/"
 #define DEV_LINKS 4
 #define CAP_VERSION _LINUX_CAPABILITY_VERSION_3
 #define CAP_WORDS   _LINUX_CAPABILITY_U32S_3
@@ -273,7 +272,7 @@ static void SetupSelfDestruction(int *pipe_to_parent) {
 static void SetupMountNamespace() {
   // Isolate only mounts in the slave (us) but not mounts in the master.
   // This is needed to support autofs
-  if (mount(nullptr, "/", nullptr, MS_REC | MS_SLAVE, nullptr) < 0) {
+  if (mount(nullptr, ROOT, nullptr, MS_REC | MS_SLAVE, nullptr) < 0) {
     DIE("mount");
   }
 }
@@ -375,6 +374,7 @@ static void MountFilesystems() {
   }
 
   for (const std::string &tmpfs_dir : opt.tmpfs_dirs) {
+    PRINT_DEBUG("mounting tmpfs %s", tmpfs_dir.c_str());
     if (mount("tmpfs", tmpfs_dir.c_str(), "tmpfs",
               MS_NOSUID | MS_NODEV | MS_NOATIME, nullptr) < 0) {
       DIE("mount(tmpfs, %s, tmpfs, MS_NOSUID | MS_NODEV | MS_NOATIME, nullptr)",
@@ -623,7 +623,7 @@ bool ToBeMounted(const char *str) {
   return false;
 }
 
-void makeEmptyHome() {
+void MakeEmptyHome() {
   if (home_dir.empty()) {
     DIE("HOME environment variable not set. Indicate it with -r option");
   }
@@ -631,6 +631,19 @@ void makeEmptyHome() {
   if (CreateTarget(sandboxed_path_homedir.c_str(), true) < 0) {
     DIE("CreateTarget %s", sandboxed_path_homedir.c_str());
   }
+}
+
+static bool CanIterateRoot() {
+    DIR* d = opendir(ROOT);
+    if (!d) return false;
+    errno = 0;
+    dirent* e = readdir(d);
+    if (!e && errno != 0) {
+        closedir(d);
+        return false;
+    }
+    closedir(d);
+    return true;
 }
 
 
@@ -643,7 +656,7 @@ void makeEmptyHome() {
 static void
 AddLeftoverFoldersToReadOnlyPaths() {
 
-  std::string root_path = "/";
+  std::string root_path = ROOT;
   std::error_code ec;
 
   fs::directory_iterator it(
@@ -1544,7 +1557,21 @@ int Pid1Main(void *args) {
         MountOverlayDirAsTmpfs();
   }
 
-  if (opt.use_default | opt.hermetic | opt.use_overlayfs) {
+  if (opt.use_default && !CanIterateRoot()) {
+    // opt.use_default is based on the fact that we can list the / folder but this 
+    // assumption might break in certain environments. If we can't iterate the
+    // root folder we end up in this branch and we'll mount a lighter version of 
+    // the read-only sandbox. 
+    PRINT_DEBUG("opt.use_default && !CanIterateRoot\n");
+    const std::string mount_point = GetMountPointOf(opt.working_dir);
+    MiniSbxMountWrite(mount_point);
+    MiniSbxMountWrite("/tmp");
+    MountFilesystems();
+    mounts = CountMounts();
+    MakeFilesystemPartiallyReadOnly(false, mounts);
+    MountProcAndSys();
+  }
+  else if (opt.use_default || opt.hermetic || opt.use_overlayfs) {
 
     MountSandboxAndGoThere();
     CreateEmptyFile();
@@ -1559,13 +1586,13 @@ int Pid1Main(void *args) {
       AddLeftoverFoldersToReadOnlyPaths();
       MountAllMounts();
       MakeFilesystemPartiallyReadOnly(true, mounts);
-      makeEmptyHome();
+      MakeEmptyHome();
     } else if (opt.use_overlayfs){
       PRINT_DEBUG("opt.use_overlayfs");
       std::vector<std::string> list_of_dirs = opt.overlayfsmount;
       MountAllOverlayFs(list_of_dirs, 0);
       MountAllMounts();
-      makeEmptyHome();
+      MakeEmptyHome();
     } else if (opt.hermetic) {
       PRINT_DEBUG("opt.hermetic");
       MountAllMounts();
