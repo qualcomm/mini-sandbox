@@ -341,10 +341,23 @@ static int ValidateOptions() {
   return 0;
 }
 
+static void StartLogging() {
+  // Open the file PRINT_DEBUG writes to.
+  // Must happen early enough so we don't lose any debugging output.
+  if (!opt.debug_path.empty()) {
+    global_debug = fopen(opt.debug_path.c_str(), "w");
+    if (!global_debug) {
+      MiniSbxReport("fopen(%s)", opt.debug_path.c_str());
+    }
+  }
+}
 
 
 int MiniSbxStart() {
   int res;
+  StartLogging();
+  PRINT_DEBUG("Start...");
+  PRINT_DEBUG("UserNamespaceSupported = %d", UserNamespaceSupported());
 
 #ifdef LIBMINISANDBOX
   docker_mode = CheckDockerMode();   
@@ -391,15 +404,6 @@ int MiniSbxStart() {
   res = ValidateOptions();
   if (res < 0)
     return res;
-  
-  // Open the file PRINT_DEBUG writes to.
-  // Must happen early enough so we don't lose any debugging output.
-  if (!opt.debug_path.empty()) {
-    global_debug = fopen(opt.debug_path.c_str(), "w");
-    if (!global_debug) {
-      MiniSbxReport("fopen(%s)", opt.debug_path.c_str());
-    }
-  }
 
 #if (!(LIBMINISANDBOX))
   // Start with default signal actions and a clear signal mask.
