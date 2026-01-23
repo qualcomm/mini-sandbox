@@ -6,6 +6,7 @@
 import os
 import ctypes
 import platform
+from enum import IntEnum
 
 script_dir = os.path.dirname( os.path.abspath(__file__))
 
@@ -14,10 +15,25 @@ script_dir = os.path.dirname( os.path.abspath(__file__))
 # LIB_NOT_LOADED -> something went wrong when loading the .so (see exception)
 # FEATURE_NOT_AVAILABLE -> the API is not available in the current shared object. Need to re-build
 # INVALID_ARG -> you called an API with wrong argument
+class MiniSandboxErrors(IntEnum):
+    """Errors"""
+    NOERROR = 0,
+    INVALID_FUNCTIONING_MODE = -1
+    SANDBOX_ROOT_NOT_UNIQUE = -2
+    INVALID_FOLDER = -3
+    OVERLAY_OPTION_NOT_SET = -4
+    PATH_DOES_NOT_EXIST = -5
+    NOT_AN_ABSOLUTE_PATH = -6
+    LOG_FILE_NOT_UNIQUE = -7
+    ILLEGAL_CONFIGURATION = -8
+    FILE_READ_AND_WRITE = -9
+    NESTED_SANDBOX = -10
+    GENERAL_OS_ERROR = -100
+    UNKNOWN = -1000
+    LIB_NOT_LOADED = -1001
+    FEATURE_NOT_AVAILABLE = -1002
+    INVALID_ARG = -1003
 
-LIB_NOT_LOADED = -1
-FEATURE_NOT_AVAILABLE = -2
-INVALID_ARG = -3
 
 _lib = None
 _tap = False
@@ -49,22 +65,22 @@ def init(tap_mode = False):
 
 def mini_sandbox_get_last_error_code():
     if _lib is None:
-        return LIB_NOT_LOADED
+        return MiniSandboxErrors.LIB_NOT_LOADED
     return _lib.mini_sandbox_get_last_error_code()
 
 def mini_sandbox_get_last_error_msg():
     if _lib is None:
-        return LIB_NOT_LOADED
+        return MiniSandboxErrors.LIB_NOT_LOADED
     return _lib.mini_sandbox_get_last_error_msg().decode()
 
 def mini_sandbox_enable_log(path):
     if _lib is None:
-        return LIB_NOT_LOADED
+        return MiniSandboxErrors.LIB_NOT_LOADED
     return _lib.mini_sandbox_enable_log(path.encode())
 
 def mini_sandbox_mount_parents_write(num_of_parents = -1):
     if _lib is None:
-        return LIB_NOT_LOADED
+        return MiniSandboxErrors.LIB_NOT_LOADED
     if num_of_parents == -1:
         return _lib.mini_sandbox_mount_parents_write()
     if num_of_parents > 0:
@@ -72,100 +88,100 @@ def mini_sandbox_mount_parents_write(num_of_parents = -1):
         parent = os.path.abspath(upper_lvls)
         if parent is not None:
             return _lib.mini_sandbox_mount_write(parent.encode())
-    return INVALID_ARG
+    return MiniSandboxErrors.INVALID_ARG
 
 def mini_sandbox_setup_default():
     if _lib is None:
-        return LIB_NOT_LOADED
+        return MiniSandboxErrors.LIB_NOT_LOADED
     return _lib.mini_sandbox_setup_default()
 
 def mini_sandbox_setup_custom(overlayfs_dir, sandbox_root):
     if _lib is None:
-       return LIB_NOT_LOADED
+       return MiniSandboxErrors.LIB_NOT_LOADED
     return _lib.mini_sandbox_setup_custom(overlayfs_dir.encode(), sandbox_root.encode())
 
 def mini_sandbox_setup_hermetic(sandbox_root):
     if _lib is None:
-        return LIB_NOT_LOADED
+        return MiniSandboxErrors.LIB_NOT_LOADED
     return _lib.mini_sandbox_setup_hermetic(sandbox_root.encode())
      
 def mini_sandbox_start():
     if _lib is None:
-        return LIB_NOT_LOADED
+        return MiniSandboxErrors.LIB_NOT_LOADED
     return _lib.mini_sandbox_start()
 
 def mini_sandbox_mount_bind(path):
     if _lib is None:
-       return LIB_NOT_LOADED
+       return MiniSandboxErrors.LIB_NOT_LOADED
     return _lib.mini_sandbox_mount_bind(path.encode())
 
 def mini_sandbox_mount_write(path):
     if _lib is None:
-        return LIB_NOT_LOADED
+        return MiniSandboxErrors.LIB_NOT_LOADED
     return _lib.mini_sandbox_mount_write(path.encode())
 
 def mini_sandbox_mount_tmpfs(path):
     if _lib is None:
-        return LIB_NOT_LOADED
+        return MiniSandboxErrors.LIB_NOT_LOADED
     return _lib.mini_sandbox_mount_tmpfs(path.encode())
 
 def mini_sandbox_mount_overlay(path):
     if _lib is None:
-        return LIB_NOT_LOADED
+        return MiniSandboxErrors.LIB_NOT_LOADED
     return _lib.mini_sandbox_mount_overlay(path.encode())
 
 def mini_sandbox_mount_empty_output_file(path):
     if _lib is None:
-        return LIB_NOT_LOADED
+        return MiniSandboxErrors.LIB_NOT_LOADED
     return _lib.mini_sandbox_mount_empty_output_file(path.encode())
 
 def mini_sandbox_share_network():
     if _lib is None:
-        return LIB_NOT_LOADED
+        return MiniSandboxErrors.LIB_NOT_LOADED
     return _lib.mini_sandbox_share_network()
 
 
 def mini_sandbox_allow_max_connections(max_connections):
     if _lib is None:
-        return LIB_NOT_LOADED
+        return MiniSandboxErrors.LIB_NOT_LOADED
     if _tap and hasattr(_lib, "mini_sandbox_allow_max_connections"):
         return _lib.mini_sandbox_allow_max_connections(max_connections)
-    return FEATURE_NOT_AVAILABLE
+    return MiniSandboxErrors.FEATURE_NOT_AVAILABLE
 
 def mini_sandbox_allow_connections(path):
     if _lib is None:
-        return LIB_NOT_LOADED
+        return MiniSandboxErrors.LIB_NOT_LOADED
     if _tap and hasattr(_lib, "mini_sandbox_allow_connections"):
         return _lib.mini_sandbox_allow_connections(path.encode())
-    raise FEATURE_NOT_AVAILABLE
+    raise MiniSandboxErrors.FEATURE_NOT_AVAILABLE
 
 def mini_sandbox_allow_ipv4(ip):
     if _lib is None:
-        return LIB_NOT_LOADED
+        return MiniSandboxErrors.LIB_NOT_LOADED
     if _tap and hasattr(_lib, "mini_sandbox_allow_ipv4"):
         return _lib.mini_sandbox_allow_ipv4(ip.encode())
-    return FEATURE_NOT_AVAILABLE
+    return MiniSandboxErrors.FEATURE_NOT_AVAILABLE
 
 def mini_sandbox_allow_domain(domain):
     if _lib is None:
-        return LIB_NOT_LOADED
+        return MiniSandboxErrors.LIB_NOT_LOADED
 
     if _tap and hasattr(_lib, "mini_sandbox_allow_domain"):
         return _lib.mini_sandbox_allow_domain(domain.encode())
-    return FEATURE_NOT_AVAILABLE
+    return MiniSandboxErrors.FEATURE_NOT_AVAILABLE
 
 def mini_sandbox_allow_all_domains():
     if _lib is None:
-        return LIB_NOT_LOADED
+        return MiniSandboxErrors.LIB_NOT_LOADED
     if _tap and hasattr(_lib, "mini_sandbox_allow_all_domains"):
         return _lib.mini_sandbox_allow_all_domains()
-    return FEATURE_NOT_AVAILABLE
+    return MiniSandboxErrors.FEATURE_NOT_AVAILABLE
 
 def mini_sandbox_allow_ipv4_subnet(subnet):
     if _lib is None:
-        return LIB_NOT_LOADED
+        return MiniSandboxErrors.LIB_NOT_LOADED
 
     if _tap and hasattr(_lib, "mini_sandbox_allow_ipv4_subnet"):
         return _lib.mini_sandbox_allow_ipv4_subnet(subnet.encode())
-    return FEATURE_NOT_AVAILABLE
+    return MiniSandboxErrors.FEATURE_NOT_AVAILABLE
 

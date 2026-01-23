@@ -73,6 +73,14 @@ int MiniSbxReportError(std::string function, ErrorCode code) {
   return UNRECOVERABLE_FAIL; 
 }
 
+int MiniSbxReportRecoverableError(std::string function, ErrorCode code) {
+  std::string err_msg = function + GetErrorMessage(code);
+  // We handle all errors at the same way in the library but we
+  // could potentially force some of them to crash the application
+  // depending on their importance
+  MiniSbxSetError(err_msg, code, true);
+  return RECOVERABLE_FAIL; 
+}
 
 MiniSbxError MiniSbxGetLastError() {
   return sbx_err;
