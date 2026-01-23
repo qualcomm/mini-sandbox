@@ -112,5 +112,11 @@ bool GetKernelInfo(struct utsname* buf);
 bool UserNamespaceSupported();
 
 
+enum UserNamespaceSupport {
+    NON_INIT,
+    USER_NS_SUPPORTED,
+    USER_NS_NOT_SUPPORTED
+};
 
+static UserNamespaceSupport user_ns_support = NON_INIT;
 #endif  // PROCESS_TOOLS_H__
