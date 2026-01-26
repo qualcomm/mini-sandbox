@@ -612,6 +612,9 @@ int MiniSbxMountWrite(const std::string &path_c) { // -w
   int res = 0;
   if ((res = ValidatePath(__func__, path)) < 0)
     return res;
+  if(path!=path_c){
+      opt.writable_files.emplace_back(path_c);
+  }
   opt.writable_files.emplace_back(path);
   PRINT_DEBUG("%s(%s)\n", __func__, path.c_str());
   return res;
