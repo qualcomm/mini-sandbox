@@ -32,7 +32,9 @@ def attempt_file_access(f_path = "/tmp/sandboxed_file"):
 
 if __name__ == "__main__":
     print("Running outside of the sandbox...")
-    file_path="./read_only"
+    file_path = os.path.join(script_dir, "read_only.test")
+    os.system(f"touch {file_path}")
+    os.system(f"chmod 444 {file_path}")
     res = mn_sbx.mini_sandbox_setup_default()
     assert(res == 0)
     # Mount all Python libraries in case Python isn't an executable.

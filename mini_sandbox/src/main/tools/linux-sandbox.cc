@@ -239,15 +239,7 @@ static pid_t SpawnPid1() {
     if (sandbox_res < 0) {
       MiniSbxReport("Failed in Pid1Main\n");
     }
-    pid_t lib_child = fork();
-    if (lib_child == 0) {
-      return 0;
-    }
-    else {
-      waitpid(lib_child, NULL);
-      exit();
-    }
-    //return 0;
+    return 0;
   } else {
 #endif
     // Signal the child that it can now proceed to spawn pid2.
