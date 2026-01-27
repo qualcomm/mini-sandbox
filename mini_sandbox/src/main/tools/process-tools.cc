@@ -628,7 +628,7 @@ bool CanCreateUserNamespace() {
 bool UserNamespaceSupported() {
   bool res = false;
   if (user_ns_support != NON_INIT)
-    res = user_ns_support;
+    res = (user_ns_support == USER_NS_SUPPORTED) ? true : false ;
   else if (std::getenv("MINI_SANDBOX_FORCE_USER_NAMESPACE") != nullptr)
     res = true;
   else {
