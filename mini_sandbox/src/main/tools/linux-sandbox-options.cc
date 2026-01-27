@@ -594,6 +594,10 @@ int MiniSbxMountBind(const std::string &c_path) { // -M
   // Add the current source path to both source and target lists
   opt.bind_mount_sources.emplace_back(path);
   opt.bind_mount_targets.emplace_back(path);
+  if(path!=c_path){
+    opt.bind_mount_sources.emplace_back(c_path);
+    opt.bind_mount_targets.emplace_back(c_path);
+  }
   PRINT_DEBUG("%s(%s)\n", __func__, path.c_str());
   return res;
 }
@@ -638,6 +642,9 @@ int MiniSbxMountOverlay(const std::string &path_c) {
     if ((res = ValidatePath(__func__, path)) < 0)
       return res;
     opt.overlayfsmount.emplace_back(overlayfsmount, 0, overlayfsmount.length());
+    if(overlayfsmount!=path_c){
+      opt.overlayfsmount.emplace_back(path_c, 0, overlayfsmount.length());
+    }
   } else {
     res = MiniSbxReportError(__func__, ErrorCode::OverlayOptionNotSet);
   }
