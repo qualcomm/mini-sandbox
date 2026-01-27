@@ -90,6 +90,5 @@ void logSystem() {
   logOSName();
   logLibc();
   logLibstdcpp();
-  PRINT_DEBUG("User namespaces supported -> %d\n", UserNamespaceSupported());
 }
 

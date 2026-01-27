@@ -940,7 +940,7 @@ static void drop_caps_ep_except(uint64_t keep) {
 
 
 void DropCapabilities() {
-  std::cout << "Warning: Sandbox cannot be fully enabled cause (either due to Docker or AppArmor). "
+  std::cout << "Warning: Sandbox cannot be fully enabled (either due to Docker or AppArmor). "
           "We'll just drop the capabilities of the current process but cannot provide advanced "
           "features such as usernamespace, overlayfs, rootless firewall, etc." << std::endl;
 
