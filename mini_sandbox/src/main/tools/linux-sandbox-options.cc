@@ -254,21 +254,18 @@ static int CreateOverlayfsDir(std::string& base_dir) {
 std::string CanonicPath(const std::string path_str, bool resolve_symlink) {
   try {
     fs::path path(path_str);
-    if (!resolve_symlink && fs::is_symlink(path)) {
-      return path.lexically_normal().string();
-    }
-
     if (fs::exists(path)) {
-      fs::path canonical_path = fs::canonical(path);
-      return canonical_path.string();
+      if (!resolve_symlink && fs::is_symlink(path)) {
+        return fs::absolute(path).string();
+      }
+      return fs::canonical(path).string();
     } else {
-      return path.lexically_normal().string(); 
+      return path.string(); 
       // If the path doesn't exist the best that we can do is
       // to return the original path. The parsing will likely
       // fail when we call ValidatePath, which instead requires
       // that the path exists.
     }
-
   } catch (const fs::filesystem_error &e) {
     PRINT_DEBUG("Filesystem error %s:", e.what());
     MiniSbxReport("Fs exception");
