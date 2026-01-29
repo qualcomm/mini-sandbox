@@ -1650,6 +1650,8 @@ int Pid1Main(void *args) {
     // doesn't use overlayfs or chroot, it just re-mounts
     // everything as read-only
     PRINT_DEBUG("Sandbox enabled in read-only mode\n");
+
+    MiniSbxMountWrite("/tmp");
     MountFilesystems();
     mounts = CountMounts();
     // In this case overlay_dirs will be empty but we need it when
