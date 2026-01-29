@@ -641,6 +641,47 @@ int MiniSbxMountOverlay(const std::string &path_c) {
   return res;
 }
 
+
+static void MiniSbxGetInitFile(std::string& init_path) {
+  if (opt.use_default) {
+    init_path = std::string(TMP) + "/" + std::string(MINI_SBX_TMP) + "/" + std::string(MINI_SBX_INIT);
+  }
+  else if (! opt.sandbox_root.empty()) {
+    init_path = opt.sandbox_root + "/" + std::string(TMP) + "/" + std::string(MINI_SBX_INIT);
+  }
+  else {
+    init_path = std::string(TMP) + "/" + std::string(MINI_SBX_INIT);
+  }
+}
+
+
+int MiniSbxReadInit() {
+  std::string init_path;
+  MiniSbxGetInitFile(init_path);  
+  std::ifstream in(init_path, std::ios::binary);
+  if (!in) return -1;
+  char c = 0;
+  in >> c;
+  if (c == '0') return 0;
+  if (c == '1') return 1;
+  return -1;
+}
+
+int MiniSbxCreateInit() {
+  std::string init_path;
+  MiniSbxGetInitFile(init_path);
+  std::ofstream out(init_path, std::ios::out | std::ios::trunc | std::ios::binary);
+  if (!out) {
+      return MiniSbxReportGenericError("could not open init file");
+  }
+  PRINT_DEBUG("init file created at %s", init_path.c_str());
+
+  out << "0\n"; 
+  out.close();
+  return 0;
+}
+
+
 int MiniSbxSetupDefault() {
   int res = 0;
   if (opt.hermetic || opt.use_overlayfs) {

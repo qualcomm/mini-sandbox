@@ -405,6 +405,9 @@ int MiniSbxStart() {
   if (res < 0)
     return res;
 
+  res = MiniSbxCreateInit();
+  if (res < 0)
+    return res;
 #if (!(LIBMINISANDBOX))
   // Start with default signal actions and a clear signal mask.
   ClearSignalMask();
@@ -524,6 +527,14 @@ int MiniSbxStart() {
    if (WIFEXITED(status)) {
           // Child exited normally, get its exit status
           int child_exit_code = WEXITSTATUS(status);
+          int init_status = MiniSbxReadInit();
+          // init_status tells us if the Pid1 inside the sandbox has completed the initialization process
+          // it evaluates to 0 if something went wrong, or 1 if everything went good. If we had a 
+          // mini-sandbox internal's problem we want to return -1 in the library and don't DIE the whole
+          // process. In the other cases instead we wanna exit cause the exit signal is coming from the 
+          // sandboxed process
+          if (init_status == 0) 
+            return -1;
           exit(child_exit_code); // Exit parent with the same code
       } else {
           // Child did not exit normally
