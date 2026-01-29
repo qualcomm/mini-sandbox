@@ -669,13 +669,22 @@ int MiniSbxReadInit() {
 
 int MiniSbxCreateInit() {
   std::string init_path;
+  std::error_code ec;
+
   MiniSbxGetInitFile(init_path);
+  fs::path init(init_path);
+  fs::path init_dir = init.parent_path();
+  fs::create_directories(init_dir, ec);
+  
+  if (ec) {
+    return MiniSbxReportGenericError(ec.message().c_str());;
+  }
   std::ofstream out(init_path, std::ios::out | std::ios::trunc | std::ios::binary);
+
   if (!out) {
       return MiniSbxReportGenericError("could not open init file");
   }
   PRINT_DEBUG("init file created at %s", init_path.c_str());
-
   out << "0\n"; 
   out.close();
   return 0;
