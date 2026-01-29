@@ -128,7 +128,7 @@ static int ValidateDir(const std::string& dir) {
   fs::path path(dir);
   try {
     if (!(fs::exists(path)) || !(fs::is_directory(path))) {
-      return MiniSbxReportError(__func__, ErrorCode::InvalidFolder);
+      return MiniSbxReportGenericRecoverableError("input folder does not exist");
     }
   } catch (const fs::filesystem_error &e) {
     PRINT_DEBUG("Filesystem error %s:", e.what());
@@ -209,7 +209,14 @@ int ValidateTmpNotRemounted(std::vector<std::string>& paths) {
 
 static int CreateSandboxRoot(const std::string& base_dir) {
   std::string rand_sandbox_root;
-  ValidateDir(base_dir);
+
+  int res = ValidateDir(base_dir);
+  if (res == UNRECOVERABLE_FAIL) return res;
+  if (res == RECOVERABLE_FAIL) {
+    if (CreateDirectories(base_dir) < 0)
+      return  MiniSbxReportError(__func__, ErrorCode::InvalidFolder);
+  }
+
   if (opt.sandbox_root.empty()) {
     rand_sandbox_root = CreateTempDirectory(base_dir);
     if (rand_sandbox_root.back() == '/') {
@@ -232,8 +239,11 @@ static int CreateOverlayfsDir(std::string& base_dir) {
   std::string tmp_overlayfs;
   int res = 0;
   res = ValidateDir(base_dir);
-  if (res < 0)
-      return res;
+  if (res == UNRECOVERABLE_FAIL) return res;
+  if (res == RECOVERABLE_FAIL) {
+    if (CreateDirectories(base_dir) < 0)
+      return MiniSbxReportError(__func__, ErrorCode::InvalidFolder);
+  }
 
   if (!opt.use_default)
     tmp_overlayfs = CreateTempDirectory(base_dir);
@@ -674,13 +684,10 @@ int MiniSbxCreateInit() {
   MiniSbxGetInitFile(init_path);
   fs::path init(init_path);
   fs::path init_dir = init.parent_path();
-  fs::create_directories(init_dir, ec);
-  
-  if (ec) {
-    return MiniSbxReportGenericError(ec.message().c_str());;
-  }
-  std::ofstream out(init_path, std::ios::out | std::ios::trunc | std::ios::binary);
+  if (CreateDirectories(init_dir.string()) < 0)
+    return -1;
 
+  std::ofstream out(init_path, std::ios::out | std::ios::trunc | std::ios::binary);
   if (!out) {
       return MiniSbxReportGenericError("could not open init file");
   }

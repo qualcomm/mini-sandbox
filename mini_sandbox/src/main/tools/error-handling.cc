@@ -16,9 +16,6 @@ Mode mode = Mode::Library;
 Mode mode = Mode::CLI;
 #endif
 
-#define UNRECOVERABLE_FAIL -1
-#define RECOVERABLE_FAIL -2
-
 MiniSbxError sbx_err;
 
 static void MiniSbxSetError(const std::string& err_msg, ErrorCode code, bool recoverable) {

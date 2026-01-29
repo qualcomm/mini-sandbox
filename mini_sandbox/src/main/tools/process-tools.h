@@ -86,9 +86,10 @@ void WaitPipe(int *pipe);
 // that it can proceed by writing a byte to the pipe.
 void SignalPipe(int *pipe);
 
-std::string CreateTempDirectory(const std::string& basePath);
-std::string CreateRandomFilename(const std::string& basePath);
-int CreateDirectory(const std::string& basePath, const std::string& dirName, std::string& out);
+std::string CreateTempDirectory(const std::string& base_path);
+std::string CreateRandomFilename(const std::string& base_path);
+int CreateDirectory(const std::string& base_path, const std::string& dir_name, std::string& out);
+int CreateDirectories(const std::string& base_path);
 int CountMounts();
 std::string GetCurrentWorkingDirectory();
 bool isSubpath(const fs::path &base, const fs::path &sub);
@@ -101,7 +102,7 @@ std::string GetLocalLib();
 uid_t get_outer_uid();
 gid_t get_outer_gid();
 
-void addIfNotPresent(std::vector<std::string>& paths, const char* pathToCheck);
+void addIfNotPresent(std::vector<std::string>& paths, const char* path);
 void Cleanup();
 
 int MiniSbxSetInternalEnv();
