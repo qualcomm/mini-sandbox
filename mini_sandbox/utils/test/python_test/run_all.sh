@@ -78,5 +78,7 @@ rm "$SCRIPT_DIR/../pyminisandbox-test-default.test"
 check_exit $PYTHON test_any_connection.py
 check_exit $PYTHON test_one_shot_connection.py
 check_exit $PYTHON test_err.py
+check_exit $PYTHON test_read_only.py
+check_exit $PYTHON test_read_only.py tap
 
 cd $ORIGINAL_DIR
