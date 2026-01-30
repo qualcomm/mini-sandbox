@@ -248,24 +248,24 @@ static int CreateOverlayfsDir(std::string& base_dir) {
   return res;
 }
 
+
 // This function is intended for usage in the APIs, so it's safe to assume that
 // every error is not recoverable
 std::string CanonicPath(const std::string path_str, bool resolve_symlink) {
   try {
     fs::path path(path_str);
-    if (!resolve_symlink && fs::is_symlink(path))
-      return path_str;
-
     if (fs::exists(path)) {
-      fs::path canonical_path = fs::canonical(path);
-      return canonical_path.string();
+      if (!resolve_symlink && fs::is_symlink(path)) {
+        return fs::absolute(path).string();
+      }
+      return fs::canonical(path).string();
     } else {
-      return path_str; // If the path doesn't exist the best that we can do is
-                       // to return the original path. The parsing will likely
-                       // fail when we call ValidatePath, which instead requires
-                       // that the path exists.
+      return path.string(); 
+      // If the path doesn't exist the best that we can do is
+      // to return the original path. The parsing will likely
+      // fail when we call ValidatePath, which instead requires
+      // that the path exists.
     }
-
   } catch (const fs::filesystem_error &e) {
     PRINT_DEBUG("Filesystem error %s:", e.what());
     MiniSbxReport("Fs exception");
@@ -585,8 +585,8 @@ int MiniSbxEnableLog(const std::string &path) {
   return res;
 }
 
-int MiniSbxMountBind(const std::string &c_path) { // -M
-  std::string path = CanonicPath(c_path, false);
+int MiniSbxMountBind(const std::string &input_path) { // -M
+  std::string path = CanonicPath(input_path, false);
   int res = 0;
   if ((res = ValidatePath(__func__, path)) < 0) {
     return res;
@@ -594,6 +594,10 @@ int MiniSbxMountBind(const std::string &c_path) { // -M
   // Add the current source path to both source and target lists
   opt.bind_mount_sources.emplace_back(path);
   opt.bind_mount_targets.emplace_back(path);
+  if(path!=input_path){
+    opt.bind_mount_sources.emplace_back(input_path);
+    opt.bind_mount_targets.emplace_back(input_path);
+  }
   PRINT_DEBUG("%s(%s)\n", __func__, path.c_str());
   return res;
 }
@@ -607,18 +611,21 @@ int MiniSbxMountBindSourceToTarget(const std::string &c_source, const std::strin
   return 0;
 }
 
-int MiniSbxMountWrite(const std::string &path_c) { // -w
-  std::string path = CanonicPath(path_c, false);
+int MiniSbxMountWrite(const std::string &input_path) { // -w
+  std::string path = CanonicPath(input_path, false);
   int res = 0;
   if ((res = ValidatePath(__func__, path)) < 0)
     return res;
+  if(path!=input_path){
+      opt.writable_files.emplace_back(input_path);
+  }
   opt.writable_files.emplace_back(path);
   PRINT_DEBUG("%s(%s)\n", __func__, path.c_str());
   return res;
 }
 
-int MiniSbxMountTmpfs(const std::string &path_c) { // -w
-  std::string path = CanonicPath(path_c, false);
+int MiniSbxMountTmpfs(const std::string &input_path) { // -w
+  std::string path = CanonicPath(input_path, false);
   int res = 0;
   if ((res = ValidatePath(__func__, path)) < 0)
     return res;
@@ -627,14 +634,17 @@ int MiniSbxMountTmpfs(const std::string &path_c) { // -w
   return res;
 }
 
-int MiniSbxMountOverlay(const std::string &path_c) {
-  std::string path = CanonicPath(path_c, false);
+int MiniSbxMountOverlay(const std::string &input_path) {
+  std::string path = CanonicPath(input_path, false);
   int res = 0;
   if (opt.use_overlayfs) {
     std::string overlayfsmount(path);
     if ((res = ValidatePath(__func__, path)) < 0)
       return res;
     opt.overlayfsmount.emplace_back(overlayfsmount, 0, overlayfsmount.length());
+    if(overlayfsmount!=input_path){
+      opt.overlayfsmount.emplace_back(input_path, 0, overlayfsmount.length());
+    }
   } else {
     res = MiniSbxReportError(__func__, ErrorCode::OverlayOptionNotSet);
   }
@@ -723,8 +733,8 @@ void SetupDefaultMounts(std::vector<std::string> &bind_mount_sources,
 }
 
 
-int MiniSbxSetupOverlayfsFolder(std::string path_c) {
-  std::string path = CanonicPath(path_c, true);
+int MiniSbxSetupOverlayfsFolder(std::string input_path) {
+  std::string path = CanonicPath(input_path, true);
 
   if (opt.use_overlayfs == true) {
     return CreateOverlayfsDir(path);
@@ -733,15 +743,15 @@ int MiniSbxSetupOverlayfsFolder(std::string path_c) {
   }
 }
 
-int MiniSbxSetupSandboxRootWithOverlay(const std::string& path_c) {
+int MiniSbxSetupSandboxRootWithOverlay(const std::string& input_path) {
   int res = 0;
-  std::string path = CanonicPath(path_c, true);
+  std::string path = CanonicPath(input_path, true);
   if (opt.use_default || opt.hermetic) {
     res = MiniSbxReportError(__func__, ErrorCode::InvalidFunctioningMode);
     return res;
   }
   opt.use_overlayfs = true;
-  res = CreateSandboxRoot(path_c);
+  res = CreateSandboxRoot(input_path);
   return res;
 }
 
