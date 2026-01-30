@@ -115,6 +115,7 @@ jobs:
           docker run --rm --privileged \
           --security-opt seccomp=unconfined \
           --security-opt apparmor=unconfined \
+          -e HOST_UID=$(id -u) -e HOST_GID=$(id -g) \
           mini-sandbox-suse:"${TAG}"
 
       - name: Build Debian container
@@ -124,7 +125,7 @@ jobs:
           docker build \
             -f mini_sandbox/utils/mini_sandbox_docker/Dockerfile.debian \
             --build-arg V=dist \
-            -t mini-sandbox-suse:"${TAG}" \
+            -t mini-sandbox-debian:"${TAG}" \
             .
 
       - name: Run SUSE container
@@ -132,4 +133,4 @@ jobs:
           docker run --rm --privileged \
           --security-opt seccomp=unconfined \
           --security-opt apparmor=unconfined \
-          mini-sandbox-suse:"${TAG}"
+          mini-sandbox-debian:"${TAG}"
