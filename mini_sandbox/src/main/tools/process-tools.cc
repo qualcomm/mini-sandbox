@@ -415,6 +415,10 @@ static inline void makeWritable(const fs::path &dir, unsigned depth, unsigned ma
 
 
 void Cleanup() {
+  // If we are debugging we can leave the temp folders
+  if (!opt.debug_path.empty()) return;
+
+  // else let's remove them
   if (opt.use_default || opt.use_overlayfs || opt.hermetic) {
     PRINT_DEBUG("delete %s\n", opt.sandbox_root.c_str());
     try {

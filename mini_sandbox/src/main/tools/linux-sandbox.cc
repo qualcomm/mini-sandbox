@@ -517,17 +517,15 @@ int MiniSbxStart() {
     int status;
     if (waitpid(pid, &status, 0) == -1) {
           perror("waitpid failed");
+          Cleanup();
           exit(EXIT_FAILURE);
     }
-     
-#endif
-    Cleanup();
-#ifdef LIBMINISANDBOX
-
+         
    if (WIFEXITED(status)) {
           // Child exited normally, get its exit status
           int child_exit_code = WEXITSTATUS(status);
           int init_status = MiniSbxReadInit();
+          Cleanup();
           // init_status tells us if the Pid1 inside the sandbox has completed the initialization process
           // it evaluates to 0 if something went wrong, or 1 if everything went good. If we had a 
           // mini-sandbox internal's problem we want to return -1 in the library and don't DIE the whole
@@ -539,11 +537,14 @@ int MiniSbxStart() {
       } else {
           // Child did not exit normally
           fprintf(stderr, "Child did not exit normally\n");
+          Cleanup();
           exit(EXIT_FAILURE);
       }
   }
   return 0;
 #else
+
+  Cleanup();
   return exit_res;
 #endif
 }

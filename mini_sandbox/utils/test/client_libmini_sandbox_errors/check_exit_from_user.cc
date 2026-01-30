@@ -16,16 +16,12 @@
 
 int main() {
     printf("starting program out of the sandbox pid=%d\n", getpid());
-
-    mini_sandbox_setup_default();
-    mini_sandbox_mount_write("/a/b/c");
-    int err_code = mini_sandbox_get_last_error_code();
-    assert (err_code < 0);
-    if (err_code < 0) {
-        printf("error code set to %d\n", err_code);
-        const char* msg = mini_sandbox_get_last_error_msg();
-        printf("%s\n\n", msg);
-        return 0;
-    }
+    pid_t initial = getpid();
+    int res = mini_sandbox_start();
+    assert (res == 0);
+    exit(0);
+    // We should never hit the abort() because mini-sandbox should understand that 
+    // the exit signal comes from a subprocess and not pid1 init 
+    abort();
     return 0;
 }

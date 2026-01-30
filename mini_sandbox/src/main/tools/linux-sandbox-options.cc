@@ -680,7 +680,6 @@ int MiniSbxReadInit() {
 int MiniSbxCreateInit() {
   std::string init_path;
   std::error_code ec;
-
   MiniSbxGetInitFile(init_path);
   fs::path init(init_path);
   fs::path init_dir = init.parent_path();
