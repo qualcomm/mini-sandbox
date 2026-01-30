@@ -5,7 +5,9 @@
 ##
 
 DIR="/tmp/sbx_dir"
-mini-sandbox -o $DIR -d $DIR -k /etc -k /lib -k /lib64 -k /sbin -k /bin -k /lib32 -k /usr -M /var -M /opt -- /bin/bash << 'EOF'
+EXPECTED_MOUNTS=12
+export EXPECTED_MOUNTS
+mini-sandbox -o $DIR -d $DIR -k /etc -k /lib -k /lib64 -k /sbin -k /bin -k /usr -M /var -M /opt -- /bin/bash << 'EOF'
 
 check_last_command() {
     if [ $? -ne 0 ]; then
@@ -41,9 +43,9 @@ check_ls_count() {
     fi
 }
 
-echo -e "\nTest that only 13 mounts are under /"
+echo -e "\nTest that only $EXPECTED_MOUNTS mounts are under /"
 count=$(ls / | wc -l)
-check_ls_count $count 13
+check_ls_count $count $EXPECTED_MOUNTS
 
 echo -e "\nTest showing the network is unavailable"
 wget google.com -T 1
