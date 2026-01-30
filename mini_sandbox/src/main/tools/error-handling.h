@@ -17,6 +17,10 @@
 
 #define MAX_ERR_LEN 255
 
+#define UNRECOVERABLE_FAIL -1
+#define RECOVERABLE_FAIL -2
+
+
 
 
 enum class Mode {

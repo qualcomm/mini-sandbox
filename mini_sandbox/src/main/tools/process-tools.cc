@@ -182,20 +182,34 @@ void SignalPipe(int *pipe) {
 }
 
 
-int CreateDirectory(const std::string& basePath, const std::string& dirName, std::string& out) {
+int CreateDirectory(const std::string& base_path, const std::string& dir_name, std::string& out) {
   int res = 0;
-  out = basePath + "/" + dirName;
+  std::error_code ec;
+  out = base_path + "/" + dir_name;
   fs::path p = fs::path(out);
-  if (!fs::exists(p)) {
-    if(! fs::create_directories(out)) {
+  if (!fs::exists(p, ec)) {
+    if(! fs::create_directories(out, ec)) {
         res = MiniSbxReport("Could not create directory %s\n", out.c_str());
     }
+  }
+  if (ec) {
+    return MiniSbxReport("Error in %s\n", __func__);
+  }
+  return res;
+}
+
+int CreateDirectories(const std::string& base_path) {
+  int res = 0;
+  std::error_code ec;
+  fs::create_directories(base_path, ec);
+  if (ec) {
+    return MiniSbxReport("Error in %s\n", __func__);
   }
   return res;
 }
 
 
-std::string CreateTempDirectory(const std::string &basePath) {
+std::string CreateTempDirectory(const std::string &base_path) {
 
   std::random_device rd;
   std::mt19937 gen(rd());
@@ -205,7 +219,7 @@ std::string CreateTempDirectory(const std::string &basePath) {
   
   for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
     randomID = dis(gen);
-    std::string tempDirPath = basePath + "/temp_" + std::to_string(randomID);
+    std::string tempDirPath = base_path + "/temp_" + std::to_string(randomID);
     fs::path p = fs::path(tempDirPath);
     if (!fs::exists(p)) {
       res = fs::create_directories(tempDirPath);
@@ -220,14 +234,14 @@ std::string CreateTempDirectory(const std::string &basePath) {
 
 
 
-std::string CreateRandomFilename(const std::string& basePath) {
+std::string CreateRandomFilename(const std::string& base_path) {
     std::mt19937 rng(std::chrono::steady_clock::now().time_since_epoch().count());
     std::uniform_int_distribution<int> dist(1000, INT_MAX);
 
     std::string filename;
     do {
         int randomNumber = dist(rng);
-        filename = basePath + "/" + std::to_string(randomNumber) + ".rules";
+        filename = base_path + "/" + std::to_string(randomNumber) + ".rules";
     } while (fs::exists(filename));
 
     return filename;
@@ -353,9 +367,9 @@ std::string GetLocalLib() {
   return home_dir.append("/.local/lib");
 }
 
-void addIfNotPresent(std::vector<std::string> &paths, const char *pathToCheck) {
+void addIfNotPresent(std::vector<std::string> &paths, const char *path_to_check) {
   // Convert the const char* to std::string for comparison
-  std::string pathStr(pathToCheck);
+  std::string pathStr(path_to_check);
 
   // Check if the path is already in the vector
   if (std::find(paths.begin(), paths.end(), pathStr) == paths.end()) {
