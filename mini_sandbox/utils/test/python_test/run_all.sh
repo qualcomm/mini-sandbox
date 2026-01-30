@@ -78,5 +78,10 @@ rm "$SCRIPT_DIR/../pyminisandbox-test-default.test"
 check_exit $PYTHON test_any_connection.py
 check_exit $PYTHON test_one_shot_connection.py
 check_exit $PYTHON test_err.py
+check_exit $PYTHON test_exit_after_mini_sandbox_start.py
+check_exit $PYTHON test_exit_after_mini_sandbox_start.py tap
+
+check_exit $PYTHON test_err_mini_sandbox_start.py
+check_exit $PYTHON test_err_mini_sandbox_start.py tap
 
 cd $ORIGINAL_DIR

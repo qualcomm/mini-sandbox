@@ -5,6 +5,7 @@
 
 #include "src/main/tools/error-handling.h"
 #include "src/main/tools/process-tools.h"
+#include "src/main/tools/linux-sandbox-options.h"
 
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -158,18 +159,19 @@ static int JoinNetNs(pid_t p) {
     return -1;
   }
 
-  close(fd);
+  if (close(fd) < 0)
+    return -1;
   return 0;
 }
 
 
-void RunTCPIP(uid_t outer_uid, gid_t outer_gid, std::string& rules) {
+int RunTCPIP(uid_t outer_uid, gid_t outer_gid, std::string& rules) {
   pid_t extern_pid = fork();
  
   if(extern_pid == 0) {
     int r = unshare(CLONE_NEWUSER);
     if (r != 0) {
-      MiniSbxReport("Unshare failed");
+      exit(0);
     }
     WriteFile("/proc/self/uid_map", "0 %u 1\n", outer_uid);
     WriteFile("/proc/self/setgroups", "deny");
@@ -177,9 +179,9 @@ void RunTCPIP(uid_t outer_uid, gid_t outer_gid, std::string& rules) {
     pid_t minitap_pid = fork();
     if (minitap_pid == 0) {
       pid_t tcp_p = RunMinitap(rules);
-      // If JoinNetNs fails we let the sandbox go on and at least isolate
-      // the rest of the environment.
-      JoinNetNs(tcp_p);
+      if ( JoinNetNs(tcp_p) < 0)
+        exit(0);
+      return 0;
     } else {
       waitpid(minitap_pid, NULL, 0);
       exit(0);
@@ -187,6 +189,9 @@ void RunTCPIP(uid_t outer_uid, gid_t outer_gid, std::string& rules) {
   }
   else {
     waitpid(extern_pid, NULL, 0);
+    int init_status = MiniSbxReadInit();
+    if (init_status == 0)
+      return -1;
     exit(0);
   }
 }

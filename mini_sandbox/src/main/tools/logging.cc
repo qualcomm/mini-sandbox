@@ -26,37 +26,37 @@
 FILE *global_debug = nullptr;
 
 
-void logOSKernel() {
+static void logOSKernel() {
   struct utsname buf;
   bool res = GetKernelInfo(&buf);
   if (res) {
-    PRINT_DEBUG("OS: %s\n", buf.sysname );
-    PRINT_DEBUG("Kernel: %s\n", buf.release );
-    PRINT_DEBUG("Version: %s\n", buf.version );
-    PRINT_DEBUG("Machine: %s\n", buf.machine );
+    PRINT_DEBUG("OS: %s", buf.sysname );
+    PRINT_DEBUG("Kernel: %s", buf.release );
+    PRINT_DEBUG("Version: %s", buf.version );
+    PRINT_DEBUG("Machine: %s", buf.machine );
   } else {
     perror("uname");
   }
 }
 
 
-void logLibc() {
-  PRINT_DEBUG("libc: %s\n", gnu_get_libc_version());
+static void logLibc() {
+  PRINT_DEBUG("libc: %s", gnu_get_libc_version());
 }
 
 
-void logLibstdcpp() {
+static void logLibstdcpp() {
 #ifdef _GLIBCXX_RELEASE
-    PRINT_DEBUG("libstdc++ release: %d\n", _GLIBCXX_RELEASE);
+    PRINT_DEBUG("libstdc++ release: %d", _GLIBCXX_RELEASE);
 #endif
 
 #ifdef __GLIBCXX__
-    PRINT_DEBUG("__GLIBCXX__: %d\n", __GLIBCXX__);
+    PRINT_DEBUG("__GLIBCXX__: %d", __GLIBCXX__);
 #endif
 }
 
 
-void logOSName() {
+static void logOSName() {
   try {
     std::string pretty, version;
     const bool ok = GetOSName(pretty, version);
@@ -85,7 +85,7 @@ void logOSName() {
 }
 
 
-void logSystem() {
+void LogSystem() {
   logOSKernel();
   logOSName();
   logLibc();

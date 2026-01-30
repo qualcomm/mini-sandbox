@@ -80,11 +80,11 @@ int TerminateAndWaitForAll(pid_t pid);
 
 // Blocks and waits on a pipe for the a signal to proceed from the other process
 // `SignalPipe()`.
-void WaitPipe(int *pipe);
+int WaitPipe(int *pipe, bool die_on_err);
 
 // Signals to the other process blocked with a read `WaitPipe()` on the pipe
 // that it can proceed by writing a byte to the pipe.
-void SignalPipe(int *pipe);
+int SignalPipe(int *pipe, bool die_on_err);
 
 std::string CreateTempDirectory(const std::string& base_path);
 std::string CreateRandomFilename(const std::string& base_path);
@@ -111,6 +111,7 @@ std::string GetFirstFolder(const std::string& path);
 bool GetOSName(std::string& printable_name, std::string& version_id);
 bool GetKernelInfo(struct utsname* buf);
 bool UserNamespaceSupported();
+void KillAndWait(pid_t pid);
 
 
 enum UserNamespaceSupport {

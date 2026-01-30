@@ -16,16 +16,9 @@
 
 int main() {
     printf("starting program out of the sandbox pid=%d\n", getpid());
-
-    mini_sandbox_setup_default();
-    mini_sandbox_mount_write("/a/b/c");
-    int err_code = mini_sandbox_get_last_error_code();
-    assert (err_code < 0);
-    if (err_code < 0) {
-        printf("error code set to %d\n", err_code);
-        const char* msg = mini_sandbox_get_last_error_msg();
-        printf("%s\n\n", msg);
-        return 0;
-    }
+    int res = mini_sandbox_start();
+    printf("Try to write into init file\n");
+    FILE* f = fopen("/tmp/mini-sandbox-init", "w");
+    assert (f == NULL);
     return 0;
 }

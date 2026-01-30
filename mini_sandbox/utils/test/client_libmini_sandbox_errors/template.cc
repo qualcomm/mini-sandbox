@@ -10,15 +10,12 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #include "linux-sandbox-api.h"
 
 int main() {
     printf("starting program out of the sandbox pid=%d\n", getpid());
-
-    
-    //mini_sandbox_mount_bind("/dev");
-
     mini_sandbox_setup_default();
     mini_sandbox_mount_write("/a/b/c");
     int res = mini_sandbox_setup_hermetic(sandbox_root);
