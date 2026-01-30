@@ -70,13 +70,13 @@ void InstallSignalHandler(int signum, void (*handler)(int)) {
     // No point in blocking signals when using the default handler or ignoring
     // the signal.
     if (sigemptyset(&sa.sa_mask) < 0) {
-      DIE("sigemptyset");
+      MiniSbxReportGeneric("sigemptyset");
     }
   } else {
     // When using a custom handler, block all signals from firing while the
     // handler is running.
     if (sigfillset(&sa.sa_mask) < 0) {
-      DIE("sigfillset");
+      MiniSbxReportGeneric("sigfillset");
     }
   }
   // sigaction may fail for certain reserved signals. Ignore failure in this
@@ -105,10 +105,10 @@ void ClearSignalMask() {
   // Use an empty signal mask for the process.
   sigset_t empty_sset;
   if (sigemptyset(&empty_sset) < 0) {
-    DIE("sigemptyset");
+    MiniSbxReportGeneric("sigemptyset");
   }
   if (sigprocmask(SIG_SETMASK, &empty_sset, nullptr) < 0) {
-    DIE("sigprocmask");
+    MiniSbxReportGeneric("sigprocmask");
   }
 
   // Set the default signal handler for all signals.
@@ -120,7 +120,7 @@ void ClearSignalMask() {
     struct sigaction sa = {};
     sa.sa_handler = SIG_DFL;
     if (sigemptyset(&sa.sa_mask) < 0) {
-      DIE("sigemptyset");
+      MiniSbxReportGeneric("sigemptyset");
     }
     // Ignore possible errors, because we might not be allowed to set the
     // handler for certain signals, but we still want to try.
