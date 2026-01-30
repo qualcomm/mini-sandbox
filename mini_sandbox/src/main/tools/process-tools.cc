@@ -70,13 +70,13 @@ void InstallSignalHandler(int signum, void (*handler)(int)) {
     // No point in blocking signals when using the default handler or ignoring
     // the signal.
     if (sigemptyset(&sa.sa_mask) < 0) {
-      MiniSbxReportGeneric("sigemptyset");
+      MiniSbxReportGenericError("sigemptyset");
     }
   } else {
     // When using a custom handler, block all signals from firing while the
     // handler is running.
     if (sigfillset(&sa.sa_mask) < 0) {
-      MiniSbxReportGeneric("sigfillset");
+      MiniSbxReportGenericError("sigfillset");
     }
   }
   // sigaction may fail for certain reserved signals. Ignore failure in this
@@ -105,10 +105,10 @@ void ClearSignalMask() {
   // Use an empty signal mask for the process.
   sigset_t empty_sset;
   if (sigemptyset(&empty_sset) < 0) {
-    MiniSbxReportGeneric("sigemptyset");
+    MiniSbxReportGenericError("sigemptyset");
   }
   if (sigprocmask(SIG_SETMASK, &empty_sset, nullptr) < 0) {
-    MiniSbxReportGeneric("sigprocmask");
+    MiniSbxReportGenericError("sigprocmask");
   }
 
   // Set the default signal handler for all signals.
@@ -120,7 +120,7 @@ void ClearSignalMask() {
     struct sigaction sa = {};
     sa.sa_handler = SIG_DFL;
     if (sigemptyset(&sa.sa_mask) < 0) {
-      MiniSbxReportGeneric("sigemptyset");
+      MiniSbxReportGenericError("sigemptyset");
     }
     // Ignore possible errors, because we might not be allowed to set the
     // handler for certain signals, but we still want to try.
@@ -149,36 +149,54 @@ void WriteFile(const std::string &filename, const char *fmt, ...) {
   }
 }
 
+static int DieOrReport(const char* msg, bool die_on_error) {
+  if (die_on_error)
+    DIE("%s", msg);
+  return MiniSbxReport(msg);
+}
+
 // Waits for a signal to proceed from the pipe.
-void WaitPipe(int *pipe) {
+int WaitPipe(int *pipe, bool die_on_error) {
   char buf = 0;
+
   // Close the writer fd of this process as it should only be written to by the
   // writer of the other process.
   if (close(pipe[1]) < 0) {
-    DIE("close");
+    return DieOrReport("close", die_on_error);
   }
   if (read(pipe[0], &buf, 1) < 0) {
-    DIE("read");
+    return DieOrReport("read", die_on_error);
   }
   if (close(pipe[0]) < 0) {
-    DIE("close");
+    return DieOrReport("close", die_on_error);
   }
+  return 0;
 }
 
+
+
 // Sends a signal to the pipe for the other waiting process proceed.
-void SignalPipe(int *pipe) {
+int SignalPipe(int *pipe, bool die_on_error) {
   char buf = 0;
   // Close the reader fd of this process as it should only be read by the reader
   // of the other process.
   if (close(pipe[0]) < 0) {
-    DIE("close");
+    return DieOrReport("close", die_on_error);
   }
   if (write(pipe[1], &buf, 1) < 0) {
-    DIE("write");
+    return DieOrReport("write", die_on_error);
   }
   if (close(pipe[1]) < 0) {
-    DIE("close");
+    return DieOrReport("close", die_on_error);
   }
+  return 0;
+}
+
+
+void KillAndWait(pid_t pid) {
+  kill(pid, SIGKILL);
+  waitpid(pid, NULL, 0);
+  return;
 }
 
 

@@ -191,10 +191,10 @@ static pid_t SpawnPid1() {
 
   int pipe_from_child[2], pipe_to_child[2];
   if (pipe(pipe_from_child) < 0) {
-    MiniSbxReport("pipe");
+    return MiniSbxReport("pipe");
   }
   if (pipe(pipe_to_child) < 0) {
-    MiniSbxReport("pipe");
+    return MiniSbxReport("pipe");
   }
 
   int clone_flags = CLONE_NEWUSER | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWPID;
@@ -218,6 +218,7 @@ static pid_t SpawnPid1() {
   Pid1Args pid1Args;
   pid1Args.pipe_to_parent = pipe_from_child;
   pid1Args.pipe_from_parent = pipe_to_child;
+
 #ifdef LIBMINISANDBOX
   int unshare_res = unshare(clone_flags);
   if (unshare_res < 0) {
@@ -233,6 +234,7 @@ static pid_t SpawnPid1() {
     MiniSbxReport("clone");
   }
 
+
 #ifdef LIBMINISANDBOX
   if (child_pid == 0) {
     int sandbox_res = Pid1Main(&pid1Args);
@@ -243,14 +245,27 @@ static pid_t SpawnPid1() {
   } else {
 #endif
     // Signal the child that it can now proceed to spawn pid2.
-    SignalPipe(pipe_to_child);
+    int res = SignalPipe(pipe_to_child, false);
+
+    // If an error happens in SignalPipe or later in WaitPipe we want to return
+    // but first we'll have to kill the child
+    if (res < 0) {
+      KillAndWait(child_pid);
+      return res;
+    }
     PRINT_DEBUG("linux-sandbox-pid1 has PID %d", child_pid);
 
     // Wait for a signal from the child linux-sandbox-pid1 process; this proves
     // to the child process that we still existed after it ran
     // prctl(PR_SET_PDEATHSIG, SIGKILL), thus preventing a race condition where
     // the parent is killed before that call was made.
-    WaitPipe(pipe_from_child);
+    res = WaitPipe(pipe_from_child, false);
+
+    // same error logic as for SignalPipe
+    if (res < 0) {
+      KillAndWait(child_pid);
+      return res;
+    }
 
     PRINT_DEBUG("done manipulating pipes");
 
@@ -356,7 +371,7 @@ static void StartLogging() {
 int MiniSbxStart() {
   int res;
   StartLogging();
-  PRINT_DEBUG("Start...");
+  LogSystem();
   PRINT_DEBUG("UserNamespaceSupported = %d", UserNamespaceSupported());
 
 #ifdef LIBMINISANDBOX
@@ -430,7 +445,9 @@ int MiniSbxStart() {
 #ifdef MINITAP
   std::string rules = CreateRandomFilename(std::string("/tmp"));
   DumpRules(&(opt.fw_rules), rules);
-  RunTCPIP(global_outer_uid, global_outer_gid, rules);
+  res = RunTCPIP(global_outer_uid, global_outer_gid, rules);
+  if (res < 0)
+    return res;
   // In this case the Network namespace has been taken care of by RunTCPIP so
   // we don't need to create a new one
   opt.create_netns = NO_NETNS;
@@ -451,8 +468,12 @@ int MiniSbxStart() {
     perror("fork1 - error");
     exit(-1);
   } else if (pid == 0) {
-#endif // ends #ifdef LIBMINISANDBOX
+#endif
     const pid_t child_pid = SpawnPid1();
+    if (child_pid < 0) {
+      PRINT_DEBUG("SpawnPid1 returned -1\n");
+      exit(-1);
+    }
 #ifdef LIBMINISANDBOX
     if (child_pid != 0) {
 #endif
@@ -531,8 +552,18 @@ int MiniSbxStart() {
           // mini-sandbox internal's problem we want to return -1 in the library and don't DIE the whole
           // process. In the other cases instead we wanna exit cause the exit signal is coming from the 
           // sandboxed process
-          if (init_status == 0) 
+          if (init_status == 0) {
+#ifdef MINITAP
+          // If we are in libminitapbox the pid executing this code is child of the one we forked in
+          // RunTcpIp() . Thus we want to exit here and the father that is waiting for us will return for 
+          // us
+            exit(0);
+#else
+          // If we are in libminisandbox here we can just return -1 (error code) and then the user 
+          // will do something with this value
             return -1;
+#endif
+          }
           exit(child_exit_code); // Exit parent with the same code
       } else {
           // Child did not exit normally
