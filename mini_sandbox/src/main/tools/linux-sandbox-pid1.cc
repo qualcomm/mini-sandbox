@@ -266,7 +266,7 @@ static void SetupSelfDestruction(int *pipe_to_parent) {
   }
 
   // Verify that the parent still lives.
-  SignalPipe(pipe_to_parent);
+  SignalPipe(pipe_to_parent, true);
 }
 #endif
 
@@ -1561,9 +1561,7 @@ static int InitDone() {
 
 int Pid1Main(void *args) {
   PRINT_DEBUG("Pid1Main started with pid = %d", getpid());
-
   MiniSbxSetInternalEnv();
-  logSystem();
   home_dir = GetHomeDir();
   PRINT_DEBUG("Home dir is %s\n", home_dir.c_str());
   std::vector<std::string> overlay_dirs;
@@ -1580,7 +1578,7 @@ int Pid1Main(void *args) {
 
   PRINT_DEBUG("Running in docker? %d\n", docker_mode);
 
-  WaitPipe(pid1Args.pipe_from_parent);
+  WaitPipe(pid1Args.pipe_from_parent, true);
 
   // Start with default signal handlers and an empty signal mask.
   ClearSignalMask();

@@ -85,9 +85,7 @@ int main(int argc, char* argv[]) {
 #elif defined(CUSTOM)
     const char* overlayfs_dir = "/tmp/overlay_client";
     const char* sandbox_root = "/tmp/sandbox_client";
-    //#mkdir(overlayfs_dir, 07555);
-    //#mkdir(sandbox_root, 07555);
-    //#printf("AAAAAAA");
+
     const char* bin = "/bin";
     const char* lib = "/lib";
     const char* lib64 = "/lib64";
