@@ -184,15 +184,37 @@ int RunTCPIP(uid_t outer_uid, gid_t outer_gid, std::string& rules) {
         exit(0);
       return 0;
     } else {
-      waitpid(minitap_pid, NULL, 0);
-      exit(0);
+      int status = 0;
+      if (waitpid(minitap_pid, &status, 0) == -1) {
+        perror("waitpid failed");
+        exit(EXIT_FAILURE);
+      }
+      if (WIFEXITED(status)) {
+        int exit_code = WEXITSTATUS(status);
+        exit(exit_code);
+      } else {
+        exit(EXIT_FAILURE);
+      }
     }
   }
   else {
-    waitpid(extern_pid, NULL, 0);
-    int init_status = MiniSbxReadInit();
-    if (init_status == 0)
-      return -1;
-    exit(0);
+    int status = 0;
+    if (waitpid(extern_pid, &status, 0) == -1) {
+      perror("waitpid failed");
+      exit(EXIT_FAILURE);
+    }
+
+    if (WIFEXITED(status)) {
+      int child_exit_code = WEXITSTATUS(status);
+      int init_status = MiniSbxReadInit();
+      if (init_status == 0)
+        return -1;
+      exit(child_exit_code);
+    }
+    else {
+      fprintf(stderr, "Child did not exit normally\n");
+      Cleanup();
+      exit(EXIT_FAILURE);
+    }
   }
 }
