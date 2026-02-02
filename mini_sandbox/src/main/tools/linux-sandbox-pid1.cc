@@ -80,6 +80,7 @@ namespace fs = std::experimental::filesystem;
 #endif
 
 #define ROOT "/"
+#define MINISBX_TMP_INIT "/tmp/mini-sandbox-init"
 #define DEV_LINKS 4
 #define CAP_VERSION _LINUX_CAPABILITY_VERSION_3
 #define CAP_WORDS   _LINUX_CAPABILITY_U32S_3
@@ -265,7 +266,7 @@ static void SetupSelfDestruction(int *pipe_to_parent) {
   }
 
   // Verify that the parent still lives.
-  SignalPipe(pipe_to_parent);
+  SignalPipe(pipe_to_parent, true);
 }
 #endif
 
@@ -1511,11 +1512,52 @@ static void MountOverlayDirAsTmpfs() {
 }
 
 
+static int InitDone() {
+    const char* path = MINISBX_TMP_INIT;
+    int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
+    if (fd < 0) {
+        perror("open");
+        return -1;
+    }
+
+    const char buf[] = "1\n";            // include newline if you like
+    ssize_t n = write(fd, buf, sizeof(buf) - 1);
+    if (n != (ssize_t)(sizeof(buf) - 1)) {
+        perror("write");
+        close(fd);
+        return -1;
+    }
+
+    if (fsync(fd) < 0) {
+        perror("fsync");
+        close(fd);
+        return -1;
+    }
+
+    if (close(fd) < 0) {
+        perror("close");
+        return -1;
+    }
+
+    if (mount(path, path, NULL, MS_BIND, NULL) < 0) {
+        perror("mount(MS_BIND)");
+        return -1;
+    }
+
+    unsigned long remount_flags = MS_REMOUNT | MS_BIND | MS_RDONLY;
+    if (mount(NULL, path, NULL, remount_flags, NULL) < 0) {
+        perror("mount(remount,ro)");
+        // Best-effort cleanup: try to unmount the bind if remount failed
+        (void)umount(path);
+        return -1;
+    }
+
+    return 0;
+}
+
 int Pid1Main(void *args) {
   PRINT_DEBUG("Pid1Main started with pid = %d", getpid());
-
   MiniSbxSetInternalEnv();
-  logSystem();
   home_dir = GetHomeDir();
   PRINT_DEBUG("Home dir is %s\n", home_dir.c_str());
   std::vector<std::string> overlay_dirs;
@@ -1532,7 +1574,7 @@ int Pid1Main(void *args) {
 
   PRINT_DEBUG("Running in docker? %d\n", docker_mode);
 
-  WaitPipe(pid1Args.pipe_from_parent);
+  WaitPipe(pid1Args.pipe_from_parent, true);
 
   // Start with default signal handlers and an empty signal mask.
   ClearSignalMask();
@@ -1603,6 +1645,8 @@ int Pid1Main(void *args) {
     // doesn't use overlayfs or chroot, it just re-mounts
     // everything as read-only
     PRINT_DEBUG("Sandbox enabled in read-only mode\n");
+
+    MiniSbxMountWrite("/tmp");
     MountFilesystems();
     mounts = CountMounts();
     // In this case overlay_dirs will be empty but we need it when
@@ -1616,6 +1660,7 @@ int Pid1Main(void *args) {
 
   EnterWorkingDirectory();
 
+  InitDone();
   // Ignore terminal signals; we hand off the terminal to the child in
   // SpawnChild below.
   IgnoreSignal(SIGTTIN);

@@ -1,5 +1,5 @@
 
-SUBDIRS := client_libmini_sandbox client_libmini_tapbox
+SUBDIRS := client_libmini_sandbox client_libmini_tapbox client_libmini_sandbox_errors
 
 .PHONY: all clean $(SUBDIRS)
 

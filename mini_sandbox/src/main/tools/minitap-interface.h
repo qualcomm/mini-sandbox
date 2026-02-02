@@ -10,6 +10,6 @@
 // namespace as 'fake root'. The third parameter can be empty
 // if we do not want to set any specific network restriction
 // via firewall
-void RunTCPIP(uid_t uid, gid_t gid, std::string& rules);
+int RunTCPIP(uid_t uid, gid_t gid, std::string& rules);
 
 #endif
