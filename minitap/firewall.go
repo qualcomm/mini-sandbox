@@ -44,8 +44,8 @@ func MiniTapSetupFirewallRule(rule string) {
 func MiniTapSetupMaxConnections(max_connections int) {
 	mu.Lock()
 	defer mu.Unlock()
-        fwRules.MaxConnections = max_connections
-        verbosef("MaxNumberConnections: %d\n", max_connections)
+    fwRules.MaxConnections = max_connections
+    verbosef("MaxNumberConnections: %d\n", max_connections)
 }
 
 func ReadFirewallRules(firewall_rules string) {
@@ -60,16 +60,17 @@ func ReadFirewallRules(firewall_rules string) {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
-                if lineno == 0 {
+		verbosef("Firewall file read %s\n", line)
+        if lineno == 0 {
 			lineno++
 			n, err := strconv.ParseInt(line, 10, 64)
-         		if err != nil {
-                		fmt.Printf("Invalid header (expected signed integer): %q, err: %v\n", line, err)
-                		return
-            		}
+        	if err != nil {
+        		fmt.Printf("Invalid header (expected signed integer): %q, err: %v\n", line, err)
+          		return
+			}
 			MiniTapSetupMaxConnections(int(n))
-                } else {
-		      MiniTapSetupFirewallRule(line)
+        } else {
+		    MiniTapSetupFirewallRule(line)
 		}
 	}
 
@@ -150,16 +151,16 @@ func firewallConnection(addr net.Addr) bool {
 		//We ignore connections that are not either TCP or UDP
 		return false
 	}
-        
-	if fwRules.MaxConnections >= 0 {
-	        // In this case we didn't specify any fw rule BUT we have a max number 
-	        // of connections allowed. We respect that policy 
-		if connections < fwRules.MaxConnections {
+	verbosef("In firewall fwRules.MaxConnections %d fwRules.Count==%d\n", fwRules.MaxConnections, fwRules.Count)
 
-        	        verbosef("connection number: %d, max allowed: %d\n", connections + 1,  fwRules.MaxConnections);
-        	      	connections ++;
+	if fwRules.MaxConnections >= 0 {
+	    // In this case we didn't specify any fw rule BUT we have a max number 
+	    // of connections allowed. We respect that policy 
+		if connections < fwRules.MaxConnections {
+        	verbosef("connection number: %d, max allowed: %d\n", connections + 1,  fwRules.MaxConnections);
+        	connections ++;
 			return true;
-        	}
+        }
 
 		// If we end up here we exceeded the number of connections allowed. Block everything else
 		return false
@@ -170,6 +171,7 @@ func firewallConnection(addr net.Addr) bool {
 		if fwRules.Count == 0 {
 			// If we end up in this branch we haven't specified any network policy 
 			// so we'll just let all the connections go through
+			verbosef("fwRules.Count==0")
 			return true;
 		}
 
