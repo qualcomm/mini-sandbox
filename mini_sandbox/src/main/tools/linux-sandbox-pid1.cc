@@ -921,18 +921,14 @@ static void drop_caps_ep_except(uint64_t keep) {
   int i;
 
   if (syscall(SYS_capget, &hdr, data))
-    DIE("Couldn't get current capabilities");
+    DIE("Couldn't get current capabilities"); 
 
   for (i = 0; i < CAP_WORDS; i++) {
-    data[i].effective = 0;
-    data[i].permitted = 0;
-  }
-
-  for (i = 0; i < CAP_WORDS; i++) {
-    uint32_t mask = keep >> (32 * i);
+    uint32_t mask = (uint32_t)(keep >> (32 * i));
 
     data[i].effective &= mask;
     data[i].permitted &= mask;
+    data[i].inheritable &= mask;
   }
 
   if (syscall(SYS_capset, &hdr, data))
@@ -1589,6 +1585,7 @@ int Pid1Main(void *args) {
   SetupMountNamespace();
   SetupUserNamespace();
 
+
   if (opt.fake_hostname) {
     SetupUtsNamespace();
   }
@@ -1675,6 +1672,7 @@ int Pid1Main(void *args) {
   InstallSignalHandler(SIGTERM, ForwardSignal);
   return WaitForChild();
 #else
+  drop_caps_ep_except(0);
   return 0;
 #endif
 }
