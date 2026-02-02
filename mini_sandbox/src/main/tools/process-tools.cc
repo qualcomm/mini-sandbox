@@ -207,7 +207,7 @@ int CreateDirectory(const std::string& base_path, const std::string& dir_name, s
   fs::path p = fs::path(out);
   if (!fs::exists(p, ec)) {
     if(! fs::create_directories(out, ec)) {
-        res = MiniSbxReport("Could not create directory %s\n", out.c_str());
+        res = MiniSbxReport("Could not create directory %s: %s\n", out.c_str(), ec.message().c_str());
     }
   }
   if (ec) {
@@ -233,7 +233,7 @@ std::string CreateTempDirectory(const std::string &base_path) {
   std::mt19937 gen(rd());
   std::uniform_int_distribution<> dis(1000, INT_MAX);
   int randomID;
-  bool res;
+  int res;
   
   for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
     std::error_code ec;
@@ -242,7 +242,7 @@ std::string CreateTempDirectory(const std::string &base_path) {
     fs::path p = fs::path(tempDirPath);
     if (!fs::exists(p, ec)) {
       res = CreateDirectories(tempDirPath);
-      if (!res) {
+      if (res < 0) {
         MiniSbxReport("Could not create temporary directory %s\n", tempDirPath.c_str());
       }
       return tempDirPath;
