@@ -80,5 +80,7 @@ check_exit $PYTHON test_one_shot_connection.py
 check_exit $PYTHON test_err.py
 check_exit $PYTHON test_read_only.py
 check_exit $PYTHON test_read_only.py tap
+check_exit $PYTHON test_allow_all_domains.py 
+check_exit $PYTHON test_allow_all_domains_negative.py 
 
 cd $ORIGINAL_DIR
