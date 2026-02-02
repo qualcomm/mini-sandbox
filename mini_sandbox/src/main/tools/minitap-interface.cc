@@ -132,7 +132,7 @@ static int RunMinitap(std::string& rules) {
     pid_t p = fork();
     if (p == 0) {
         execvp(m_args[0], m_args);
-        std::cerr << "Failed to execute minitap binary. No TUN device and firewall available";
+        std::cerr << "Failed to execute minitap binary. No TUN device and firewall available\n";
         kill(getppid(), SIGUSR1);
         exit(-1);
     }
