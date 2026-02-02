@@ -23,21 +23,29 @@ int set_max_connections(int max_connections, FirewallRules* fw_rules) {
 
 
 int set_firewall_rule(const char *rule, FirewallRules *fw_rules) {
-  if (fw_rules->count > MAX_RULES) 
-      return -1;
+    if (fw_rules->count > MAX_RULES) 
+        return -1;
 
-  size_t rule_len = strlen(rule);
-  if (rule_len > MAX_RULE_LENGTH)
-      return -2;
+    size_t rule_len = strlen(rule);
+    if (rule_len > MAX_RULE_LENGTH)
+        return -2;
 
-  memcpy(fw_rules->rules[fw_rules->count], rule, rule_len);
-  fw_rules->count++;
-  return 0;
+    if(fw_rules->max_connections==-2){
+        return -3;
+    }
+    memcpy(fw_rules->rules[fw_rules->count], rule, rule_len);
+    fw_rules->count++;
+    return 0;
 }
 
 int reset_firewall_rules(FirewallRules *fw_rules) {
-  fw_rules->count = 0;
-  return 0;
+    if(fw_rules->count > 0){
+        //Invalid configuration, the user first specified a firewall rule and then wants to allow all domains.
+        return -1;
+    }
+    fw_rules->count = 0; 
+    fw_rules->max_connections=-2;
+    return 0;
 }
 
 

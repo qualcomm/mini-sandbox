@@ -541,21 +541,32 @@ int MiniSbxAllowMaxConnections(int max_connections) {
 
 int MiniSbxAllowAllDomains() {
   PRINT_DEBUG("Allow all domains");
-  reset_firewall_rules(&opt.fw_rules);
-  return 0;
+  if(reset_firewall_rules(&opt.fw_rules) == 0){
+    return 0;
+  }else{
+    return MiniSbxReportError(__func__, ErrorCode::LogFileNotUnique);
+  }
+  
 }
 
 int MiniSbxAllowDomain(const std::string& domain) {
   const char* domain_str = domain.c_str();
   PRINT_DEBUG("allow domain %s", domain_str);
-  set_firewall_rule(domain_str, &(opt.fw_rules));
-  return 0;
+  if(set_firewall_rule(domain_str, &(opt.fw_rules))<0){
+    return MiniSbxReportError(__func__,ErrorCode::IllegalNetworkConfiguration);
+  }else{
+    return 0;
+  }
 }
 
 int MiniSbxAllowIpv4(const std::string& ip) {
   const char* ip_str = ip.c_str();
   PRINT_DEBUG("allow ip %s", ip_str);
-  set_firewall_rule(ip_str, &(opt.fw_rules));
+  if(set_firewall_rule(ip_str, &(opt.fw_rules))<0){
+    return MiniSbxReportError(__func__,ErrorCode::IllegalNetworkConfiguration);
+  }else{
+    return 0;
+  }
   return 0;
 }
 

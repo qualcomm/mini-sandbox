@@ -17,8 +17,8 @@
 
 struct FirewallRules {
     char rules[MAX_RULES][MAX_RULE_LENGTH];
-    size_t count;
-    int max_connections = -1;
+    size_t count = 0;
+    int max_connections = -1; //If max_connections==-1, unlimited number of connections allowed, but count must be >0. Thus, we still have a firewall. If max_connections==-2, unlimited number and count==0. Thus, the firewall is disabled.
 };
 
 int set_firewall_rule(const char* rule, FirewallRules* fw_rules);
