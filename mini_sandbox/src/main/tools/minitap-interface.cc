@@ -40,9 +40,10 @@ void handler(int sig) {
 
 
 static std::string ResolveSymlink(const std::string& path) {
+    std::error_code ec;
     fs::path fsPath(path);
 
-    if (fs::is_symlink(fsPath)) {
+    if (fs::is_symlink(fsPath, ec)) {
         char resolvedPath[PATH_MAX];
         if (realpath(path.c_str(), resolvedPath)) {
             return std::string(resolvedPath);

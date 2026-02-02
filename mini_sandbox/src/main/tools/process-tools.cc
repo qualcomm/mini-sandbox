@@ -236,15 +236,19 @@ std::string CreateTempDirectory(const std::string &base_path) {
   bool res;
   
   for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
+    std::error_code ec;
     randomID = dis(gen);
     std::string tempDirPath = base_path + "/temp_" + std::to_string(randomID);
     fs::path p = fs::path(tempDirPath);
-    if (!fs::exists(p)) {
-      res = fs::create_directories(tempDirPath);
+    if (!fs::exists(p, ec)) {
+      res = CreateDirectories(tempDirPath);
       if (!res) {
         MiniSbxReport("Could not create temporary directory %s\n", tempDirPath.c_str());
       }
       return tempDirPath;
+    }
+    if (ec) {
+      PRINT_DEBUG("%s Access error: %s", __func__, p.c_str());
     }
   }
   return nullptr;

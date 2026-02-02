@@ -81,6 +81,11 @@ namespace fs = std::experimental::filesystem;
 
 #define ROOT "/"
 #define MINISBX_TMP_INIT "/tmp/mini-sandbox-init"
+
+#ifndef TMP
+#define TMP "/tmp"
+#endif
+
 #define DEV_LINKS 4
 #define CAP_VERSION _LINUX_CAPABILITY_VERSION_3
 #define CAP_WORDS   _LINUX_CAPABILITY_U32S_3
@@ -503,7 +508,7 @@ static bool ShouldBeWritable(const std::string &mnt_dir) {
   if (ends_with(mnt_dir.c_str(), "/proc")) 
     return true;
 
-  if (ends_with(mnt_dir.c_str(), "/tmp"))
+  if (ends_with(mnt_dir.c_str(), TMP))
     return true;
 
   if (starts_with(mnt_dir.c_str(), "/dev"))
@@ -600,7 +605,7 @@ bool ToBeMounted(const char *str) {
   // /tmp and all its subpaths have to be excluded cause that's where
   // we're going to have the sandbox_root and the overlayfs work dir.
   // We'll have a dedicated policy for mounting /tmp
-  fs::path tmp("/tmp");
+  fs::path tmp(TMP);
   if (isSubpath(tmp, inputPath)) {
     PRINT_DEBUG("/tmp subpath");
     return true;
@@ -1607,7 +1612,7 @@ int Pid1Main(void *args) {
     PRINT_DEBUG("opt.use_default && !CanIterateRoot\n");
     const std::string mount_point = GetMountPointOf(opt.working_dir);
     MiniSbxMountWrite(mount_point);
-    MiniSbxMountWrite("/tmp");
+    MiniSbxMountWrite(TMP);
     MountFilesystems();
     mounts = CountMounts();
     MakeFilesystemPartiallyReadOnly(false, mounts);
@@ -1649,7 +1654,7 @@ int Pid1Main(void *args) {
     // everything as read-only
     PRINT_DEBUG("Sandbox enabled in read-only mode\n");
 
-    MiniSbxMountWrite("/tmp");
+    MiniSbxMountWrite(TMP);
     MountFilesystems();
     mounts = CountMounts();
     // In this case overlay_dirs will be empty but we need it when

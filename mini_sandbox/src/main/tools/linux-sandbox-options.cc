@@ -804,8 +804,9 @@ int MiniSbxSetupSandboxRootWithOverlay(const std::string& path_c) {
 // This function is useful when you want to mount a single file as output,
 // instead of a whole directory The file must exists or is created.
 int MiniSbxMountEmptyOutputFile(const std::string &path_str) {
+  std::error_code ec;
   std::string path = CanonicPath(path_str, false);
-  if (!fs::exists(path)) {
+  if (!fs::exists(path, ec)) {
     int handle = open(path.c_str(), O_CREAT | O_WRONLY | O_EXCL, 0666);
     if (handle < 0) {
       MiniSbxReport("%s: open failed", __func__);
@@ -813,6 +814,10 @@ int MiniSbxMountEmptyOutputFile(const std::string &path_str) {
     if (close(handle) < 0) {
       MiniSbxReport("%s: close failed", __func__);
     }
+  }
+  if (ec) {
+    PRINT_DEBUG("%s could not mount %s", __func__, path_str.c_str());
+    return -1;
   }
   MiniSbxMountWrite(path);
   return 0;
