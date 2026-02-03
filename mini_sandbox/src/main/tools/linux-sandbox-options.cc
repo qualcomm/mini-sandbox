@@ -551,21 +551,32 @@ int MiniSbxAllowMaxConnections(int max_connections) {
 
 int MiniSbxAllowAllDomains() {
   PRINT_DEBUG("Allow all domains");
-  reset_firewall_rules(&opt.fw_rules);
-  return 0;
+  if(reset_firewall_rules(&opt.fw_rules) == 0){
+    return 0;
+  }else{
+    return MiniSbxReportError(__func__, ErrorCode::IllegalNetworkConfiguration);
+  }
+  
 }
 
 int MiniSbxAllowDomain(const std::string& domain) {
   const char* domain_str = domain.c_str();
   PRINT_DEBUG("allow domain %s", domain_str);
-  set_firewall_rule(domain_str, &(opt.fw_rules));
-  return 0;
+  if(set_firewall_rule(domain_str, &(opt.fw_rules))<0){
+    return MiniSbxReportError(__func__,ErrorCode::IllegalNetworkConfiguration);
+  }else{
+    return 0;
+  }
 }
 
 int MiniSbxAllowIpv4(const std::string& ip) {
   const char* ip_str = ip.c_str();
   PRINT_DEBUG("allow ip %s", ip_str);
-  set_firewall_rule(ip_str, &(opt.fw_rules));
+  if(set_firewall_rule(ip_str, &(opt.fw_rules))<0){
+    return MiniSbxReportError(__func__,ErrorCode::IllegalNetworkConfiguration);
+  }else{
+    return 0;
+  }
   return 0;
 }
 
@@ -814,8 +825,9 @@ int MiniSbxSetupSandboxRootWithOverlay(const std::string& input_path) {
 // This function is useful when you want to mount a single file as output,
 // instead of a whole directory The file must exists or is created.
 int MiniSbxMountEmptyOutputFile(const std::string &path_str) {
+  std::error_code ec;
   std::string path = CanonicPath(path_str, false);
-  if (!fs::exists(path)) {
+  if (!fs::exists(path, ec)) {
     int handle = open(path.c_str(), O_CREAT | O_WRONLY | O_EXCL, 0666);
     if (handle < 0) {
       MiniSbxReport("%s: open failed", __func__);
@@ -823,6 +835,10 @@ int MiniSbxMountEmptyOutputFile(const std::string &path_str) {
     if (close(handle) < 0) {
       MiniSbxReport("%s: close failed", __func__);
     }
+  }
+  if (ec) {
+    PRINT_DEBUG("%s could not mount %s", __func__, path_str.c_str());
+    return -1;
   }
   MiniSbxMountWrite(path);
   return 0;

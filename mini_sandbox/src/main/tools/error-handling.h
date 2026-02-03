@@ -40,6 +40,7 @@ enum class ErrorCode : int {
   IllegalConfiguration = -8,
   FileReadAndWrite = -9,
   NestedSandbox = -10,
+  IllegalNetworkConfiguration = -11,
   GeneralOSError = -100,
   Unknown = -1000
 };
@@ -70,6 +71,8 @@ inline std::string GetErrorMessage(ErrorCode code) {
       return " : Cannot nest multiple sandbox. The process is already running inside mini-sandbox.";
     case ErrorCode::GeneralOSError:
       return " : OS Error";
+    case ErrorCode::IllegalNetworkConfiguration:
+      return " : Cannot allow all domains after specifying one network rule";
     case ErrorCode::Unknown:
     default:
       return ": Unknown error occurred";
