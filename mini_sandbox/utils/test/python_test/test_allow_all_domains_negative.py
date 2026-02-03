@@ -9,7 +9,6 @@ import os
 import env
 from pathlib import Path
 
-tap = False
 script_dir = os.path.abspath(os.path.dirname(__file__))
 
 import pyminisandbox.pyminitapbox as mn_sbx
@@ -36,22 +35,20 @@ def attempt_network_connection(domain):
 
 if __name__ == "__main__":
     print("Running outside of the sandbox...")
-    file_path = os.path.join(script_dir, "read_only.test")
-    os.system(f"touch {file_path}")
-    os.system(f"chmod 444 {file_path}")
     res = mn_sbx.mini_sandbox_setup_default()
     assert(res == 0)
-    # Mount all Python libraries in case Python isn't an executable.
-    for path in sys.path:
-        if Path(path).exists():
-            mn_sbx.mini_sandbox_mount_write(path)
 
     res= mn_sbx.mini_sandbox_allow_all_domains()
     assert (res ==0)
 
-
     res= mn_sbx.mini_sandbox_allow_domain("www.google.com")
     assert(res<0)
+
+    res = mn_sbx.mini_sandbox_start()
+    res = attempt_network_connection("https://www.google.com")
+    assert (res == 0)
+    res = attempt_network_connection("https://www.qualcomm.com")
+    assert (res == 0)
 
 
 

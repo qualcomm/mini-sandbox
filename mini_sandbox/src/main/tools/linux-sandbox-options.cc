@@ -544,7 +544,7 @@ int MiniSbxAllowAllDomains() {
   if(reset_firewall_rules(&opt.fw_rules) == 0){
     return 0;
   }else{
-    return MiniSbxReportError(__func__, ErrorCode::LogFileNotUnique);
+    return MiniSbxReportError(__func__, ErrorCode::IllegalNetworkConfiguration);
   }
   
 }
