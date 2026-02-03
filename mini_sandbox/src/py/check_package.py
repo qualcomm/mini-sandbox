@@ -21,6 +21,7 @@ with zipfile.ZipFile(wheel) as z:
         archived_files.append(os.path.basename(n))
 
 for f in FILES:
+    print(f"did we pack {f} ?")
     assert (f in archived_files)
 print("Wheel validated !")
 

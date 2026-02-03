@@ -1,0 +1,35 @@
+FROM python:3.10-slim AS py
+
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ca-certificates \
+        build-essential \
+        git \
+        curl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python -m pip install --upgrade pip setuptools wheel build requests
+
+
+WORKDIR /app/
+ARG VER
+ENV VERSION=$VER
+
+ENV DOCKER_BUILD=1
+RUN mkdir /rel
+
+COPY ./oss-mini-sandbox /app/oss-mini-sandbox
+COPY $VER /app/$VER
+
+
+RUN /app/oss-mini-sandbox/clean.sh
+RUN cp -r /app/$VER/python/pyminisandbox/ /app/oss-mini-sandbox/mini_sandbox/src/py/ctype_bindings/
+
+ENTRYPOINT ["sh", "-c", "set -e && /app/oss-mini-sandbox/mini_sandbox/src/py/build.sh && cp -r  /app/oss-mini-sandbox/mini_sandbox/src/py/dist/ /rel/ "]
