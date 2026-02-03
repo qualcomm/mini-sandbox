@@ -82,5 +82,6 @@ check_exit $PYTHON test_read_only.py
 check_exit $PYTHON test_read_only.py tap
 check_exit $PYTHON test_allow_all_domains.py 
 check_exit $PYTHON test_allow_all_domains_negative.py 
+check_exit $PYTHON test_no_rules_pyminitapbox.py
 
 cd $ORIGINAL_DIR
