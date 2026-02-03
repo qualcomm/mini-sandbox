@@ -128,7 +128,7 @@ jobs:
             -t mini-sandbox-debian:"${TAG}" \
             .
 
-      - name: Run SUSE container
+      - name: Run Debian container
         run: | 
           docker run --rm --privileged \
           --security-opt seccomp=unconfined \

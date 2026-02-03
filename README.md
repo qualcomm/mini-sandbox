@@ -1,5 +1,6 @@
 # Project overview
 
+
 A sandbox CLI and library based on the concept of namespaces which can be used to isolate the untrusted code. The main use cases are isolating standalone tools like python scripts, bash , binaries etc. Say you have to run a python tool that imports dozens 3rd-party dependencies you'll never manually review, this is for you. It comes with the same advantage of Podman style isolation (root-less namespaces), but doesn't require any Containerfile/Dockerfile and can be directly embedded in your code. 
 
 More details about the goals at [motivations](docs/motivations.md)
