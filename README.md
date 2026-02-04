@@ -38,27 +38,28 @@ wget wikipedia.com   # will fail !
 
 ### Library Mode -- Python
 
-Last, we have bindings for C/C++ and Python. See here an example of how to use this in python code (pip package coming, but fow now you'll have to manually add this to your PYTHONPATH). For a list of APIs checkout [the APIs documentation](docs/libminisandbox_apis.md).
+Last, we have bindings for C/C++ and Python. In this section we'll walk through an example for out python bindings but you can checkout the C/C++ APIs in [the APIs documentation](docs/libminisandbox_apis.md).
+
+You can install our PyPI package with `pip install pyminisandbox`.
 
 ```python
-import pyminisandbox as mn_sbx
+import pyminisandbox.pyminitapbox as mn_sbx
 
 if __name__ == "__main__":
         
     mn_sbx.mini_sandbox_setup_default()
+
     mn_sbx.mini_sandbox_mount_write("/usr2")
- 
     mn_sbx.mini_sandbox_allow_domain("www.wikipedia.org")
-    # mn_sbx.mini_sandbox_allow_ipv4_subnet("142.250.72.132/24")
  
-    mn_sbx.mini_sandbox_start()
+    res = mn_sbx.mini_sandbox_start()
+    assert (res == 0)
      
     print("Running inside the sandbox...")
     attempt_network_connection("http://www.google.com") 
     attempt_network_connection("http://www.wikipedia.org")
  
-    # rest of your logic here
-    # use all third-party deps you want as now they are sandboxed
+    # rest of your logic
 ```
 
 
