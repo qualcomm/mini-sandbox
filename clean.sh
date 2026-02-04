@@ -14,4 +14,5 @@ rm -rf $SCRIPT_DIR/mini_sandbox/src/py/ctype_bindings/pyminisandbox/*.so
 rm -rf $SCRIPT_DIR/mini_sandbox/src/py/ctype_bindings/pyminisandbox/minitap
 rm -rf $SCRIPT_DIR/mini_sandbox/src/py/ctype_bindings/pyminisandbox/*.pyc
 rm -rf $SCRIPT_DIR/mini_sandbox/src/py/ctype_bindings/pyminisandbox/__pycache__/
+rm -rf $SCRIPT_DIR/mini_sandbox/src/py/ctype_bindings/*.egg-info
 

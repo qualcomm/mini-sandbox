@@ -152,7 +152,7 @@ void WriteFile(const std::string &filename, const char *fmt, ...) {
 static int DieOrReport(const char* msg, bool die_on_error) {
   if (die_on_error)
     DIE("%s", msg);
-  return MiniSbxReport(msg);
+  return MiniSbxReportGenericError(msg);
 }
 
 // Waits for a signal to proceed from the pipe.
@@ -206,12 +206,10 @@ int CreateDirectory(const std::string& base_path, const std::string& dir_name, s
   out = base_path + "/" + dir_name;
   fs::path p = fs::path(out);
   if (!fs::exists(p, ec)) {
-    if(! fs::create_directories(out, ec)) {
-        res = MiniSbxReport("Could not create directory %s: %s\n", out.c_str(), ec.message().c_str());
-    }
+    fs::create_directories(out, ec);
   }
   if (ec) {
-    return MiniSbxReport("Error in %s\n", __func__);
+    return MiniSbxReportGenericError(ec.message());
   }
   return res;
 }
@@ -221,7 +219,7 @@ int CreateDirectories(const std::string& base_path) {
   std::error_code ec;
   fs::create_directories(base_path, ec);
   if (ec) {
-    return MiniSbxReport("Error in %s\n", __func__);
+    return MiniSbxReportGenericError(ec.message());
   }
   return res;
 }
@@ -243,7 +241,8 @@ std::string CreateTempDirectory(const std::string &base_path) {
     if (!fs::exists(p, ec)) {
       res = CreateDirectories(tempDirPath);
       if (res < 0) {
-        MiniSbxReport("Could not create temporary directory %s\n", tempDirPath.c_str());
+        std::string err_msg = "Could not create temporary directory:" + tempDirPath;
+        MiniSbxReportGenericError(err_msg);
       }
       return tempDirPath;
     }
@@ -278,11 +277,11 @@ int GetCWD(std::string& res) {
     res += currentPath.string();
     return 0;
   } catch (const fs::filesystem_error& e) {
-        return MiniSbxReport("Filesystem error");
+        return MiniSbxReportGenericError("Filesystem error");
   } catch (const std::exception& e) {
-        return MiniSbxReport("General exception");
+        return MiniSbxReportGenericError("General exception");
   } catch (...) {
-    return MiniSbxReportError(__func__, ErrorCode::Unknown);
+    return MiniSbxReportError(ErrorCode::Unknown);
   }
 
 }
@@ -447,14 +446,14 @@ void Cleanup() {
       fs::path sandbox_dir = opt.sandbox_root.c_str();
       makeWritable(sandbox_dir, 0, MAX_DEPTH_SANDBOX_ROOT);
       if (fs::remove_all(sandbox_dir) < 0) {
-        MiniSbxReport("ERROR when removing the sandbox directory");
+        MiniSbxReportGenericError("ERROR when removing the sandbox directory");
       }
 
       if (!opt.hermetic) {
         fs::path overlayfs_dir = opt.tmp_overlayfs.c_str();
         makeWritable(overlayfs_dir, 0, MAX_DEPTH_OVERLAYFS_ROOT);
         if (fs::remove_all(overlayfs_dir) < 0) {
-          MiniSbxReport("ERROR when removing the overlay directory");
+          MiniSbxReportGenericError("ERROR when removing the overlay directory");
         }
       }
     } catch (const std::exception &e) {
@@ -518,7 +517,7 @@ gid_t get_outer_gid() {
 int MiniSbxSetInternalEnv() {
   if (setenv(INTERNAL_MINI_SANDBOX_ENV, "1", 1) != 0) {
       std::cerr << "Failed to set environment variable." << std::endl;
-      MiniSbxReport("Failed to set environment variable __INTERNAL_MINI_SANDBOX_ON");
+      MiniSbxReportGenericError("Failed to set environment variable __INTERNAL_MINI_SANDBOX_ON");
   }
   return 0;
 }
