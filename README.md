@@ -9,9 +9,10 @@ More details about the goals at [motivations](docs/motivations.md)
 
 The easier way to access the tool is to download the binaries/libraries from the [release page](https://github.com/qualcomm/mini-sandbox/releases). 
 
-Alternatively, you can also build the code, see [build instructions](docs/build.md).
 
-If you are interested at the python bindings you can `pip install pyminisandbox` [Pypi page](https://pypi.org/project/pyminisandbox)
+If you are interested at the python bindings you can `pip install pyminisandbox` ( Pypi page [here](https://pypi.org/project/pyminisandbox) ).
+
+Alternatively, you can also build the code, see [build instructions](docs/build.md).
 
 Here we are going to highlight three main uses cases
 
