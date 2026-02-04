@@ -11,6 +11,8 @@ The easier way to access the tool is to download the binaries/libraries from the
 
 Alternatively, you can also build the code, see [build instructions](docs/build.md).
 
+If you are interested at the python bindings you can `pip install pyminisandbox` [Pypi page](https://pypi.org/project/pyminisandbox)
+
 Here we are going to highlight three main uses cases
 
 ### Default Command line usage
@@ -19,7 +21,7 @@ The fastest, default usage is:
 
 `mini-sandbox -x -- /bin/bash`
 
-In short this will i) shut down the network 2) mount several mount points as overlay (modifications do not affect the filesystem out of the sandbox) 3) mount less-security sensitive or custom filesystems as read-only (e.g., autofs, nfs, ..) 4) chroot into a custom folder .
+In short this will 1) shut down the network 2) mount several mount points as read-only/overlayfs (modifications do not affect the filesystem out of the sandbox) 3) chroot into a custom folder 4) create an empty home (unless you're running from $HOME or mounting it explicitly).
 If you need to open network connections in your app/package check out the `TAP mode` below to enable the root-less firewall feature that will allow you to block all connections except for the necessary ones.
 
 **IMPORTANT** If you execute this from hour $HOME directory we will mount the $HOME directory as fully writable and many of our isolation guarantees do not hold anymore.
@@ -38,7 +40,7 @@ wget wikipedia.com   # will fail !
 
 ### Library Mode -- Python
 
-Last, we have bindings for C/C++ and Python. In this section we'll walk through an example for out python bindings but you can checkout the C/C++ APIs in [the APIs documentation](docs/libminisandbox_apis.md).
+Last, we have bindings for C/C++ and Python. In this section we'll walk through an example for our Python bindings but you can checkout the C/C++ APIs in [the APIs documentation](docs/libminisandbox_apis.md).
 
 You can install our PyPI package with `pip install pyminisandbox`.
 
