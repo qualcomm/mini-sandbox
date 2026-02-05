@@ -24,6 +24,7 @@ check_exit() {
 
 
 check_exit $SCRIPT_DIR/test_err.sh
+check_exit $SCRIPT_DIR/test_tap_err.sh
 check_exit $SCRIPT_DIR/test_default_base.sh  
 check_exit $SCRIPT_DIR/test_default_overlay.sh  
 
