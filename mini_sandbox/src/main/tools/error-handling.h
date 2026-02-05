@@ -50,36 +50,36 @@ enum class ErrorCode : int {
 inline std::string GetErrorMessage(ErrorCode code) {
   switch (code) {
     case ErrorCode::None:
-      return ": No error";
+      return "No error";
     case ErrorCode::InvalidFunctioningMode:
-      return ": Only one between default, overlayfs and hermetic must be used";
+      return "Only one between default, overlayfs and hermetic must be used";
     case ErrorCode::SandboxRootNotUnique:
-      return " : Only one sandbox root directory is allowed";
+      return "Only one sandbox root directory is allowed";
     case ErrorCode::InvalidFolder:
-      return " : Specify a valid directory";
+      return "Specify a valid directory";
     case ErrorCode::OverlayOptionNotSet:
-      return " : Overlay option not enabled";
+      return "Overlay option not enabled";
     case ErrorCode::PathDoesNotExist:
-      return " : Path does not exist";
+      return "Path does not exist";
     case ErrorCode::NotAnAbsolutePath:
-      return " : Must use absolute paths";
+      return "Must use absolute paths";
     case ErrorCode::LogFileNotUnique:
-      return " : Cannot write debug output to more than one file";
+      return "Cannot write debug output to more than one file";
     case ErrorCode::IllegalConfiguration:
-      return " : Illegal configuration. Overlay folder can't be inside a writable directory";
+      return "Illegal configuration. Overlay folder can't be inside a writable directory";
     case ErrorCode::FileReadAndWrite:
-      return " : Illegal configuration. File mounted as read and write at the same time";
+      return "Illegal configuration. File mounted as read and write at the same time";
     case ErrorCode::NestedSandbox:
-      return " : Cannot nest multiple sandbox. The process is already running inside mini-sandbox.";
+      return " Cannot nest multiple sandbox. The process is already running inside mini-sandbox.";
     case ErrorCode::GeneralOSError:
-      return " : OS Error";
+      return "OS Error";
     case ErrorCode::IllegalNetworkConfiguration:
-      return " : Cannot allow all domains after specifying one network rule";
+      return "Cannot allow all domains after specifying one network rule";
     case ErrorCode::TmpNotRemounted:
-      return " : /tmp cannot be remounted when running in default mode";
+      return "/tmp cannot be remounted when running in default mode";
     case ErrorCode::Unknown:
     default:
-      return ": Unknown error occurred";
+      return "Unknown error occurred";
   }
 }
 

@@ -46,28 +46,24 @@ static void MiniSbxSetError(const std::string& err_msg, ErrorCode code, int& ret
 
 
 int MiniSbxReportGenericError_impl(const std::string& err_msg, const char* file, int line, const char* func) {
-  std::string msg;
-  int ret = 0;
-  GenErrorMessage(err_msg, file, line, func, msg);
-  MiniSbxSetError(msg, ErrorCode::GeneralOSError, ret);
-  return ret;
+  return MiniSbxReportErrorAndMessage_impl(err_msg, ErrorCode::GeneralOSError, file, line, func);
 }
 
 
 int MiniSbxReportError_impl(ErrorCode code, const char* file, int line, const char* func) {
-  std::string msg;
-  int ret = 0;
-  std::string code_msg = GetErrorMessage(code);
-  GenErrorMessage(code_msg, file, line, func, msg);
-  MiniSbxSetError(msg, code, ret);
-  return ret;
+  return MiniSbxReportErrorAndMessage_impl("", code, file, line, func);
 }
 
 
 int MiniSbxReportErrorAndMessage_impl(std::string err_msg, ErrorCode code, const char* file, int line, const char* func) {
   std::string msg; 
+  std::string code_msg;
   int ret = 0;
-  std::string code_msg = GetErrorMessage(code) + ": " + err_msg;
+  
+  code_msg = GetErrorMessage(code);
+  if (!err_msg.empty())
+    code_msg += ": " + err_msg;
+
   GenErrorMessage(code_msg, file, line, func, msg);
   MiniSbxSetError(msg, code, ret);
   return ret;
