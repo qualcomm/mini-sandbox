@@ -49,11 +49,30 @@ check_last_command_failed() {
     fi
 }
 
+check_last_exit_code() {
+    if [ $? -eq 5 ]; then
+        echo "Success: Last command failed (As Expected)."
+        return 0
+    else
+        echo "Error: Last command succeeded but should have failed."
+        cd $ORIGINAL_DIR
+        exit 1
+    fi
+}
+
 if ! [ -z "$PYTHON" ]; then
 	echo "Using the suggested python interpreter $PYTHON"
 else
 	PYTHON=$(which python)
 fi
+
+# Disable error-exit mode just to check the exit codes work
+set +e
+$PYTHON test_exit_code.py
+check_last_exit_code
+$PYTHON test_exit_code.py tap
+check_last_exit_code
+set -e
 
 check_exit $PYTHON test_all_api.py
 check_exit $PYTHON test_all_api.py tap
@@ -77,10 +96,8 @@ rm "$SCRIPT_DIR/../pyminisandbox-test-default.test"
 
 check_exit $PYTHON test_any_connection.py
 check_exit $PYTHON test_one_shot_connection.py
-check_exit $PYTHON test_err.py
 check_exit $PYTHON test_exit_after_mini_sandbox_start.py
 check_exit $PYTHON test_exit_after_mini_sandbox_start.py tap
-
 check_exit $PYTHON test_err_mini_sandbox_start.py
 check_exit $PYTHON test_err_mini_sandbox_start.py tap
 check_exit $PYTHON test_read_only.py

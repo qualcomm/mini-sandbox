@@ -119,7 +119,7 @@ static_assert(global_need_polite_sigterm.is_always_lock_free);
 static void CloseFds() {
   DIR *fds = opendir("/proc/self/fd");
   if (fds == nullptr) {
-    MiniSbxReport("opendir");
+    MiniSbxReportGenericError("opendir");
   }
 
   while (1) {
@@ -128,7 +128,7 @@ static void CloseFds() {
 
     if (dent == nullptr) {
       if (errno != 0) {
-        MiniSbxReport("readdir");
+        MiniSbxReportGenericError("readdir");
       }
       break;
     }
@@ -144,14 +144,14 @@ static void CloseFds() {
           (global_debug == NULL || fd != fileno(global_debug)) &&
           fd != dirfd(fds)) {
         if (close(fd) < 0) {
-          MiniSbxReport("close");
+          MiniSbxReportGenericError("close");
         }
       }
     }
   }
 
   if (closedir(fds) < 0) {
-    MiniSbxReport("closedir");
+    MiniSbxReportGenericError("closedir");
   }
 }
 #endif
@@ -191,10 +191,10 @@ static pid_t SpawnPid1() {
 
   int pipe_from_child[2], pipe_to_child[2];
   if (pipe(pipe_from_child) < 0) {
-    return MiniSbxReport("pipe");
+    return MiniSbxReportGenericError("pipe");
   }
   if (pipe(pipe_to_child) < 0) {
-    return MiniSbxReport("pipe");
+    return MiniSbxReportGenericError("pipe");
   }
 
   int clone_flags = CLONE_NEWUSER | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWPID;
@@ -222,7 +222,7 @@ static pid_t SpawnPid1() {
 #ifdef LIBMINISANDBOX
   int unshare_res = unshare(clone_flags);
   if (unshare_res < 0) {
-    MiniSbxReport("unshare failed\n");
+    MiniSbxReportGenericError("unshare failed\n");
   }
   pid_t child_pid = fork();
 #else
@@ -231,7 +231,7 @@ static pid_t SpawnPid1() {
 #endif
 
   if (child_pid < 0) {
-    MiniSbxReport("clone");
+    MiniSbxReportGenericError("clone");
   }
 
 
@@ -239,7 +239,7 @@ static pid_t SpawnPid1() {
   if (child_pid == 0) {
     int sandbox_res = Pid1Main(&pid1Args);
     if (sandbox_res < 0) {
-      MiniSbxReport("Failed in Pid1Main\n");
+      MiniSbxReportGenericError("Failed in Pid1Main\n");
     }
     return 0;
   } else {
@@ -298,7 +298,7 @@ static int WaitForPid1(const pid_t child_pid) {
       continue;
     }
 
-    MiniSbxReport("wait4");
+    MiniSbxReportGenericError("wait4");
   }
 
   // If we're supposed to write stats to a file, do so now.
@@ -323,11 +323,11 @@ static int ValidateOptions() {
 
   if (opt.use_overlayfs) {
     if (ValidateOverlayOutOfFolder(opt.tmp_overlayfs, opt.working_dir) < 0)
-      return MiniSbxReportError(__func__, ErrorCode::IllegalConfiguration);
+      return MiniSbxReportError(ErrorCode::IllegalConfiguration);
   }
  
   if (ValidateReadWritePaths(opt.bind_mount_sources, opt.writable_files) < 0)
-      return MiniSbxReportError(__func__, ErrorCode::FileReadAndWrite);
+      return MiniSbxReportError(ErrorCode::FileReadAndWrite);
 
   if (docker_mode == PRIVILEGED_CONTAINER) {
     MiniSbxMountBind(std::string("/etc"));
@@ -335,7 +335,7 @@ static int ValidateOptions() {
   else {
     for (auto writable_file : opt.writable_files) {
       if (opt.use_overlayfs && ValidateOverlayOutOfFolder(opt.tmp_overlayfs, writable_file) < 0)
-        return MiniSbxReportError(__func__, ErrorCode::IllegalConfiguration);
+        return MiniSbxReportError(ErrorCode::IllegalConfiguration);
     }
   }
 
@@ -348,29 +348,33 @@ static int ValidateOptions() {
   // 3 - instead of running the sandbox with the "Default" (-x) functioning mode
   // use the custom functioning mode with -o/-d
   if (ValidateTmpNotRemounted(opt.writable_files) < 0)
-      return MiniSbxReportError(__func__, ErrorCode::IllegalConfiguration);
+      return MiniSbxReportError(ErrorCode::TmpNotRemounted);
 
   if (ValidateTmpNotRemounted(opt.bind_mount_sources) < 0)
-      return MiniSbxReportError(__func__, ErrorCode::IllegalConfiguration);
+      return MiniSbxReportError(ErrorCode::TmpNotRemounted);
  
   return 0;
 }
 
-static void StartLogging() {
+static int StartLogging() {
   // Open the file PRINT_DEBUG writes to.
   // Must happen early enough so we don't lose any debugging output.
   if (!opt.debug_path.empty()) {
     global_debug = fopen(opt.debug_path.c_str(), "w");
     if (!global_debug) {
-      MiniSbxReport("fopen(%s)", opt.debug_path.c_str());
+      std::string err_msg = "fopen(" + opt.debug_path + ") failed";
+      return MiniSbxReportGenericError(err_msg);
     }
   }
+  return 0;
 }
 
 
 int MiniSbxStart() {
   int res;
-  StartLogging();
+  res = StartLogging();
+  if (res < 0) return res;
+
   LogSystem();
   PRINT_DEBUG("UserNamespaceSupported = %d", UserNamespaceSupported());
 
@@ -380,7 +384,7 @@ int MiniSbxStart() {
 
   // Ask the kernel to kill us with SIGKILL if our parent dies.
   if (prctl(PR_SET_PDEATHSIG, SIGKILL) < 0) {
-    MiniSbxReport("prctl");
+    MiniSbxReportGenericError("prctl");
   }
 
 
@@ -398,7 +402,7 @@ int MiniSbxStart() {
 #if (!(LIBMINISANDBOX))
     SpawnChild(true);  
 #else
-    return MiniSbxReportRecoverableError("Already running inside mini-sandbox",ErrorCode::NestedSandbox);
+    return MiniSbxReportError(ErrorCode::NestedSandbox);
 #endif
   }
 
