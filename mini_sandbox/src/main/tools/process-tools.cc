@@ -62,6 +62,7 @@ namespace fs = std::experimental::filesystem;
 #define MAX_ATTEMPTS 100
 #define INTERNAL_MINI_SANDBOX_ENV "__INTERNAL_MINI_SANDBOX_ON"
 
+static UserNamespaceSupport user_ns_support = NON_INIT;
 
 void InstallSignalHandler(int signum, void (*handler)(int)) {
   struct sigaction sa = {};
