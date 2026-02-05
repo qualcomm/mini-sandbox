@@ -11,10 +11,16 @@ else
         SO_PATH = $(MINI)/out/
 endif
 
-CXX = clang++
+CXX := $(shell command -v clang++ 2>/dev/null)
+CC := $(shell command -v clang 2>/dev/null)
+ifeq ($(CXX),)
+  CXX := g++
+  CC := gcc
+endif
+
 FLAGS = -DMINITAP -DLIBMINISANDBOX -g -Wno-writable-strings -std=c++17
 
-LDFLAGS ?= ""
+LDFLAGS :=
 LDFLAGS += -lpthread -ldl
 
 ifeq (4.3,$(firstword $(sort $(MAKE_VERSION) 4.3)))
