@@ -13,14 +13,16 @@ endif
 
 CXX := $(shell command -v clang++ 2>/dev/null)
 CC := $(shell command -v clang 2>/dev/null)
+LDFLAGS ?= ""
 ifeq ($(CXX),)
   CXX := g++
   CC := gcc
+  LDFLAGS :=
 endif
 
 FLAGS = -DMINITAP -DLIBMINISANDBOX -g -Wno-writable-strings -std=c++17
 
-LDFLAGS :=
+
 LDFLAGS += -lpthread -ldl
 
 ifeq (4.3,$(firstword $(sort $(MAKE_VERSION) 4.3)))

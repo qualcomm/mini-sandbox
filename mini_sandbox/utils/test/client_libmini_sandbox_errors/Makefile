@@ -10,16 +10,16 @@ else
 endif
 
 CXX := $(shell command -v clang++ 2>/dev/null)
-CC := $(shell command -v clang 2>/dev/null)
+LDFLAGS ?= ""
 ifeq ($(CXX),)
   CXX := g++
-  CC := gcc
+  LDFLAGS := 
 endif
 
 
 COMMON_FLAGS = -DLIBMINISANDBOX -g -lpthread -Wno-writable-strings
 FLAGS = $(COMMON_FLAGS) -std=c++17
-LDFLAGS := 
+
 
 ifeq (4.3,$(firstword $(sort $(MAKE_VERSION) 4.3)))
 HAS_FILESYSTEM += $(shell echo "#include <filesystem> \nint main() {}" | $(CXX) $(STD) -x c++ - -o /dev/null 2> /dev/null && echo "yes" || echo "no")
