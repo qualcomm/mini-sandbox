@@ -37,5 +37,6 @@ check_exit $SCRIPT_DIR/check_exit_from_user.bin
 check_exit $SCRIPT_DIR/check_runtime_init_error.bin
 check_exit $SCRIPT_DIR/check_runtime_init_error_custom.bin
 check_exit $SCRIPT_DIR/check_runtime_init_error_readonly.bin
+check_exit $SCRIPT_DIR/check_mount_fails_after_init.bin
 
 cd $ORIGINAL_DIR

@@ -32,7 +32,7 @@ ifeq ($(HAS_FILESYSTEM),no)
 endif
 
 # List of source files
-SRC_CXX_LIST = check_only_one_root.cc  check_validate_path.cc only_one_log.cc check_overlay_enabled.cc call_default_after_start.cc call_start_twice.cc check_runtime_init_error.cc check_exit_from_user.cc check_runtime_init_error_readonly.cc check_runtime_init_error_custom.cc
+SRC_CXX_LIST = check_only_one_root.cc  check_validate_path.cc only_one_log.cc check_overlay_enabled.cc call_default_after_start.cc call_start_twice.cc check_runtime_init_error.cc check_exit_from_user.cc check_runtime_init_error_readonly.cc check_runtime_init_error_custom.cc check_mount_fails_after_init.cc
 
 # Derive target names from source files
 TARGETS = $(SRC_CXX_LIST:.cc=.bin)
