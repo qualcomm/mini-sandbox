@@ -139,16 +139,33 @@ static int ValidateDirAndCreate(const std::string& dir) {
 }
 
 
-
-
 static int ValidatePath(const std::string &path) {
-
   if (path[0] != '/') {
     return MiniSbxReportErrorAndMessage(path, ErrorCode::NotAnAbsolutePath);
   }
   fs::path fs_path(path);
   try {
     if (!(fs::exists(fs_path))) {
+      return MiniSbxReportErrorAndMessage(path, ErrorCode::PathDoesNotExist);
+    }
+  } catch (const fs::filesystem_error &e) {
+    PRINT_DEBUG("Filesystem error %s:", e.what());
+    return MiniSbxReportErrorAndMessage(path, ErrorCode::PathDoesNotExist);
+  }
+  return 0;
+}
+
+
+static int ValidateDirPath(const std::string &path) {
+  if (path[0] != '/') {
+    return MiniSbxReportErrorAndMessage(path, ErrorCode::NotAnAbsolutePath);
+  }
+  fs::path fs_path(path);
+  try {
+    if (!(fs::exists(fs_path))) {
+      return MiniSbxReportErrorAndMessage(path, ErrorCode::PathDoesNotExist);
+    }
+    if (!(fs::is_directory(fs_path))) {
       return MiniSbxReportErrorAndMessage(path, ErrorCode::PathDoesNotExist);
     }
   } catch (const fs::filesystem_error &e) {
@@ -266,7 +283,7 @@ std::string CanonicPath(const std::string path_str, bool resolve_symlink) {
       return path.string(); 
       // If the path doesn't exist the best that we can do is
       // to return the original path. The parsing will likely
-      // fail when we call ValidatePath, which instead requires
+      // fail when we call ValidateDirPath, which instead requires
       // that the path exists.
     }
   } catch (const fs::filesystem_error &e) {
@@ -350,7 +367,6 @@ static void ParseCommandLine(unique_ptr<vector<char *>> args) {
 #else
     case 'F':
       if (opt.firewall_rules_path.empty()) {
-        ValidateIsAbsolutePath(optarg, args->front(), static_cast<char>(c));
         opt.firewall_rules_path.assign(optarg);
         MiniSbxAllowConnections(opt.firewall_rules_path.c_str());
       } else {
@@ -497,6 +513,25 @@ std::regex ipv4_regex(R"(^(\d{1,3}\.){3}\d{1,3}$)");
 std::regex domain_regex(R"(^([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$)");
 std::regex subnet_regex(R"(^(\d{1,3}\.){3}\d{1,3}/\d{1,2}$)");
 
+static int ValidateFilePath(const std::string &path) {
+  std::error_code ec;
+  fs::path fs_path(path);
+  try {
+    if (!(fs::exists(fs_path))) {
+      return MiniSbxReportErrorAndMessage(path, ErrorCode::PathDoesNotExist);
+    }
+    if (!(fs::is_regular_file(fs_path))) {
+      return MiniSbxReportErrorAndMessage(path, ErrorCode::PathDoesNotExist);
+    }
+  } catch (const fs::filesystem_error &e) {
+    PRINT_DEBUG("Filesystem error %s:", e.what());
+    return MiniSbxReportErrorAndMessage(path, ErrorCode::PathDoesNotExist);
+  }
+  return 0;
+}
+
+
+
 static int ReadAllowedConnections(std::ifstream& file) {
     int res = 0;
     std::string line;
@@ -521,7 +556,7 @@ static int ReadAllowedConnections(std::ifstream& file) {
 
 int MiniSbxAllowConnections(const std::string& path) {
     int res = 0;
-    if ((res = ValidatePath(path)) < 0)
+    if ((res = ValidateFilePath(path)) < 0)
       return res;
     std::ifstream file(path);
     if (!file.is_open()) {
@@ -586,7 +621,7 @@ int MiniSbxEnableLog(const std::string &path) {
   if (opt.debug_path.empty()) {
     fs::path fs_path(path);
     fs::path base_dir = fs_path.parent_path();
-    res = ValidatePath(base_dir.string());
+    res = ValidateDirPath(base_dir.string());
     opt.debug_path.assign(path);
   } else {
     res = MiniSbxReportError(ErrorCode::LogFileNotUnique);
@@ -597,7 +632,7 @@ int MiniSbxEnableLog(const std::string &path) {
 int MiniSbxMountBind(const std::string &input_path) { // -M
   std::string path = CanonicPath(input_path, false);
   int res = 0;
-  if ((res = ValidatePath(path)) < 0) {
+  if ((res = ValidateDirPath(path)) < 0) {
     return res;
   }
   // Add the current source path to both source and target lists
@@ -614,7 +649,7 @@ int MiniSbxMountBind(const std::string &input_path) { // -M
 int MiniSbxMountBindSourceToTarget(const std::string &c_source, const std::string& c_target) {
   std::string source = CanonicPath(c_source, false);
   std::string target = CanonicPath(c_target, false);
-  ValidatePath(source);
+  ValidateDirPath(source);
   opt.bind_mount_sources.emplace_back(source);
   opt.bind_mount_targets.emplace_back(target);
   return 0;
@@ -623,7 +658,7 @@ int MiniSbxMountBindSourceToTarget(const std::string &c_source, const std::strin
 int MiniSbxMountWrite(const std::string &input_path) { // -w
   std::string path = CanonicPath(input_path, false);
   int res = 0;
-  if ((res = ValidatePath(path)) < 0)
+  if ((res = ValidateDirPath(path)) < 0)
     return res;
   if(path!=input_path){
       opt.writable_files.emplace_back(input_path);
@@ -636,7 +671,7 @@ int MiniSbxMountWrite(const std::string &input_path) { // -w
 int MiniSbxMountTmpfs(const std::string &input_path) { // -w
   std::string path = CanonicPath(input_path, false);
   int res = 0;
-  if ((res = ValidatePath(path)) < 0)
+  if ((res = ValidateDirPath(path)) < 0)
     return res;
   opt.tmpfs_dirs.emplace_back(path);
   PRINT_DEBUG("%s(%s)\n", __func__, path.c_str());
@@ -834,7 +869,7 @@ int MiniSbxMountParentsWrite() {
 int MiniSbxSetWorkingDir(const std::string& input_path) {
   std::string path = CanonicPath(input_path, false);
   int res = 0;
-  if ((res = ValidatePath(path)) < 0)
+  if ((res = ValidateDirPath(path)) < 0)
     return res;
   opt.working_dir.assign(path);
   return 0;

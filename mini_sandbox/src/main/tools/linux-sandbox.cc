@@ -333,10 +333,7 @@ static int ValidateOptions() {
   if (ValidateReadWritePaths(opt.bind_mount_sources, opt.writable_files) < 0)
       return MiniSbxReportError(ErrorCode::FileReadAndWrite);
 
-  if (docker_mode == PRIVILEGED_CONTAINER) {
-    MiniSbxMountBind(std::string("/etc"));
-  }
-  else {
+  if (docker_mode != PRIVILEGED_CONTAINER) {
     for (auto writable_file : opt.writable_files) {
       if (opt.use_overlayfs && ValidateOverlayOutOfFolder(opt.tmp_overlayfs, writable_file) < 0)
         return MiniSbxReportError(ErrorCode::IllegalConfiguration);
@@ -422,6 +419,9 @@ int MiniSbxStart() {
 #else
     return 0;
 #endif
+  }
+  else if (docker_mode == PRIVILEGED_CONTAINER) {
+    MiniSbxMountBind(ETC);
   }
 
   res = ValidateOptions();

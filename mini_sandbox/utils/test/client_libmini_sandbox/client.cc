@@ -78,8 +78,10 @@ int main(int argc, char* argv[]) {
 #if defined(WORKDIR)
     char* buf = (char*) malloc(PATH_MAX);
     size_t n = readlink("/proc/self/exe", buf, PATH_MAX);
-    printf("set work dir to %s\n", dirname(buf));
-    res = mini_sandbox_set_working_dir(dirname(buf));
+    char* buf_parent = dirname(buf);
+    printf("set work dir to %s\n", buf_parent);
+
+    res = mini_sandbox_set_working_dir(buf_parent);
     assert (res == 0);
 #endif 
 #if defined(DEFAULT)
@@ -179,12 +181,24 @@ int main(int argc, char* argv[]) {
 #endif
     free(dst);
 #if defined(WORKDIR)
-    char* parent = dirname(dirname(buf));
+    char* parent = dirname(buf);
     char parent_file[PATH_MAX];
     snprintf(parent_file, sizeof(parent_file), "%s/%s", parent, "libminisandbox.test");
     printf("\n\nTrying to write in the parent %s\n", parent_file);
     file_written = try_file_write(parent_file);
     assert (file_written == 0);
+
+    //char cwd[PATH_MAX];
+    //if (getcwd(cwd, sizeof(cwd)) != NULL) {
+    //  snprintf(cwd, sizeof(cwd), "%s/%s", cwd, "libminisandbox.test");
+    const char* cwd_file = "libminisandbox.test";
+    char cwd[PATH_MAX];
+    assert (getcwd(cwd, sizeof(cwd)) != NULL);
+    printf("\n\nTrying to write in the cwd (with cwd != wd) %s\n", cwd);
+      file_written = try_file_write(cwd_file);
+      assert (file_written == 0);
+
+
 #else
     char cwd[PATH_MAX];
     char parent_file[PATH_MAX];
