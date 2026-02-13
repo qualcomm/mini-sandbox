@@ -45,12 +45,7 @@ const char* mini_sandbox_get_last_error_msg();
 
 #ifndef MINITAP
 int mini_sandbox_share_network();
-#endif
-
-
-
-#ifdef MINITAP
-
+#else // ifdef MINITAP
 int mini_sandbox_allow_connections(const char* path);
 int mini_sandbox_allow_max_connections(int max_connections);
 int mini_sandbox_allow_ipv4(const char* ip);
