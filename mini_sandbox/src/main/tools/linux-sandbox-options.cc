@@ -412,13 +412,6 @@ static void ParseCommandLine(unique_ptr<vector<char *>> args) {
     }
   }
 
-  if (!opt.working_dir.empty() && !opt.sandbox_root.empty() &&
-      opt.working_dir.find(opt.sandbox_root) == std::string::npos) {
-    Usage(args->front(),
-          "working-dir %s (-W) should be a "
-          "subdirectory of sandbox-dir %s (-h)",
-          opt.working_dir.c_str(), opt.sandbox_root.c_str());
-  }
   if (optind < static_cast<int>(args->size())) {
     if (opt.args.empty()) {
       opt.args.assign(args->begin() + optind, args->end());
@@ -724,12 +717,6 @@ int MiniSbxSetupDefault() {
 #else
   opt.create_netns = NO_NETNS;
 #endif
-
-#if defined(LIBMINISANDBOX)
-  // Working_dir is assigned in ParseOption for minisandbox and tapbox
-  opt.working_dir = "";
-  res += GetCWD(opt.working_dir);
-#endif
   opt.use_default = true;
   opt.use_overlayfs = true;
   std::string tmp(TMP);
@@ -841,5 +828,14 @@ int MiniSbxMountEmptyOutputFile(const std::string &path_str) {
 
 int MiniSbxMountParentsWrite() {
   opt.parents_writable = true;
+  return 0;
+}
+
+int MiniSbxSetWorkingDir(const std::string& input_path) {
+  std::string path = CanonicPath(input_path, false);
+  int res = 0;
+  if ((res = ValidatePath(path)) < 0)
+    return res;
+  opt.working_dir.assign(path);
   return 0;
 }

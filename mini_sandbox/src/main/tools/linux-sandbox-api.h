@@ -31,7 +31,9 @@ int mini_sandbox_mount_write(const char* path);
 int mini_sandbox_mount_tmpfs(const char* path);
 int mini_sandbox_mount_overlay(const char* path);
 int mini_sandbox_mount_empty_output_file(const char* path);
+int mini_sandbox_set_working_dir(const char* path);
 int mini_sandbox_mount_parents_write();
+
 
 // Enables logging at a certain path. Path has to be an existing folder
 int mini_sandbox_enable_log(const char* path);

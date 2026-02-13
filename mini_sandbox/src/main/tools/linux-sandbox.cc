@@ -320,9 +320,13 @@ static int WaitForPid1(const pid_t child_pid) {
 #endif
 
 static int ValidateOptions() {
-
   if (opt.use_overlayfs) {
     if (ValidateOverlayOutOfFolder(opt.tmp_overlayfs, opt.working_dir) < 0)
+      return MiniSbxReportError(ErrorCode::IllegalConfiguration);
+  }
+
+  if (opt.hermetic ) {
+     if (ValidateOverlayOutOfFolder(opt.sandbox_root, opt.working_dir) < 0)
       return MiniSbxReportError(ErrorCode::IllegalConfiguration);
   }
  
@@ -387,14 +391,14 @@ int MiniSbxStart() {
     MiniSbxReportGenericError("prctl");
   }
 
-
   if (opt.working_dir.empty()) {
     char *working_dir = getcwd(nullptr, 0);
     if (working_dir == nullptr) {
       return -1;
     }
-    opt.working_dir = working_dir;
+    opt.working_dir = std::string(working_dir);
   }
+
 
 
   if (MiniSbxGetInternalEnv() == 0) {

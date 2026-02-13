@@ -66,7 +66,7 @@ inline std::string GetErrorMessage(ErrorCode code) {
     case ErrorCode::LogFileNotUnique:
       return "Cannot write debug output to more than one file";
     case ErrorCode::IllegalConfiguration:
-      return "Illegal configuration. Overlay folder can't be inside a writable directory";
+      return "Illegal configuration. Overlay folder/sandbox root can't be inside a writable directory";
     case ErrorCode::FileReadAndWrite:
       return "Illegal configuration. File mounted as read and write at the same time";
     case ErrorCode::NestedSandbox:

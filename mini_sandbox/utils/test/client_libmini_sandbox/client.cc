@@ -74,6 +74,14 @@ int main(int argc, char* argv[]) {
         printf("\n\nExecutable name: %s\n\n", argv[0]);
     printf("starting program out of the sandbox pid=%d\n", getpid());
     int res = 0;
+
+#if defined(WORKDIR)
+    char* buf = (char*) malloc(PATH_MAX);
+    size_t n = readlink("/proc/self/exe", buf, PATH_MAX);
+    printf("set work dir to %s\n", dirname(buf));
+    res = mini_sandbox_set_working_dir(dirname(buf));
+    assert (res == 0);
+#endif 
 #if defined(DEFAULT)
     res = mini_sandbox_setup_default();
     assert (res == 0);
@@ -169,11 +177,15 @@ int main(int argc, char* argv[]) {
 #else
 	assert(file_written == 1);
 #endif
-
-
     free(dst);
-
-
+#if defined(WORKDIR)
+    char* parent = dirname(dirname(buf));
+    char parent_file[PATH_MAX];
+    snprintf(parent_file, sizeof(parent_file), "%s/%s", parent, "libminisandbox.test");
+    printf("\n\nTrying to write in the parent %s\n", parent_file);
+    file_written = try_file_write(parent_file);
+    assert (file_written == 0);
+#else
     char cwd[PATH_MAX];
     char parent_file[PATH_MAX];
     if (getcwd(cwd, sizeof(cwd)) != NULL) {
@@ -193,9 +205,9 @@ int main(int argc, char* argv[]) {
 #endif
     }
 
+#endif // ENDS if not def WORKDIR
+
     printf("\n\nLaunching `ls` command in subprocess\n");
     launch_interactive_bash();
-
-
     return 0;
 }
