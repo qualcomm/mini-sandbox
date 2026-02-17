@@ -135,6 +135,11 @@ def mini_sandbox_mount_empty_output_file(path):
         return MiniSandboxErrors.LIB_NOT_LOADED
     return _lib.mini_sandbox_mount_empty_output_file(path.encode())
 
+def mini_sandbox_set_working_dir(path):
+    if _lib is None:
+        return MiniSandboxErrors.LIB_NOT_LOADED
+    return _lib.mini_sandbox_set_working_dir(path.encode())
+
 def mini_sandbox_share_network():
     if _lib is None:
         return MiniSandboxErrors.LIB_NOT_LOADED

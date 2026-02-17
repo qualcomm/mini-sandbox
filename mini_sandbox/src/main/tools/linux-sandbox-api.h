@@ -31,7 +31,9 @@ int mini_sandbox_mount_write(const char* path);
 int mini_sandbox_mount_tmpfs(const char* path);
 int mini_sandbox_mount_overlay(const char* path);
 int mini_sandbox_mount_empty_output_file(const char* path);
+int mini_sandbox_set_working_dir(const char* path);
 int mini_sandbox_mount_parents_write();
+
 
 // Enables logging at a certain path. Path has to be an existing folder
 int mini_sandbox_enable_log(const char* path);
@@ -43,12 +45,7 @@ const char* mini_sandbox_get_last_error_msg();
 
 #ifndef MINITAP
 int mini_sandbox_share_network();
-#endif
-
-
-
-#ifdef MINITAP
-
+#else // ifdef MINITAP
 int mini_sandbox_allow_connections(const char* path);
 int mini_sandbox_allow_max_connections(int max_connections);
 int mini_sandbox_allow_ipv4(const char* ip);

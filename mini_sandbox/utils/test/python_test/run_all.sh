@@ -105,5 +105,12 @@ check_exit $PYTHON test_read_only.py tap
 check_exit $PYTHON test_allow_all_domains.py 
 check_exit $PYTHON test_allow_all_domains_negative.py 
 check_exit $PYTHON test_no_rules_pyminitapbox.py
+pushd ../
+check_exit $PYTHON python_test/test_set_working_dir.py
+set +e 
+ls "test_pyminisandbox.test"
+check_last_command_failed
+set -e
+popd
 
 cd $ORIGINAL_DIR
