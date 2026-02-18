@@ -50,4 +50,4 @@ ctype_bindings = [
 
 
 [tool.setuptools.data-files]
-"bin" = ["ctype_bindings/pyminisandbox/minitap"]
+bin = ["ctype_bindings/pyminisandbox/minitap"]
