@@ -29,6 +29,6 @@ COPY ./dist /app/dist/
 
 
 RUN /app/mini-sandbox/clean.sh
-RUN cp -r /app/dist/python/pyminisandbox/ /app/mini-sandbox/mini_sandbox/src/py/ctype_bindings/
+RUN cp -r /app/dist/release/python/pyminisandbox/ /app/mini-sandbox/mini_sandbox/src/py/ctype_bindings/
 
 ENTRYPOINT ["sh", "-c", "set -e && /app/mini-sandbox/mini_sandbox/src/py/build.sh && cp -r  /app/mini-sandbox/mini_sandbox/src/py/dist/ /rel/ "]
