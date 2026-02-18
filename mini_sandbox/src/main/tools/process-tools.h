@@ -120,5 +120,4 @@ enum UserNamespaceSupport {
     USER_NS_NOT_SUPPORTED
 };
 
-static UserNamespaceSupport user_ns_support = NON_INIT;
 #endif  // PROCESS_TOOLS_H__

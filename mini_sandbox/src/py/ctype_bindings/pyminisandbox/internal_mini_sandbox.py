@@ -27,8 +27,8 @@ class MiniSandboxErrors(IntEnum):
     LOG_FILE_NOT_UNIQUE = -7
     ILLEGAL_CONFIGURATION = -8
     FILE_READ_AND_WRITE = -9
-    NESTED_SANDBOX = -10
     GENERAL_OS_ERROR = -100
+    NESTED_SANDBOX = -201
     UNKNOWN = -1000
     LIB_NOT_LOADED = -1001
     FEATURE_NOT_AVAILABLE = -1002
@@ -134,6 +134,11 @@ def mini_sandbox_mount_empty_output_file(path):
     if _lib is None:
         return MiniSandboxErrors.LIB_NOT_LOADED
     return _lib.mini_sandbox_mount_empty_output_file(path.encode())
+
+def mini_sandbox_set_working_dir(path):
+    if _lib is None:
+        return MiniSandboxErrors.LIB_NOT_LOADED
+    return _lib.mini_sandbox_set_working_dir(path.encode())
 
 def mini_sandbox_share_network():
     if _lib is None:

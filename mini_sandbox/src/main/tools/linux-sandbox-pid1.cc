@@ -1561,6 +1561,8 @@ static int InitDone() {
 }
 
 int Pid1Main(void *args) {
+
+  PRINT_DEBUG("opt.working_dir -> %s", opt.working_dir.c_str()); 
   PRINT_DEBUG("Pid1Main started with pid = %d", getpid());
   MiniSbxSetInternalEnv();
   home_dir = GetHomeDir();
@@ -1606,7 +1608,7 @@ int Pid1Main(void *args) {
     // assumption might break in certain environments. If we can't iterate the
     // root folder we end up in this branch and we'll mount a lighter version of 
     // the read-only sandbox. 
-    PRINT_DEBUG("opt.use_default && !CanIterateRoot\n");
+    PRINT_DEBUG("opt.use_default && !CanIterateRoot");
     const std::string mount_point = GetMountPointOf(opt.working_dir);
     MiniSbxMountWrite(mount_point);
     MiniSbxMountWrite(TMP);

@@ -9,13 +9,17 @@ else
         LIBS = $(MINI)/out/libmini-sandbox.a
 endif
 
+CXX := $(shell command -v clang++ 2>/dev/null)
+LDFLAGS ?= ""
+ifeq ($(CXX),)
+  CXX := g++
+  LDFLAGS := 
+endif
 
-CXX = clang++
-CC = clang
 
 COMMON_FLAGS = -DLIBMINISANDBOX -g -lpthread -Wno-writable-strings
 FLAGS = $(COMMON_FLAGS) -std=c++17
-LDFLAGS ?= ""
+
 
 ifeq (4.3,$(firstword $(sort $(MAKE_VERSION) 4.3)))
 HAS_FILESYSTEM += $(shell echo "#include <filesystem> \nint main() {}" | $(CXX) $(STD) -x c++ - -o /dev/null 2> /dev/null && echo "yes" || echo "no")
@@ -28,7 +32,7 @@ ifeq ($(HAS_FILESYSTEM),no)
 endif
 
 # List of source files
-SRC_CXX_LIST = check_only_one_root.cc  check_validate_path.cc only_one_log.cc check_overlay_enabled.cc call_default_after_start.cc call_start_twice.cc check_runtime_init_error.cc check_exit_from_user.cc check_runtime_init_error_readonly.cc check_runtime_init_error_custom.cc
+SRC_CXX_LIST = check_only_one_root.cc  check_validate_path.cc only_one_log.cc check_overlay_enabled.cc call_default_after_start.cc call_start_twice.cc check_runtime_init_error.cc check_exit_from_user.cc check_runtime_init_error_readonly.cc check_runtime_init_error_custom.cc check_mount_fails_after_init.cc
 
 # Derive target names from source files
 TARGETS = $(SRC_CXX_LIST:.cc=.bin)

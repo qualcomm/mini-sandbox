@@ -19,7 +19,7 @@
 
 #define UNRECOVERABLE_FAIL -1
 #define RECOVERABLE_FAIL -2
-
+#define RECOVERABLE_ERROR_CODES -200
 
 
 
@@ -39,43 +39,47 @@ enum class ErrorCode : int {
   LogFileNotUnique = -7,
   IllegalConfiguration = -8,
   FileReadAndWrite = -9,
-  NestedSandbox = -10,
-  IllegalNetworkConfiguration = -11,
+  IllegalNetworkConfiguration = -10,
+  TmpNotRemounted = -11,
   GeneralOSError = -100,
+  // Error codes from -201 are recoverables
+  NestedSandbox = -201,
   Unknown = -1000
 };
 
 inline std::string GetErrorMessage(ErrorCode code) {
   switch (code) {
     case ErrorCode::None:
-      return ": No error";
+      return "No error";
     case ErrorCode::InvalidFunctioningMode:
-      return ": Only one between default, overlayfs and hermetic must be used";
+      return "Only one between default, overlayfs and hermetic must be used";
     case ErrorCode::SandboxRootNotUnique:
-      return " : Only one sandbox root directory is allowed";
+      return "Only one sandbox root directory is allowed";
     case ErrorCode::InvalidFolder:
-      return " : Specify a valid directory";
+      return "Specify a valid directory";
     case ErrorCode::OverlayOptionNotSet:
-      return " : Overlay option not enabled";
+      return "Overlay option not enabled";
     case ErrorCode::PathDoesNotExist:
-      return " : Path does not exist";
+      return "Path does not exist";
     case ErrorCode::NotAnAbsolutePath:
-      return " : Must use absolute paths";
+      return "Must use absolute paths";
     case ErrorCode::LogFileNotUnique:
-      return " : Cannot write debug output to more than one file";
+      return "Cannot write debug output to more than one file";
     case ErrorCode::IllegalConfiguration:
-      return " : Illegal configuration. Overlay folder can't be inside a writable directory";
+      return "Illegal configuration. Overlay folder/sandbox root can't be inside a writable directory";
     case ErrorCode::FileReadAndWrite:
-      return " : Illegal configuration. File mounted as read and write at the same time";
+      return "Illegal configuration. File mounted as read and write at the same time";
     case ErrorCode::NestedSandbox:
-      return " : Cannot nest multiple sandbox. The process is already running inside mini-sandbox.";
+      return " Cannot nest multiple sandbox. The process is already running inside mini-sandbox.";
     case ErrorCode::GeneralOSError:
-      return " : OS Error";
+      return "OS Error";
     case ErrorCode::IllegalNetworkConfiguration:
-      return " : Cannot allow all domains after specifying one network rule";
+      return "Cannot allow all domains after specifying one network rule";
+    case ErrorCode::TmpNotRemounted:
+      return "/tmp cannot be remounted when running in default mode";
     case ErrorCode::Unknown:
     default:
-      return ": Unknown error occurred";
+      return "Unknown error occurred";
   }
 }
 
@@ -84,14 +88,24 @@ typedef struct {
   ErrorCode code;
 } MiniSbxError;
 
+#define MiniSbxReportGenericError(msg) \
+    MiniSbxReportGenericError_impl((msg), __FILE__, __LINE__, __func__)
 
-int MiniSbxReport(const char* fmt, ...);
-int MiniSbxReportGenericError(const std::string& msg);
-int MiniSbxReportError(const std::string msg, ErrorCode code);
-int MiniSbxReportRecoverableError(const std::string msg, ErrorCode code);
+int MiniSbxReportGenericError_impl(const std::string& err_msg, const char* file, int line, const char* func);
+
+#define MiniSbxReportError(code) \
+    MiniSbxReportError_impl((code), __FILE__, __LINE__, __func__)
+
+int MiniSbxReportError_impl(ErrorCode code, const char* file, int line, const char* func);
+
+#define MiniSbxReportErrorAndMessage(msg, code) \
+    MiniSbxReportErrorAndMessage_impl((msg), (code), __FILE__, __LINE__, __func__)
+
+int MiniSbxReportErrorAndMessage_impl(std::string err_msg, ErrorCode code, const char* file, int line, const char* func);
+
 MiniSbxError MiniSbxGetError();
 const char* MiniSbxGetErrorMsg();
 int MiniSbxGetErrorCode();
-int MiniSbxReportGenericRecoverableError(const std::string& err_msg);
+
 #endif
 

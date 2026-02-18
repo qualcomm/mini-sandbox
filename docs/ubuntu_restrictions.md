@@ -7,9 +7,9 @@ This affects our usual plug‑and‑play workflow on these systems and requires 
 For more details, see the official Ubuntu blog post:  
 https://ubuntu.com/blog/whats-new-in-security-for-ubuntu-24-04-lts
 
-To overcome this limitation, we run a light-weight version of mini-sandbox which only enables capabilities. 
+To overcome this limitation, we run a light-weight version of mini-sandbox which only attempts to reduce the capabilities but cannot really create usern, mount, pid and other namespaces. 
 
-To fully enable the sandbox, the user manually needs to enable user namespace and export MINI_SANDBOX_FORCE_USER_NAMESPACE variable. 
+To fully enable the sandbox, the user manually needs to enable user namespace, see the following section for the HOWTO. 
 
 
 ## Enabling User Namespaces
@@ -17,8 +17,8 @@ To fully enable the sandbox, the user manually needs to enable user namespace an
 To allow user namespaces system‑wide, apply the following configuration:
 
 ```bash
-echo "kernel.apparmor_restrict_unprivileged_userns = 0" >/etc/sysctl.d/99-userns.conf
-sysctl --system
+echo 'kernel.apparmor_restrict_unprivileged_userns = 0' | sudo tee /etc/sysctl.d/99-userns.conf
+sudo sysctl --system
 ```
 
 Alternatively, you can define a custom app-armor profile for mini-sandbox which allows user namespaces.
