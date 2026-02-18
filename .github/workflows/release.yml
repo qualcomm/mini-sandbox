@@ -80,6 +80,14 @@ jobs:
           ls -lah
 
 
+      - name: Upload dist for downstream jobs
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-dist
+          path: dist/
+          if-no-files-found: error
+
+
       - name: Create GitHub Release and upload assets (gh)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -89,3 +97,59 @@ jobs:
             "dist/mini-sandbox-${TAG}.tar.gz" \
             "dist/SHA256SUMS.txt" \
       
+
+
+  pypi_publish:
+    name: Publish PyPI package (Trusted Publisher)
+    needs: test
+    runs-on: ubuntu-latest
+
+    environment: pypi
+
+    permissions:
+      contents: read
+      id-token: write   
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Derive TAG for this run
+        id: meta
+        run: |
+          TAG="${{ github.ref_type == 'tag' && github.ref_name || '' }}"
+          if [ -z "$TAG" ]; then TAG="manual"; fi
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          echo "Using TAG=$TAG"
+
+      - name: Download dist from previous job
+        uses: actions/download-artifact@v4
+        with:
+          name: build-dist
+          path: dist
+
+      - name: Build PyPI wheel builder image (Dockerfile.pypi)
+        run: |
+          docker build \
+            -f mini_sandbox/utils/mini_sandbox_docker/Dockerfile.pypi \
+            -t mini-sandbox-pypi:"${TAG}" \
+            .
+
+      - name: Run PyPI wheel builder container (dist/ -> wheel in /rel)
+        run: |
+          mkdir -p pypi_dist
+
+          docker run --rm \
+            -e VERSION="${TAG}" \
+            -v "$PWD/dist:/dist:ro" \
+            -v "$PWD/pypi_dist:/rel" \
+            mini-sandbox-pypi:"${TAG}"
+
+          echo "Contents of pypi_dist:"
+          ls -lah pypi_dist
+          ls -lah pypi_dist/*.whl
+
+      - name: Publish package distributions to PyPI (Trusted Publishing / OIDC)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: pypi_dist
