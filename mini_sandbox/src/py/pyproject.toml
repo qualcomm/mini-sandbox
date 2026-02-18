@@ -45,7 +45,9 @@ where = ["ctype_bindings/"]
 [tool.setuptools.package-data]
 ctype_bindings = [
        "libmini-sandbox.so",
-       "libmini-tapbox.so",
-       "minitap"
+       "libmini-tapbox.so"
 ]
 
+
+[tool.setuptools.data-files]
+"bin" = ["ctype_bindings/pyminisandbox/minitap"]

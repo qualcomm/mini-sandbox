@@ -8,6 +8,7 @@ FILES = [
     "internal_mini_sandbox.py",
     "libmini-sandbox.so",
     "libmini-tapbox.so",
+    "minitap",
     "pyminisandbox.py",
     "pyminitapbox.py"
 ]
