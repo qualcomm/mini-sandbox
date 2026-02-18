@@ -139,12 +139,11 @@ jobs:
 
           docker run --rm \
             -e VERSION="${TAG}" \
-            -v "$PWD/dist:/dist:ro" \
             -v "$PWD/pypi_dist:/rel" \
             mini-sandbox-pypi:"${TAG}"
 
           echo "Contents of pypi_dist:"
-          ls -lah pypi_dist
+          ls -lah pypi_dist/
           ls -lah pypi_dist/*.whl
 
       - name: Publish package distributions to PyPI (Trusted Publishing / OIDC)

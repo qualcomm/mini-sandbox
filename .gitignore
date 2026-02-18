@@ -18,3 +18,4 @@ release/
 .venv*/
 *.egg-info/
 dist/
+pypi_dist/
