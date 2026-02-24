@@ -5,6 +5,7 @@
 
 #include "src/main/tools/error-handling.h"
 #include "src/main/tools/process-tools.h"
+#include "src/main/tools/linux-sandbox-options.h"
 
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -39,9 +40,10 @@ void handler(int sig) {
 
 
 static std::string ResolveSymlink(const std::string& path) {
+    std::error_code ec;
     fs::path fsPath(path);
 
-    if (fs::is_symlink(fsPath)) {
+    if (fs::is_symlink(fsPath, ec)) {
         char resolvedPath[PATH_MAX];
         if (realpath(path.c_str(), resolvedPath)) {
             return std::string(resolvedPath);
@@ -130,7 +132,7 @@ static int RunMinitap(std::string& rules) {
     pid_t p = fork();
     if (p == 0) {
         execvp(m_args[0], m_args);
-        std::cerr << "Failed to execute minitap binary. No TUN device and firewall available";
+        std::cerr << "Failed to execute minitap binary. No TUN device and firewall available\n";
         kill(getppid(), SIGUSR1);
         exit(-1);
     }
@@ -158,18 +160,19 @@ static int JoinNetNs(pid_t p) {
     return -1;
   }
 
-  close(fd);
+  if (close(fd) < 0)
+    return -1;
   return 0;
 }
 
 
-void RunTCPIP(uid_t outer_uid, gid_t outer_gid, std::string& rules) {
+int RunTCPIP(uid_t outer_uid, gid_t outer_gid, std::string& rules) {
   pid_t extern_pid = fork();
  
   if(extern_pid == 0) {
     int r = unshare(CLONE_NEWUSER);
     if (r != 0) {
-      MiniSbxReport("Unshare failed");
+      exit(0);
     }
     WriteFile("/proc/self/uid_map", "0 %u 1\n", outer_uid);
     WriteFile("/proc/self/setgroups", "deny");
@@ -177,16 +180,41 @@ void RunTCPIP(uid_t outer_uid, gid_t outer_gid, std::string& rules) {
     pid_t minitap_pid = fork();
     if (minitap_pid == 0) {
       pid_t tcp_p = RunMinitap(rules);
-      // If JoinNetNs fails we let the sandbox go on and at least isolate
-      // the rest of the environment.
-      JoinNetNs(tcp_p);
+      if ( JoinNetNs(tcp_p) < 0)
+        exit(0);
+      return 0;
     } else {
-      waitpid(minitap_pid, NULL, 0);
-      exit(0);
+      int status = 0;
+      if (waitpid(minitap_pid, &status, 0) == -1) {
+        perror("waitpid failed");
+        exit(EXIT_FAILURE);
+      }
+      if (WIFEXITED(status)) {
+        int exit_code = WEXITSTATUS(status);
+        exit(exit_code);
+      } else {
+        exit(EXIT_FAILURE);
+      }
     }
   }
   else {
-    waitpid(extern_pid, NULL, 0);
-    exit(0);
+    int status = 0;
+    if (waitpid(extern_pid, &status, 0) == -1) {
+      perror("waitpid failed");
+      exit(EXIT_FAILURE);
+    }
+
+    if (WIFEXITED(status)) {
+      int child_exit_code = WEXITSTATUS(status);
+      int init_status = MiniSbxReadInit();
+      if (init_status == 0)
+        return -1;
+      exit(child_exit_code);
+    }
+    else {
+      fprintf(stderr, "Child did not exit normally\n");
+      Cleanup();
+      exit(EXIT_FAILURE);
+    }
   }
 }

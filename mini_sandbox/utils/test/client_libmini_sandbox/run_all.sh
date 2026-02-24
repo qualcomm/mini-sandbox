@@ -71,6 +71,18 @@ check_last_command_failed
 ls "$PARENT_FOLDER/libminisandbox.test"
 check_last_command_failed
 
+pushd ../
+check_exit $SCRIPT_DIR/client_cxx_default_workdir.bin
+ls "$HOME/libminisandbox.test"
+check_last_command_failed
+ls "$PARENT_FOLDER/libminisandbox.test"
+check_last_command_failed
+ls "./libminisandbox.test"
+check_last_command_failed
+popd
+
+
+
 check_exit $SCRIPT_DIR/client_cxx_hermetic.bin
 ls "$PARENT_FOLDER/libminisandbox.test"
 check_last_command_failed

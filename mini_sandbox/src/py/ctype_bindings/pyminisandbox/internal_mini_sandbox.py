@@ -29,8 +29,9 @@ class MiniSandboxErrors(IntEnum):
     FILE_READ_AND_WRITE = -9
     NESTED_SANDBOX = -10
     ILLEGAL_NETWORK_CONFIGURATION = -11
-    SANDBOX_ALREADY_STARTED = -12 #The difference between this and NESTED_SANDBOX is that NESTED_SANDBOX is returned when the parent process started the sandbox, while SANDBOX_ALREADY_STARTED is invoked when the current app called mini_sandbox_start twice. 
     GENERAL_OS_ERROR = -100
+    NESTED_SANDBOX = -201
+    SANDBOX_ALREADY_STARTED = -202 #The difference between this and NESTED_SANDBOX is that NESTED_SANDBOX is returned when the parent process started the sandbox, while SANDBOX_ALREADY_STARTED is invoked when the current app called mini_sandbox_start twice. 
     UNKNOWN = -1000
     LIB_NOT_LOADED = -1001
     FEATURE_NOT_AVAILABLE = -1002
@@ -136,6 +137,11 @@ def mini_sandbox_mount_empty_output_file(path):
     if _lib is None:
         return MiniSandboxErrors.LIB_NOT_LOADED
     return _lib.mini_sandbox_mount_empty_output_file(path.encode())
+
+def mini_sandbox_set_working_dir(path):
+    if _lib is None:
+        return MiniSandboxErrors.LIB_NOT_LOADED
+    return _lib.mini_sandbox_set_working_dir(path.encode())
 
 def mini_sandbox_share_network():
     if _lib is None:

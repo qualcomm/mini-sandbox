@@ -73,6 +73,10 @@ int mini_sandbox_start() {
 }
 
 
+int mini_sandbox_set_working_dir(const char* path) {
+  return MiniSbxSetWorkingDir(path);
+}
+
 int mini_sandbox_mount_bind(const char* path) {
   if(already_started){
     return MiniSbxReportRecoverableError(__func__,ErrorCode::SandboxAlreadyStarted);

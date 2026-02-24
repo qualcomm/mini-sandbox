@@ -62,6 +62,7 @@ namespace fs = std::experimental::filesystem;
 #define MAX_ATTEMPTS 100
 #define INTERNAL_MINI_SANDBOX_ENV "__INTERNAL_MINI_SANDBOX_ON"
 
+static UserNamespaceSupport user_ns_support = NON_INIT;
 
 void InstallSignalHandler(int signum, void (*handler)(int)) {
   struct sigaction sa = {};
@@ -70,13 +71,13 @@ void InstallSignalHandler(int signum, void (*handler)(int)) {
     // No point in blocking signals when using the default handler or ignoring
     // the signal.
     if (sigemptyset(&sa.sa_mask) < 0) {
-      DIE("sigemptyset");
+      MiniSbxReportGenericError("sigemptyset");
     }
   } else {
     // When using a custom handler, block all signals from firing while the
     // handler is running.
     if (sigfillset(&sa.sa_mask) < 0) {
-      DIE("sigfillset");
+      MiniSbxReportGenericError("sigfillset");
     }
   }
   // sigaction may fail for certain reserved signals. Ignore failure in this
@@ -105,10 +106,10 @@ void ClearSignalMask() {
   // Use an empty signal mask for the process.
   sigset_t empty_sset;
   if (sigemptyset(&empty_sset) < 0) {
-    DIE("sigemptyset");
+    MiniSbxReportGenericError("sigemptyset");
   }
   if (sigprocmask(SIG_SETMASK, &empty_sset, nullptr) < 0) {
-    DIE("sigprocmask");
+    MiniSbxReportGenericError("sigprocmask");
   }
 
   // Set the default signal handler for all signals.
@@ -120,7 +121,7 @@ void ClearSignalMask() {
     struct sigaction sa = {};
     sa.sa_handler = SIG_DFL;
     if (sigemptyset(&sa.sa_mask) < 0) {
-      DIE("sigemptyset");
+      MiniSbxReportGenericError("sigemptyset");
     }
     // Ignore possible errors, because we might not be allowed to set the
     // handler for certain signals, but we still want to try.
@@ -149,70 +150,105 @@ void WriteFile(const std::string &filename, const char *fmt, ...) {
   }
 }
 
+static int DieOrReport(const char* msg, bool die_on_error) {
+  if (die_on_error)
+    DIE("%s", msg);
+  return MiniSbxReportGenericError(msg);
+}
+
 // Waits for a signal to proceed from the pipe.
-void WaitPipe(int *pipe) {
+int WaitPipe(int *pipe, bool die_on_error) {
   char buf = 0;
+
   // Close the writer fd of this process as it should only be written to by the
   // writer of the other process.
   if (close(pipe[1]) < 0) {
-    DIE("close");
+    return DieOrReport("close", die_on_error);
   }
   if (read(pipe[0], &buf, 1) < 0) {
-    DIE("read");
+    return DieOrReport("read", die_on_error);
   }
   if (close(pipe[0]) < 0) {
-    DIE("close");
+    return DieOrReport("close", die_on_error);
   }
+  return 0;
 }
 
+
+
 // Sends a signal to the pipe for the other waiting process proceed.
-void SignalPipe(int *pipe) {
+int SignalPipe(int *pipe, bool die_on_error) {
   char buf = 0;
   // Close the reader fd of this process as it should only be read by the reader
   // of the other process.
   if (close(pipe[0]) < 0) {
-    DIE("close");
+    return DieOrReport("close", die_on_error);
   }
   if (write(pipe[1], &buf, 1) < 0) {
-    DIE("write");
+    return DieOrReport("write", die_on_error);
   }
   if (close(pipe[1]) < 0) {
-    DIE("close");
+    return DieOrReport("close", die_on_error);
   }
+  return 0;
 }
 
 
-int CreateDirectory(const std::string& basePath, const std::string& dirName, std::string& out) {
+void KillAndWait(pid_t pid) {
+  kill(pid, SIGKILL);
+  waitpid(pid, NULL, 0);
+  return;
+}
+
+
+int CreateDirectory(const std::string& base_path, const std::string& dir_name, std::string& out) {
   int res = 0;
-  out = basePath + "/" + dirName;
+  std::error_code ec;
+  out = base_path + "/" + dir_name;
   fs::path p = fs::path(out);
-  if (!fs::exists(p)) {
-    if(! fs::create_directories(out)) {
-        res = MiniSbxReport("Could not create directory %s\n", out.c_str());
-    }
+  if (!fs::exists(p, ec)) {
+    fs::create_directories(out, ec);
+  }
+  if (ec) {
+    return MiniSbxReportGenericError(ec.message());
+  }
+  return res;
+}
+
+int CreateDirectories(const std::string& base_path) {
+  int res = 0;
+  std::error_code ec;
+  fs::create_directories(base_path, ec);
+  if (ec) {
+    return MiniSbxReportGenericError(ec.message());
   }
   return res;
 }
 
 
-std::string CreateTempDirectory(const std::string &basePath) {
+std::string CreateTempDirectory(const std::string &base_path) {
 
   std::random_device rd;
   std::mt19937 gen(rd());
   std::uniform_int_distribution<> dis(1000, INT_MAX);
   int randomID;
-  bool res;
+  int res;
   
   for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
+    std::error_code ec;
     randomID = dis(gen);
-    std::string tempDirPath = basePath + "/temp_" + std::to_string(randomID);
+    std::string tempDirPath = base_path + "/temp_" + std::to_string(randomID);
     fs::path p = fs::path(tempDirPath);
-    if (!fs::exists(p)) {
-      res = fs::create_directories(tempDirPath);
-      if (!res) {
-        MiniSbxReport("Could not create temporary directory %s\n", tempDirPath.c_str());
+    if (!fs::exists(p, ec)) {
+      res = CreateDirectories(tempDirPath);
+      if (res < 0) {
+        std::string err_msg = "Could not create temporary directory:" + tempDirPath;
+        MiniSbxReportGenericError(err_msg);
       }
       return tempDirPath;
+    }
+    if (ec) {
+      PRINT_DEBUG("%s Access error: %s", __func__, p.c_str());
     }
   }
   return nullptr;
@@ -220,14 +256,14 @@ std::string CreateTempDirectory(const std::string &basePath) {
 
 
 
-std::string CreateRandomFilename(const std::string& basePath) {
+std::string CreateRandomFilename(const std::string& base_path) {
     std::mt19937 rng(std::chrono::steady_clock::now().time_since_epoch().count());
     std::uniform_int_distribution<int> dist(1000, INT_MAX);
 
     std::string filename;
     do {
         int randomNumber = dist(rng);
-        filename = basePath + "/" + std::to_string(randomNumber) + ".rules";
+        filename = base_path + "/" + std::to_string(randomNumber) + ".rules";
     } while (fs::exists(filename));
 
     return filename;
@@ -242,11 +278,11 @@ int GetCWD(std::string& res) {
     res += currentPath.string();
     return 0;
   } catch (const fs::filesystem_error& e) {
-        return MiniSbxReport("Filesystem error");
+        return MiniSbxReportGenericError("Filesystem error");
   } catch (const std::exception& e) {
-        return MiniSbxReport("General exception");
+        return MiniSbxReportGenericError("General exception");
   } catch (...) {
-    return MiniSbxReportError(__func__, ErrorCode::Unknown);
+    return MiniSbxReportError(ErrorCode::Unknown);
   }
 
 }
@@ -353,9 +389,9 @@ std::string GetLocalLib() {
   return home_dir.append("/.local/lib");
 }
 
-void addIfNotPresent(std::vector<std::string> &paths, const char *pathToCheck) {
+void addIfNotPresent(std::vector<std::string> &paths, const char *path_to_check) {
   // Convert the const char* to std::string for comparison
-  std::string pathStr(pathToCheck);
+  std::string pathStr(path_to_check);
 
   // Check if the path is already in the vector
   if (std::find(paths.begin(), paths.end(), pathStr) == paths.end()) {
@@ -401,20 +437,24 @@ static inline void makeWritable(const fs::path &dir, unsigned depth, unsigned ma
 
 
 void Cleanup() {
+  // If we are debugging we can leave the temp folders
+  if (!opt.debug_path.empty()) return;
+
+  // else let's remove them
   if (opt.use_default || opt.use_overlayfs || opt.hermetic) {
     PRINT_DEBUG("delete %s\n", opt.sandbox_root.c_str());
     try {
       fs::path sandbox_dir = opt.sandbox_root.c_str();
       makeWritable(sandbox_dir, 0, MAX_DEPTH_SANDBOX_ROOT);
       if (fs::remove_all(sandbox_dir) < 0) {
-        MiniSbxReport("ERROR when removing the sandbox directory");
+        MiniSbxReportGenericError("ERROR when removing the sandbox directory");
       }
 
       if (!opt.hermetic) {
         fs::path overlayfs_dir = opt.tmp_overlayfs.c_str();
         makeWritable(overlayfs_dir, 0, MAX_DEPTH_OVERLAYFS_ROOT);
         if (fs::remove_all(overlayfs_dir) < 0) {
-          MiniSbxReport("ERROR when removing the overlay directory");
+          MiniSbxReportGenericError("ERROR when removing the overlay directory");
         }
       }
     } catch (const std::exception &e) {
@@ -478,7 +518,7 @@ gid_t get_outer_gid() {
 int MiniSbxSetInternalEnv() {
   if (setenv(INTERNAL_MINI_SANDBOX_ENV, "1", 1) != 0) {
       std::cerr << "Failed to set environment variable." << std::endl;
-      MiniSbxReport("Failed to set environment variable __INTERNAL_MINI_SANDBOX_ON");
+      MiniSbxReportGenericError("Failed to set environment variable __INTERNAL_MINI_SANDBOX_ON");
   }
   return 0;
 }

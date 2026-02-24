@@ -28,6 +28,8 @@ namespace fs = std::experimental::filesystem;
 #include <cstdlib>
 
 
+#define ETC "/etc"
+
 bool isRunningInDocker();
 enum DockerMode CheckDockerMode();
 

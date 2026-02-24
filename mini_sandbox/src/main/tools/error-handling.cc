@@ -16,12 +16,17 @@ Mode mode = Mode::Library;
 Mode mode = Mode::CLI;
 #endif
 
-#define UNRECOVERABLE_FAIL -1
-#define RECOVERABLE_FAIL -2
-
 MiniSbxError sbx_err;
 
-static void MiniSbxSetError(const std::string& err_msg, ErrorCode code, bool recoverable) {
+
+static void GenErrorMessage(const std::string& err_msg, const char* file, 
+                                          int line, const char* func, std::string& out) {
+  out = "[" + std::string(func) + ":" + std::to_string(line) + "]: "  + err_msg;
+}
+
+
+static void MiniSbxSetError(const std::string& err_msg, ErrorCode code, int& ret) {
+  bool recoverable = (static_cast<int>(code) < RECOVERABLE_ERROR_CODES);
   if (mode == Mode::Library || recoverable) {
     memset(sbx_err.msg, 0, MAX_ERR_LEN - 1);
     strncpy(sbx_err.msg, err_msg.c_str(), MAX_ERR_LEN - 1);
@@ -33,58 +38,42 @@ static void MiniSbxSetError(const std::string& err_msg, ErrorCode code, bool rec
      fprintf(stderr, "%s\n", err_msg.c_str());
      exit(EXIT_FAILURE);
   }
-}
-
-int MiniSbxReportGenericRecoverableError(const std::string& err_msg) {
-  MiniSbxSetError(err_msg, ErrorCode::GeneralOSError, true);
-  return RECOVERABLE_FAIL;
-}
-
-
-int MiniSbxReportGenericError(const std::string& err_msg) {
-  MiniSbxSetError(err_msg, ErrorCode::GeneralOSError, false );
-  return UNRECOVERABLE_FAIL;
+  if (recoverable) 
+    ret = RECOVERABLE_FAIL;
+  else
+    ret = UNRECOVERABLE_FAIL;
 }
 
 
-int MiniSbxReport(const char* fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-
-    size_t size = std::vsnprintf(nullptr, 0, fmt, args) + 1;
-    va_end(args);
-
-    std::vector<char> buffer(size);
-    va_start(args, fmt);
-    std::vsnprintf(buffer.data(), size, fmt, args);
-    va_end(args);
-
-    return MiniSbxReportGenericError(std::string(buffer.data()));
+int MiniSbxReportGenericError_impl(const std::string& err_msg, const char* file, int line, const char* func) {
+  return MiniSbxReportErrorAndMessage_impl(err_msg, ErrorCode::GeneralOSError, file, line, func);
 }
 
 
-
-int MiniSbxReportError(std::string function, ErrorCode code) {
-  std::string err_msg = function + GetErrorMessage(code);
-  // We handle all errors at the same way in the library but we
-  // could potentially force some of them to crash the application
-  // depending on their importance
-  MiniSbxSetError(err_msg, code, false);
-  return UNRECOVERABLE_FAIL; 
+int MiniSbxReportError_impl(ErrorCode code, const char* file, int line, const char* func) {
+  return MiniSbxReportErrorAndMessage_impl("", code, file, line, func);
 }
 
-int MiniSbxReportRecoverableError(std::string function, ErrorCode code) {
-  std::string err_msg = function + GetErrorMessage(code);
-  // We handle all errors at the same way in the library but we
-  // could potentially force some of them to crash the application
-  // depending on their importance
-  MiniSbxSetError(err_msg, code, true);
-  return RECOVERABLE_FAIL; 
+
+int MiniSbxReportErrorAndMessage_impl(std::string err_msg, ErrorCode code, const char* file, int line, const char* func) {
+  std::string msg; 
+  std::string code_msg;
+  int ret = 0;
+  
+  code_msg = GetErrorMessage(code);
+  if (!err_msg.empty())
+    code_msg += ": " + err_msg;
+
+  GenErrorMessage(code_msg, file, line, func, msg);
+  MiniSbxSetError(msg, code, ret);
+  return ret;
 }
+
 
 MiniSbxError MiniSbxGetLastError() {
   return sbx_err;
 }
+
 
 const char* MiniSbxGetErrorMsg() {
   return sbx_err.msg;

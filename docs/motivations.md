@@ -10,13 +10,17 @@ In the modern software ecosystem we routinely get overwhelmed by 3rd-party, open
 
 # Solution
 
-Rather than scanning each script/tool used looking for some `signs` of maliciousness or unpatched bugs, we decided to apply a containment strategy called sandboxing and here implemented in a tool named `mini-sandbox` (or its library-based version `libmini-sandbox`).
+Rather than scanning each script/tool used looking for some `signs` of maliciousness or unpatched bugs, we decided to apply a containment strategy called sandboxing and here implemented in a tool named `mini-sandbox` (or its library-based version `libmini-sandbox`). The main underlying idea behind the tool is that it should be as much "transparent" as possible for the end-user, without requiring much overhead to enable it on a new tool. As said, other tools exist with similar scope but they all didn't fit our use case where ease-of-use becomes a crucial factor. Few examples:
+- One may be tempted to use Docker/Podman to run tools in an isolated context but that requires to write everytime a Dockerfile, pull images and create a brand-new environment from scratch. This requires a certain overhead
+- Other tools such as nsjail and similars are great sandboxes to begin with but they are mostly command line only and to the best of our knowledge require root for the firewall configuration
+- Sandboxed API is another great example of novel sandboxing techniques but you have to manually modify your code in order to run your functions inside the sandbox -- again, we don't want to require changes to the code.
 
-The basic idea is that we reduce the privileges of code running inside our sandbox as already done by many others. For instance a python script running inside our container won't be able to arbitrarily modify files that are present in the home directories. There are few other restrictions that apply here mostly at the filesystem, network, user and IPC levels. Most of the restrictions are configurable even though we have a default mode where we try to enforce all the important restrictions to make sure the sandbox guarantees are at the top. Here the list of restrictions that we enforce inside our sandbox when running it in default mode:
-1. Overlay filesystems for /bin, /lib, /etc and few other fundamental mount points/directories
+The basic idea is that we reduce the privileges of code running inside our sandbox as already done by many others and we introduce different restrictions, depending on the running mode. 
+Our restrictions apply mostly at the filesystem, network, user and IPC levels. Most of the restrictions are configurable even though we have a default mode where we try to enforce all the important restrictions. Here the list of restrictions that we enforce inside our sandbox when running it in default mode (CWD is Current Working Directory):
+1. Read-only filesystems for /bin, /lib, /etc
 2. CWD writable as a regular user
 3. Parents of CWD mounted as overlay filesystem
-4. Home never accessible, unless specified differently (for instance if you're executing from the home itself)
+4. Home's original data never accessible, unless specified differently (for instance if you're executing from the home itself)
 5. Rest of the filesystem mounted as read-only except for autofs that will be left up to the host machine configuration
 6. Isolate network with two functioning modes: default (no network at all) or tap mode (user-space firewall to select the needed IPs)
 7. Isolate pid, mount, proc namespaces

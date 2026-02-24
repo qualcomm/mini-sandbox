@@ -117,3 +117,20 @@ jobs:
           --security-opt apparmor=unconfined \
           -e HOST_UID=$(id -u) -e HOST_GID=$(id -g) \
           mini-sandbox-suse:"${TAG}"
+
+      - name: Build Debian container
+        run: |
+          test -d dist || (echo "dist/ missing" && exit 1)
+
+          docker build \
+            -f mini_sandbox/utils/mini_sandbox_docker/Dockerfile.debian \
+            --build-arg V=dist \
+            -t mini-sandbox-debian:"${TAG}" \
+            .
+
+      - name: Run Debian container
+        run: | 
+          docker run --rm --privileged \
+          --security-opt seccomp=unconfined \
+          --security-opt apparmor=unconfined \
+          mini-sandbox-debian:"${TAG}"

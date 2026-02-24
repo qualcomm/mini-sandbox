@@ -14,7 +14,7 @@ if [[ ! -d "$RELEASE" ]]; then
     exit
 fi
 
-PATH="$RELEASE/bin":$PATH
-LD_LIBRARY_PATH="$RELEASE/lib"
-PYTHONPATH="$RELEASE/python/"
-PACKAGE_DIR="$RELEASE"
+export PATH="$RELEASE/bin":$PATH
+export LD_LIBRARY_PATH="$RELEASE/lib"
+export PYTHONPATH="$RELEASE/python/"
+export PACKAGE_DIR="$RELEASE"

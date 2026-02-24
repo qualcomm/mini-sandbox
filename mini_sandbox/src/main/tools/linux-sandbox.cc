@@ -119,7 +119,7 @@ static_assert(global_need_polite_sigterm.is_always_lock_free);
 static void CloseFds() {
   DIR *fds = opendir("/proc/self/fd");
   if (fds == nullptr) {
-    MiniSbxReport("opendir");
+    MiniSbxReportGenericError("opendir");
   }
 
   while (1) {
@@ -128,7 +128,7 @@ static void CloseFds() {
 
     if (dent == nullptr) {
       if (errno != 0) {
-        MiniSbxReport("readdir");
+        MiniSbxReportGenericError("readdir");
       }
       break;
     }
@@ -144,14 +144,14 @@ static void CloseFds() {
           (global_debug == NULL || fd != fileno(global_debug)) &&
           fd != dirfd(fds)) {
         if (close(fd) < 0) {
-          MiniSbxReport("close");
+          MiniSbxReportGenericError("close");
         }
       }
     }
   }
 
   if (closedir(fds) < 0) {
-    MiniSbxReport("closedir");
+    MiniSbxReportGenericError("closedir");
   }
 }
 #endif
@@ -191,10 +191,10 @@ static pid_t SpawnPid1() {
 
   int pipe_from_child[2], pipe_to_child[2];
   if (pipe(pipe_from_child) < 0) {
-    MiniSbxReport("pipe");
+    return MiniSbxReportGenericError("pipe");
   }
   if (pipe(pipe_to_child) < 0) {
-    MiniSbxReport("pipe");
+    return MiniSbxReportGenericError("pipe");
   }
 
   int clone_flags = CLONE_NEWUSER | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWPID;
@@ -218,10 +218,11 @@ static pid_t SpawnPid1() {
   Pid1Args pid1Args;
   pid1Args.pipe_to_parent = pipe_from_child;
   pid1Args.pipe_from_parent = pipe_to_child;
+
 #ifdef LIBMINISANDBOX
   int unshare_res = unshare(clone_flags);
   if (unshare_res < 0) {
-    MiniSbxReport("unshare failed\n");
+    MiniSbxReportGenericError("unshare failed\n");
   }
   pid_t child_pid = fork();
 #else
@@ -230,27 +231,41 @@ static pid_t SpawnPid1() {
 #endif
 
   if (child_pid < 0) {
-    MiniSbxReport("clone");
+    MiniSbxReportGenericError("clone");
   }
+
 
 #ifdef LIBMINISANDBOX
   if (child_pid == 0) {
     int sandbox_res = Pid1Main(&pid1Args);
     if (sandbox_res < 0) {
-      MiniSbxReport("Failed in Pid1Main\n");
+      MiniSbxReportGenericError("Failed in Pid1Main\n");
     }
     return 0;
   } else {
 #endif
     // Signal the child that it can now proceed to spawn pid2.
-    SignalPipe(pipe_to_child);
+    int res = SignalPipe(pipe_to_child, false);
+
+    // If an error happens in SignalPipe or later in WaitPipe we want to return
+    // but first we'll have to kill the child
+    if (res < 0) {
+      KillAndWait(child_pid);
+      return res;
+    }
     PRINT_DEBUG("linux-sandbox-pid1 has PID %d", child_pid);
 
     // Wait for a signal from the child linux-sandbox-pid1 process; this proves
     // to the child process that we still existed after it ran
     // prctl(PR_SET_PDEATHSIG, SIGKILL), thus preventing a race condition where
     // the parent is killed before that call was made.
-    WaitPipe(pipe_from_child);
+    res = WaitPipe(pipe_from_child, false);
+
+    // same error logic as for SignalPipe
+    if (res < 0) {
+      KillAndWait(child_pid);
+      return res;
+    }
 
     PRINT_DEBUG("done manipulating pipes");
 
@@ -283,7 +298,7 @@ static int WaitForPid1(const pid_t child_pid) {
       continue;
     }
 
-    MiniSbxReport("wait4");
+    MiniSbxReportGenericError("wait4");
   }
 
   // If we're supposed to write stats to a file, do so now.
@@ -305,22 +320,23 @@ static int WaitForPid1(const pid_t child_pid) {
 #endif
 
 static int ValidateOptions() {
-
   if (opt.use_overlayfs) {
     if (ValidateOverlayOutOfFolder(opt.tmp_overlayfs, opt.working_dir) < 0)
-      return MiniSbxReportError(__func__, ErrorCode::IllegalConfiguration);
+      return MiniSbxReportError(ErrorCode::IllegalConfiguration);
+  }
+
+  if (opt.hermetic ) {
+     if (ValidateOverlayOutOfFolder(opt.sandbox_root, opt.working_dir) < 0)
+      return MiniSbxReportError(ErrorCode::IllegalConfiguration);
   }
  
   if (ValidateReadWritePaths(opt.bind_mount_sources, opt.writable_files) < 0)
-      return MiniSbxReportError(__func__, ErrorCode::FileReadAndWrite);
+      return MiniSbxReportError(ErrorCode::FileReadAndWrite);
 
-  if (docker_mode == PRIVILEGED_CONTAINER) {
-    MiniSbxMountBind(std::string("/etc"));
-  }
-  else {
+  if (docker_mode != PRIVILEGED_CONTAINER) {
     for (auto writable_file : opt.writable_files) {
       if (opt.use_overlayfs && ValidateOverlayOutOfFolder(opt.tmp_overlayfs, writable_file) < 0)
-        return MiniSbxReportError(__func__, ErrorCode::IllegalConfiguration);
+        return MiniSbxReportError(ErrorCode::IllegalConfiguration);
     }
   }
 
@@ -333,30 +349,34 @@ static int ValidateOptions() {
   // 3 - instead of running the sandbox with the "Default" (-x) functioning mode
   // use the custom functioning mode with -o/-d
   if (ValidateTmpNotRemounted(opt.writable_files) < 0)
-      return MiniSbxReportError(__func__, ErrorCode::IllegalConfiguration);
+      return MiniSbxReportError(ErrorCode::TmpNotRemounted);
 
   if (ValidateTmpNotRemounted(opt.bind_mount_sources) < 0)
-      return MiniSbxReportError(__func__, ErrorCode::IllegalConfiguration);
+      return MiniSbxReportError(ErrorCode::TmpNotRemounted);
  
   return 0;
 }
 
-static void StartLogging() {
+static int StartLogging() {
   // Open the file PRINT_DEBUG writes to.
   // Must happen early enough so we don't lose any debugging output.
   if (!opt.debug_path.empty()) {
     global_debug = fopen(opt.debug_path.c_str(), "w");
     if (!global_debug) {
-      MiniSbxReport("fopen(%s)", opt.debug_path.c_str());
+      std::string err_msg = "fopen(" + opt.debug_path + ") failed";
+      return MiniSbxReportGenericError(err_msg);
     }
   }
+  return 0;
 }
 
 
 int MiniSbxStart() {
   int res;
-  StartLogging();
-  PRINT_DEBUG("Start...");
+  res = StartLogging();
+  if (res < 0) return res;
+
+  LogSystem();
   PRINT_DEBUG("UserNamespaceSupported = %d", UserNamespaceSupported());
 
 #ifdef LIBMINISANDBOX
@@ -365,17 +385,17 @@ int MiniSbxStart() {
 
   // Ask the kernel to kill us with SIGKILL if our parent dies.
   if (prctl(PR_SET_PDEATHSIG, SIGKILL) < 0) {
-    MiniSbxReport("prctl");
+    MiniSbxReportGenericError("prctl");
   }
-
 
   if (opt.working_dir.empty()) {
     char *working_dir = getcwd(nullptr, 0);
     if (working_dir == nullptr) {
       return -1;
     }
-    opt.working_dir = working_dir;
+    opt.working_dir = std::string(working_dir);
   }
+
 
 
   if (MiniSbxGetInternalEnv() == 0) {
@@ -383,7 +403,7 @@ int MiniSbxStart() {
 #if (!(LIBMINISANDBOX))
     SpawnChild(true);  
 #else
-    return MiniSbxReportRecoverableError("Already running inside mini-sandbox",ErrorCode::NestedSandbox);
+    return MiniSbxReportError(ErrorCode::NestedSandbox);
 #endif
   }
 
@@ -400,11 +420,17 @@ int MiniSbxStart() {
     return 0;
 #endif
   }
+  else if (docker_mode == PRIVILEGED_CONTAINER) {
+    MiniSbxMountBind(ETC);
+  }
 
   res = ValidateOptions();
   if (res < 0)
     return res;
 
+  res = MiniSbxCreateInit();
+  if (res < 0)
+    return res;
 #if (!(LIBMINISANDBOX))
   // Start with default signal actions and a clear signal mask.
   ClearSignalMask();
@@ -427,7 +453,9 @@ int MiniSbxStart() {
 #ifdef MINITAP
   std::string rules = CreateRandomFilename(std::string("/tmp"));
   DumpRules(&(opt.fw_rules), rules);
-  RunTCPIP(global_outer_uid, global_outer_gid, rules);
+  res = RunTCPIP(global_outer_uid, global_outer_gid, rules);
+  if (res < 0)
+    return res;
   // In this case the Network namespace has been taken care of by RunTCPIP so
   // we don't need to create a new one
   opt.create_netns = NO_NETNS;
@@ -448,8 +476,12 @@ int MiniSbxStart() {
     perror("fork1 - error");
     exit(-1);
   } else if (pid == 0) {
-#endif // ends #ifdef LIBMINISANDBOX
+#endif
     const pid_t child_pid = SpawnPid1();
+    if (child_pid < 0) {
+      PRINT_DEBUG("SpawnPid1 returned -1\n");
+      exit(-1);
+    }
 #ifdef LIBMINISANDBOX
     if (child_pid != 0) {
 #endif
@@ -514,25 +546,44 @@ int MiniSbxStart() {
     int status;
     if (waitpid(pid, &status, 0) == -1) {
           perror("waitpid failed");
+          Cleanup();
           exit(EXIT_FAILURE);
     }
-     
-#endif
-    Cleanup();
-#ifdef LIBMINISANDBOX
-
+         
    if (WIFEXITED(status)) {
           // Child exited normally, get its exit status
           int child_exit_code = WEXITSTATUS(status);
+          int init_status = MiniSbxReadInit();
+          Cleanup();
+          // init_status tells us if the Pid1 inside the sandbox has completed the initialization process
+          // it evaluates to 0 if something went wrong, or 1 if everything went good. If we had a 
+          // mini-sandbox internal's problem we want to return -1 in the library and don't DIE the whole
+          // process. In the other cases instead we wanna exit cause the exit signal is coming from the 
+          // sandboxed process
+          if (init_status == 0) {
+#ifdef MINITAP
+          // If we are in libminitapbox the pid executing this code is child of the one we forked in
+          // RunTcpIp() . Thus we want to exit here and the father that is waiting for us will return for 
+          // us
+            exit(0);
+#else
+          // If we are in libminisandbox here we can just return -1 (error code) and then the user 
+          // will do something with this value
+            return -1;
+#endif
+          }
           exit(child_exit_code); // Exit parent with the same code
       } else {
           // Child did not exit normally
           fprintf(stderr, "Child did not exit normally\n");
+          Cleanup();
           exit(EXIT_FAILURE);
       }
   }
   return 0;
 #else
+
+  Cleanup();
   return exit_res;
 #endif
 }

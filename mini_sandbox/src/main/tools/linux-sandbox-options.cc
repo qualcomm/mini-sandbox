@@ -123,36 +123,54 @@ static void ValidateIsAbsolutePath(char *path, char *program_name, char flag) {
 }
 
 
-static int ValidateDir(const std::string& dir) {
+static int ValidateDirAndCreate(const std::string& dir) {
 
   fs::path path(dir);
   try {
     if (!(fs::exists(path)) || !(fs::is_directory(path))) {
-      return MiniSbxReportError(__func__, ErrorCode::InvalidFolder);
+      if (CreateDirectories(dir) < 0)
+        return MiniSbxReportError(ErrorCode::InvalidFolder);
     }
   } catch (const fs::filesystem_error &e) {
     PRINT_DEBUG("Filesystem error %s:", e.what());
-    return MiniSbxReportError(__func__, ErrorCode::InvalidFolder);
+    return MiniSbxReportError(ErrorCode::InvalidFolder);
   }
   return 0;
 }
 
 
-
-
-static int ValidatePath(const std::string &func_name,
-                        const std::string &path) {
+static int ValidatePath(const std::string &path) {
   if (path[0] != '/') {
-    return MiniSbxReportError(func_name, ErrorCode::NotAnAbsolutePath);
+    return MiniSbxReportErrorAndMessage(path, ErrorCode::NotAnAbsolutePath);
   }
   fs::path fs_path(path);
   try {
     if (!(fs::exists(fs_path))) {
-      return MiniSbxReportError(func_name, ErrorCode::PathDoesNotExist);
+      return MiniSbxReportErrorAndMessage(path, ErrorCode::PathDoesNotExist);
     }
   } catch (const fs::filesystem_error &e) {
     PRINT_DEBUG("Filesystem error %s:", e.what());
-    return MiniSbxReportError(func_name, ErrorCode::PathDoesNotExist);
+    return MiniSbxReportErrorAndMessage(path, ErrorCode::PathDoesNotExist);
+  }
+  return 0;
+}
+
+
+static int ValidateDirPath(const std::string &path) {
+  if (path[0] != '/') {
+    return MiniSbxReportErrorAndMessage(path, ErrorCode::NotAnAbsolutePath);
+  }
+  fs::path fs_path(path);
+  try {
+    if (!(fs::exists(fs_path))) {
+      return MiniSbxReportErrorAndMessage(path, ErrorCode::PathDoesNotExist);
+    }
+    if (!(fs::is_directory(fs_path))) {
+      return MiniSbxReportErrorAndMessage(path, ErrorCode::PathDoesNotExist);
+    }
+  } catch (const fs::filesystem_error &e) {
+    PRINT_DEBUG("Filesystem error %s:", e.what());
+    return MiniSbxReportErrorAndMessage(path, ErrorCode::PathDoesNotExist);
   }
   return 0;
 }
@@ -209,21 +227,24 @@ int ValidateTmpNotRemounted(std::vector<std::string>& paths) {
 
 static int CreateSandboxRoot(const std::string& base_dir) {
   std::string rand_sandbox_root;
-  ValidateDir(base_dir);
+
+  int res = ValidateDirAndCreate(base_dir);
+  if (res == UNRECOVERABLE_FAIL) return res;
+
   if (opt.sandbox_root.empty()) {
     rand_sandbox_root = CreateTempDirectory(base_dir);
     if (rand_sandbox_root.back() == '/') {
       opt.sandbox_root.assign(rand_sandbox_root, 0,
                               rand_sandbox_root.length() - 1);
       if (opt.sandbox_root.back() == '/') {
-        return MiniSbxReportError(__func__, ErrorCode::InvalidFolder);
+        return MiniSbxReportError(ErrorCode::InvalidFolder);
       }
     } else {
       opt.sandbox_root.assign(rand_sandbox_root);
     }
   }
   else {
-    return MiniSbxReportError(__func__, ErrorCode::SandboxRootNotUnique);
+    return MiniSbxReportError(ErrorCode::SandboxRootNotUnique);
   }
   return 0;
 }
@@ -231,9 +252,8 @@ static int CreateSandboxRoot(const std::string& base_dir) {
 static int CreateOverlayfsDir(std::string& base_dir) {
   std::string tmp_overlayfs;
   int res = 0;
-  res = ValidateDir(base_dir);
-  if (res < 0)
-      return res;
+  res = ValidateDirAndCreate(base_dir);
+  if (res == UNRECOVERABLE_FAIL) return res;
 
   if (!opt.use_default)
     tmp_overlayfs = CreateTempDirectory(base_dir);
@@ -263,12 +283,12 @@ std::string CanonicPath(const std::string path_str, bool resolve_symlink) {
       return path.string(); 
       // If the path doesn't exist the best that we can do is
       // to return the original path. The parsing will likely
-      // fail when we call ValidatePath, which instead requires
+      // fail when we call ValidateDirPath, which instead requires
       // that the path exists.
     }
   } catch (const fs::filesystem_error &e) {
     PRINT_DEBUG("Filesystem error %s:", e.what());
-    MiniSbxReport("Fs exception");
+    MiniSbxReportGenericError("Fs exception");
     return nullptr;    
   }
 }
@@ -347,7 +367,6 @@ static void ParseCommandLine(unique_ptr<vector<char *>> args) {
 #else
     case 'F':
       if (opt.firewall_rules_path.empty()) {
-        ValidateIsAbsolutePath(optarg, args->front(), static_cast<char>(c));
         opt.firewall_rules_path.assign(optarg);
         MiniSbxAllowConnections(opt.firewall_rules_path.c_str());
       } else {
@@ -409,13 +428,6 @@ static void ParseCommandLine(unique_ptr<vector<char *>> args) {
     }
   }
 
-  if (!opt.working_dir.empty() && !opt.sandbox_root.empty() &&
-      opt.working_dir.find(opt.sandbox_root) == std::string::npos) {
-    Usage(args->front(),
-          "working-dir %s (-W) should be a "
-          "subdirectory of sandbox-dir %s (-h)",
-          opt.working_dir.c_str(), opt.sandbox_root.c_str());
-  }
   if (optind < static_cast<int>(args->size())) {
     if (opt.args.empty()) {
       opt.args.assign(args->begin() + optind, args->end());
@@ -440,7 +452,8 @@ ExpandArgument(unique_ptr<vector<char *>> expanded, char *arg) {
     ifstream f(filename);
 
     if (!f.is_open()) {
-      MiniSbxReport("opening argument file %s failed", filename);
+      std::string err_msg = "opening argument file failed: " + std::string(filename);
+      MiniSbxReportGenericError(err_msg);
     }
 
     for (std::string line; std::getline(f, line);) {
@@ -450,7 +463,8 @@ ExpandArgument(unique_ptr<vector<char *>> expanded, char *arg) {
     }
 
     if (f.bad()) {
-      MiniSbxReport("error while reading from argument file %s", filename);
+      std::string err_msg = "error while reading from argument file" + std::string(filename);
+      MiniSbxReportGenericError(err_msg);
 
     }
   } else {
@@ -499,6 +513,25 @@ std::regex ipv4_regex(R"(^(\d{1,3}\.){3}\d{1,3}$)");
 std::regex domain_regex(R"(^([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$)");
 std::regex subnet_regex(R"(^(\d{1,3}\.){3}\d{1,3}/\d{1,2}$)");
 
+static int ValidateFilePath(const std::string &path) {
+  std::error_code ec;
+  fs::path fs_path(path);
+  try {
+    if (!(fs::exists(fs_path))) {
+      return MiniSbxReportErrorAndMessage(path, ErrorCode::PathDoesNotExist);
+    }
+    if (!(fs::is_regular_file(fs_path))) {
+      return MiniSbxReportErrorAndMessage(path, ErrorCode::PathDoesNotExist);
+    }
+  } catch (const fs::filesystem_error &e) {
+    PRINT_DEBUG("Filesystem error %s:", e.what());
+    return MiniSbxReportErrorAndMessage(path, ErrorCode::PathDoesNotExist);
+  }
+  return 0;
+}
+
+
+
 static int ReadAllowedConnections(std::ifstream& file) {
     int res = 0;
     std::string line;
@@ -523,7 +556,7 @@ static int ReadAllowedConnections(std::ifstream& file) {
 
 int MiniSbxAllowConnections(const std::string& path) {
     int res = 0;
-    if ((res = ValidatePath(__func__, path)) < 0)
+    if ((res = ValidateFilePath(path)) < 0)
       return res;
     std::ifstream file(path);
     if (!file.is_open()) {
@@ -544,7 +577,7 @@ int MiniSbxAllowAllDomains() {
   if(reset_firewall_rules(&opt.fw_rules) == 0){
     return 0;
   }else{
-    return MiniSbxReportError(__func__, ErrorCode::LogFileNotUnique);
+    return MiniSbxReportError(ErrorCode::IllegalNetworkConfiguration);
   }
   
 }
@@ -553,7 +586,7 @@ int MiniSbxAllowDomain(const std::string& domain) {
   const char* domain_str = domain.c_str();
   PRINT_DEBUG("allow domain %s", domain_str);
   if(set_firewall_rule(domain_str, &(opt.fw_rules))<0){
-    return MiniSbxReportError(__func__,ErrorCode::IllegalNetworkConfiguration);
+    return MiniSbxReportError(ErrorCode::IllegalNetworkConfiguration);
   }else{
     return 0;
   }
@@ -563,7 +596,7 @@ int MiniSbxAllowIpv4(const std::string& ip) {
   const char* ip_str = ip.c_str();
   PRINT_DEBUG("allow ip %s", ip_str);
   if(set_firewall_rule(ip_str, &(opt.fw_rules))<0){
-    return MiniSbxReportError(__func__,ErrorCode::IllegalNetworkConfiguration);
+    return MiniSbxReportError(ErrorCode::IllegalNetworkConfiguration);
   }else{
     return 0;
   }
@@ -588,10 +621,10 @@ int MiniSbxEnableLog(const std::string &path) {
   if (opt.debug_path.empty()) {
     fs::path fs_path(path);
     fs::path base_dir = fs_path.parent_path();
-    res = ValidatePath(__func__, base_dir.string());
+    res = ValidateDirPath(base_dir.string());
     opt.debug_path.assign(path);
   } else {
-    res = MiniSbxReportError(__func__, ErrorCode::LogFileNotUnique);
+    res = MiniSbxReportError(ErrorCode::LogFileNotUnique);
   }
   return res;
 }
@@ -628,7 +661,7 @@ std::vector<std::string> getHomeSymlinkedDirs(std::string path){
 int MiniSbxMountBind(const std::string &input_path) { // -M
   std::string path = CanonicPath(input_path, false);
   int res = 0;
-  if ((res = ValidatePath(__func__, path)) < 0) {
+  if ((res = ValidateDirPath(path)) < 0) {
     return res;
   }
   // Add the current source path to both source and target lists
@@ -655,7 +688,7 @@ int MiniSbxMountBind(const std::string &input_path) { // -M
 int MiniSbxMountBindSourceToTarget(const std::string &c_source, const std::string& c_target) {
   std::string source = CanonicPath(c_source, false);
   std::string target = CanonicPath(c_target, false);
-  ValidatePath(__func__, source);
+  ValidateDirPath(source);
   opt.bind_mount_sources.emplace_back(source);
   opt.bind_mount_targets.emplace_back(target);
   return 0;
@@ -664,7 +697,7 @@ int MiniSbxMountBindSourceToTarget(const std::string &c_source, const std::strin
 int MiniSbxMountWrite(const std::string &input_path) { // -w
   std::string path = CanonicPath(input_path, false);
   int res = 0;
-  if ((res = ValidatePath(__func__, path)) < 0)
+  if ((res = ValidateDirPath(path)) < 0)
     return res;
   if(path!=input_path){
       opt.writable_files.emplace_back(input_path);
@@ -687,7 +720,7 @@ int MiniSbxMountWrite(const std::string &input_path) { // -w
 int MiniSbxMountTmpfs(const std::string &input_path) { // -w
   std::string path = CanonicPath(input_path, false);
   int res = 0;
-  if ((res = ValidatePath(__func__, path)) < 0)
+  if ((res = ValidateDirPath(path)) < 0)
     return res;
   opt.tmpfs_dirs.emplace_back(path);
   PRINT_DEBUG("%s(%s)\n", __func__, path.c_str());
@@ -699,7 +732,7 @@ int MiniSbxMountOverlay(const std::string &input_path) {
   int res = 0;
   if (opt.use_overlayfs) {
     std::string overlayfsmount(path);
-    if ((res = ValidatePath(__func__, path)) < 0)
+    if ((res = ValidatePath(path)) < 0)
       return res;
     opt.overlayfsmount.emplace_back(overlayfsmount, 0, overlayfsmount.length());
     if(overlayfsmount!=input_path){
@@ -714,27 +747,67 @@ int MiniSbxMountOverlay(const std::string &input_path) {
       }
     }
   } else {
-    res = MiniSbxReportError(__func__, ErrorCode::OverlayOptionNotSet);
+    res = MiniSbxReportError(ErrorCode::OverlayOptionNotSet);
   }
   return res;
 }
 
+
+static void MiniSbxGetInitFile(std::string& init_path) {
+  if (opt.use_default) {
+    init_path = std::string(TMP) + "/" + std::string(MINI_SBX_TMP) + "/" + std::string(MINI_SBX_INIT);
+  }
+  else if (! opt.sandbox_root.empty()) {
+    init_path = opt.sandbox_root + "/" + std::string(TMP) + "/" + std::string(MINI_SBX_INIT);
+  }
+  else {
+    init_path = std::string(TMP) + "/" + std::string(MINI_SBX_INIT);
+  }
+}
+
+
+int MiniSbxReadInit() {
+  std::string init_path;
+  MiniSbxGetInitFile(init_path);  
+  std::ifstream in(init_path, std::ios::binary);
+  if (!in) return -1;
+  char c = 0;
+  in >> c;
+  if (c == '0') return 0;
+  if (c == '1') return 1;
+  return -1;
+}
+
+int MiniSbxCreateInit() {
+  std::string init_path;
+  std::error_code ec;
+  MiniSbxGetInitFile(init_path);
+  fs::path init(init_path);
+  fs::path init_dir = init.parent_path();
+  if (CreateDirectories(init_dir.string()) < 0)
+    return -1;
+
+  std::ofstream out(init_path, std::ios::out | std::ios::trunc | std::ios::binary);
+  if (!out) {
+      return MiniSbxReportGenericError("could not open init file");
+  }
+  PRINT_DEBUG("init file created at %s", init_path.c_str());
+  out << "0\n"; 
+  out.close();
+  return 0;
+}
+
+
 int MiniSbxSetupDefault() {
   int res = 0;
   if (opt.hermetic || opt.use_overlayfs) {
-    res = MiniSbxReportError(__func__, ErrorCode::InvalidFunctioningMode);
+    res = MiniSbxReportError(ErrorCode::InvalidFunctioningMode);
     return res;
   }
 #ifndef MINITAP
   opt.create_netns = NETNS_WITH_LOOPBACK;
 #else
   opt.create_netns = NO_NETNS;
-#endif
-
-#if defined(LIBMINISANDBOX)
-  // Working_dir is assigned in ParseOption for minisandbox and tapbox
-  opt.working_dir = "";
-  res += GetCWD(opt.working_dir);
 #endif
   opt.use_default = true;
   opt.use_overlayfs = true;
@@ -765,7 +838,7 @@ int MiniSbxSetupCustom(const std::string &overlayfs_dir,
 int MiniSbxSetupHermetic(const std::string &sdbx_root) {
   int res = 0;
   if (opt.use_default || opt.use_overlayfs) {
-    res = MiniSbxReportError(__func__, ErrorCode::InvalidFunctioningMode);
+    res = MiniSbxReportError(ErrorCode::InvalidFunctioningMode);
   }
   opt.hermetic = true;
   res = CreateSandboxRoot(sdbx_root);
@@ -807,7 +880,7 @@ int MiniSbxSetupOverlayfsFolder(std::string input_path) {
   if (opt.use_overlayfs == true) {
     return CreateOverlayfsDir(path);
   } else {
-    return MiniSbxReportError(__func__, ErrorCode::OverlayOptionNotSet);
+    return MiniSbxReportError(ErrorCode::OverlayOptionNotSet);
   }
 }
 
@@ -815,7 +888,7 @@ int MiniSbxSetupSandboxRootWithOverlay(const std::string& input_path) {
   int res = 0;
   std::string path = CanonicPath(input_path, true);
   if (opt.use_default || opt.hermetic) {
-    res = MiniSbxReportError(__func__, ErrorCode::InvalidFunctioningMode);
+    res = MiniSbxReportError(ErrorCode::InvalidFunctioningMode);
     return res;
   }
   opt.use_overlayfs = true;
@@ -826,15 +899,20 @@ int MiniSbxSetupSandboxRootWithOverlay(const std::string& input_path) {
 // This function is useful when you want to mount a single file as output,
 // instead of a whole directory The file must exists or is created.
 int MiniSbxMountEmptyOutputFile(const std::string &path_str) {
+  std::error_code ec;
   std::string path = CanonicPath(path_str, false);
-  if (!fs::exists(path)) {
+  if (!fs::exists(path, ec)) {
     int handle = open(path.c_str(), O_CREAT | O_WRONLY | O_EXCL, 0666);
     if (handle < 0) {
-      MiniSbxReport("%s: open failed", __func__);
+      MiniSbxReportGenericError("open failed");
     }
     if (close(handle) < 0) {
-      MiniSbxReport("%s: close failed", __func__);
+      MiniSbxReportGenericError("close failed");
     }
+  }
+  if (ec) {
+    PRINT_DEBUG("%s could not mount %s", __func__, path_str.c_str());
+    return -1;
   }
   MiniSbxMountWrite(path);
   return 0;
@@ -842,5 +920,14 @@ int MiniSbxMountEmptyOutputFile(const std::string &path_str) {
 
 int MiniSbxMountParentsWrite() {
   opt.parents_writable = true;
+  return 0;
+}
+
+int MiniSbxSetWorkingDir(const std::string& input_path) {
+  std::string path = CanonicPath(input_path, false);
+  int res = 0;
+  if ((res = ValidateDirPath(path)) < 0)
+    return res;
+  opt.working_dir.assign(path);
   return 0;
 }

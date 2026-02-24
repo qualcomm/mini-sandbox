@@ -11,21 +11,22 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <sys/stat.h>
+#include <sys/mount.h>
 
 #include "linux-sandbox-api.h"
 
 int main() {
     printf("starting program out of the sandbox pid=%d\n", getpid());
-
+    pid_t initial = getpid();
     mini_sandbox_setup_default();
-    mini_sandbox_mount_write("/a/b/c");
-    int err_code = mini_sandbox_get_last_error_code();
-    assert (err_code < 0);
-    if (err_code < 0) {
-        printf("error code set to %d\n", err_code);
-        const char* msg = mini_sandbox_get_last_error_msg();
-        printf("%s\n\n", msg);
-        return 0;
-    }
+    int res = mini_sandbox_start();
+    assert (res == 0);
+    assert (getpid() != initial);  
+    assert (access("/tmp", F_OK) == 0);
+    printf("Setup ok.\n");
+    res = mount("/tmp", "/tmp", NULL, MS_BIND, NULL);
+    assert (res < 0);
+
     return 0;
 }

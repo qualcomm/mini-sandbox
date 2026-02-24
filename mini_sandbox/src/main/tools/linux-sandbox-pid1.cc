@@ -80,6 +80,12 @@ namespace fs = std::experimental::filesystem;
 #endif
 
 #define ROOT "/"
+#define MINISBX_TMP_INIT "/tmp/mini-sandbox-init"
+
+#ifndef TMP
+#define TMP "/tmp"
+#endif
+
 #define DEV_LINKS 4
 #define CAP_VERSION _LINUX_CAPABILITY_VERSION_3
 #define CAP_WORDS   _LINUX_CAPABILITY_U32S_3
@@ -265,7 +271,7 @@ static void SetupSelfDestruction(int *pipe_to_parent) {
   }
 
   // Verify that the parent still lives.
-  SignalPipe(pipe_to_parent);
+  SignalPipe(pipe_to_parent, true);
 }
 #endif
 
@@ -502,7 +508,7 @@ static bool ShouldBeWritable(const std::string &mnt_dir) {
   if (ends_with(mnt_dir.c_str(), "/proc")) 
     return true;
 
-  if (ends_with(mnt_dir.c_str(), "/tmp"))
+  if (ends_with(mnt_dir.c_str(), TMP))
     return true;
 
   if (starts_with(mnt_dir.c_str(), "/dev"))
@@ -599,7 +605,7 @@ bool ToBeMounted(const char *str) {
   // /tmp and all its subpaths have to be excluded cause that's where
   // we're going to have the sandbox_root and the overlayfs work dir.
   // We'll have a dedicated policy for mounting /tmp
-  fs::path tmp("/tmp");
+  fs::path tmp(TMP);
   if (isSubpath(tmp, inputPath)) {
     PRINT_DEBUG("/tmp subpath");
     return true;
@@ -1511,11 +1517,54 @@ static void MountOverlayDirAsTmpfs() {
 }
 
 
-int Pid1Main(void *args) {
-  PRINT_DEBUG("Pid1Main started with pid = %d", getpid());
+static int InitDone() {
+    const char* path = MINISBX_TMP_INIT;
+    int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
+    if (fd < 0) {
+        perror("open");
+        return -1;
+    }
 
+    const char buf[] = "1\n";            // include newline if you like
+    ssize_t n = write(fd, buf, sizeof(buf) - 1);
+    if (n != (ssize_t)(sizeof(buf) - 1)) {
+        perror("write");
+        close(fd);
+        return -1;
+    }
+
+    if (fsync(fd) < 0) {
+        perror("fsync");
+        close(fd);
+        return -1;
+    }
+
+    if (close(fd) < 0) {
+        perror("close");
+        return -1;
+    }
+
+    if (mount(path, path, NULL, MS_BIND, NULL) < 0) {
+        perror("mount(MS_BIND)");
+        return -1;
+    }
+
+    unsigned long remount_flags = MS_REMOUNT | MS_BIND | MS_RDONLY;
+    if (mount(NULL, path, NULL, remount_flags, NULL) < 0) {
+        perror("mount(remount,ro)");
+        // Best-effort cleanup: try to unmount the bind if remount failed
+        (void)umount(path);
+        return -1;
+    }
+
+    return 0;
+}
+
+int Pid1Main(void *args) {
+
+  PRINT_DEBUG("opt.working_dir -> %s", opt.working_dir.c_str()); 
+  PRINT_DEBUG("Pid1Main started with pid = %d", getpid());
   MiniSbxSetInternalEnv();
-  logSystem();
   home_dir = GetHomeDir();
   PRINT_DEBUG("Home dir is %s\n", home_dir.c_str());
   std::vector<std::string> overlay_dirs;
@@ -1532,7 +1581,7 @@ int Pid1Main(void *args) {
 
   PRINT_DEBUG("Running in docker? %d\n", docker_mode);
 
-  WaitPipe(pid1Args.pipe_from_parent);
+  WaitPipe(pid1Args.pipe_from_parent, true);
 
   // Start with default signal handlers and an empty signal mask.
   ClearSignalMask();
@@ -1559,10 +1608,10 @@ int Pid1Main(void *args) {
     // assumption might break in certain environments. If we can't iterate the
     // root folder we end up in this branch and we'll mount a lighter version of 
     // the read-only sandbox. 
-    PRINT_DEBUG("opt.use_default && !CanIterateRoot\n");
+    PRINT_DEBUG("opt.use_default && !CanIterateRoot");
     const std::string mount_point = GetMountPointOf(opt.working_dir);
     MiniSbxMountWrite(mount_point);
-    MiniSbxMountWrite("/tmp");
+    MiniSbxMountWrite(TMP);
     MountFilesystems();
     mounts = CountMounts();
     MakeFilesystemPartiallyReadOnly(false, mounts);
@@ -1603,6 +1652,8 @@ int Pid1Main(void *args) {
     // doesn't use overlayfs or chroot, it just re-mounts
     // everything as read-only
     PRINT_DEBUG("Sandbox enabled in read-only mode\n");
+
+    MiniSbxMountWrite(TMP);
     MountFilesystems();
     mounts = CountMounts();
     // In this case overlay_dirs will be empty but we need it when
@@ -1616,6 +1667,7 @@ int Pid1Main(void *args) {
 
   EnterWorkingDirectory();
 
+  InitDone();
   // Ignore terminal signals; we hand off the terminal to the child in
   // SpawnChild below.
   IgnoreSignal(SIGTTIN);

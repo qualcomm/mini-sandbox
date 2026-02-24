@@ -21,8 +21,6 @@ This should be the default production mode. It'll automatically set up the best 
 This will still chroot to the specified directory and will use overlayfs but the locations for the chroot'ed folder (the root inside the sandbox) and the overlayfs have to be provided. Use the '-d' flag to provide a folder where to store the fs tree and the '-k' to mount fs locations in overlay mode. This can be useful for custom scenarios where we want to mount only a part of our filesystem and we wanna dictate how to mount it. See the following example 
 
 ```bash
-mkdir /local/mnt/workspace/sandbox
-
 mini-sandbox -o /local/mnt/workspace/sandbox/ -d /local/mnt/workspace/sandbox/ -k /etc -k /lib -k /lib64 -k /sbin -k /bin -k /lib32 -k /usr -M /var -M /opt -- /bin/bash
 ```
 

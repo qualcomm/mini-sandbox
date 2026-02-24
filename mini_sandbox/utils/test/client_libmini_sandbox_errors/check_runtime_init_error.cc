@@ -16,16 +16,16 @@
 
 int main() {
     printf("starting program out of the sandbox pid=%d\n", getpid());
-
+    pid_t initial = getpid();
     mini_sandbox_setup_default();
-    mini_sandbox_mount_write("/a/b/c");
-    int err_code = mini_sandbox_get_last_error_code();
-    assert (err_code < 0);
-    if (err_code < 0) {
-        printf("error code set to %d\n", err_code);
-        const char* msg = mini_sandbox_get_last_error_msg();
-        printf("%s\n\n", msg);
-        return 0;
-    }
+
+    // /etc/passwd is a file that we cannot mount as overlay. Mounting
+    // as overlay a file will make Pid1 exit with failure. In this case we 
+    // want to return and not exit
+    mini_sandbox_mount_overlay("/etc/passwd");
+    int res = mini_sandbox_start();
+    printf("Sandbox didnt start (returned %d) but the application can still run\n", res);
+    assert (res < 0);
+    assert (getpid() == initial);    
     return 0;
 }

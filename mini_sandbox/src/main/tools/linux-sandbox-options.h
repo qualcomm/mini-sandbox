@@ -27,6 +27,7 @@
 
 #define TMP "/tmp"
 #define MINI_SBX_TMP "mini-sandbox-tmp"
+#define MINI_SBX_INIT "mini-sandbox-init"
 
 enum NetNamespaceOption {NETNS_WITH_LOOPBACK,  NO_NETNS, NETNS};
 
@@ -106,12 +107,17 @@ int MiniSbxEnableLog(const std::string &path);
 int MiniSbxSetupDefault();
 int MiniSbxSetupCustom(const std::string &overlayfs_dir, const std::string& sandbox_root);
 int MiniSbxSetupHermetic(const std::string& sandbox_root);
+
+int MiniSbxSetWorkingDir(const std::string& path);
 int MiniSbxMountBind(const std::string& path);
 int MiniSbxMountWrite(const std::string& path);
 int MiniSbxMountTmpfs(const std::string& path);
 int MiniSbxMountOverlay(const std::string& path);
 int MiniSbxMountEmptyOutputFile(const std::string& path);
 int MiniSbxMountParentsWrite();
+
+int MiniSbxCreateInit();
+int MiniSbxReadInit();
 
 #ifndef MINITAP
 int MiniSbxShareNetNamespace() ;

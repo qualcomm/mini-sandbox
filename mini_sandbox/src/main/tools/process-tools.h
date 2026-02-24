@@ -80,15 +80,16 @@ int TerminateAndWaitForAll(pid_t pid);
 
 // Blocks and waits on a pipe for the a signal to proceed from the other process
 // `SignalPipe()`.
-void WaitPipe(int *pipe);
+int WaitPipe(int *pipe, bool die_on_err);
 
 // Signals to the other process blocked with a read `WaitPipe()` on the pipe
 // that it can proceed by writing a byte to the pipe.
-void SignalPipe(int *pipe);
+int SignalPipe(int *pipe, bool die_on_err);
 
-std::string CreateTempDirectory(const std::string& basePath);
-std::string CreateRandomFilename(const std::string& basePath);
-int CreateDirectory(const std::string& basePath, const std::string& dirName, std::string& out);
+std::string CreateTempDirectory(const std::string& base_path);
+std::string CreateRandomFilename(const std::string& base_path);
+int CreateDirectory(const std::string& base_path, const std::string& dir_name, std::string& out);
+int CreateDirectories(const std::string& base_path);
 int CountMounts();
 std::string GetCurrentWorkingDirectory();
 bool isSubpath(const fs::path &base, const fs::path &sub);
@@ -101,7 +102,7 @@ std::string GetLocalLib();
 uid_t get_outer_uid();
 gid_t get_outer_gid();
 
-void addIfNotPresent(std::vector<std::string>& paths, const char* pathToCheck);
+void addIfNotPresent(std::vector<std::string>& paths, const char* path);
 void Cleanup();
 
 int MiniSbxSetInternalEnv();
@@ -110,6 +111,7 @@ std::string GetFirstFolder(const std::string& path);
 bool GetOSName(std::string& printable_name, std::string& version_id);
 bool GetKernelInfo(struct utsname* buf);
 bool UserNamespaceSupported();
+void KillAndWait(pid_t pid);
 
 
 enum UserNamespaceSupport {
@@ -118,5 +120,4 @@ enum UserNamespaceSupport {
     USER_NS_NOT_SUPPORTED
 };
 
-static UserNamespaceSupport user_ns_support = NON_INIT;
 #endif  // PROCESS_TOOLS_H__
