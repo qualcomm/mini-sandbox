@@ -37,6 +37,7 @@ enum class ErrorCode : int {
   FileReadAndWrite = -9,
   NestedSandbox = -10,
   IllegalNetworkConfiguration = -11,
+  SandboxAlreadyStarted=-12,
   GeneralOSError = -100,
   Unknown = -1000
 };
@@ -65,6 +66,8 @@ inline std::string GetErrorMessage(ErrorCode code) {
       return " : Illegal configuration. File mounted as read and write at the same time";
     case ErrorCode::NestedSandbox:
       return " : Cannot nest multiple sandbox. The process is already running inside mini-sandbox.";
+    case ErrorCode::SandboxAlreadyStarted:
+      return " : Sandbox was already started. Cannot change the configuration.";
     case ErrorCode::GeneralOSError:
       return " : OS Error";
     case ErrorCode::IllegalNetworkConfiguration:

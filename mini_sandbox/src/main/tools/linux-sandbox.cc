@@ -536,3 +536,7 @@ int MiniSbxStart() {
   return exit_res;
 #endif
 }
+
+bool MiniSbxIsNestedSandbox(){
+  return MiniSbxGetInternalEnv()==0;
+}
