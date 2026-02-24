@@ -27,8 +27,8 @@ class MiniSandboxErrors(IntEnum):
     LOG_FILE_NOT_UNIQUE = -7
     ILLEGAL_CONFIGURATION = -8
     FILE_READ_AND_WRITE = -9
-    NESTED_SANDBOX = -10
-    ILLEGAL_NETWORK_CONFIGURATION = -11
+    IllegalNetworkConfiguration = -10
+    TmpNotRemounted = -11
     GENERAL_OS_ERROR = -100
     NESTED_SANDBOX = -201
     SANDBOX_ALREADY_STARTED = -202 #The difference between this and NESTED_SANDBOX is that NESTED_SANDBOX is returned when the parent process started the sandbox, while SANDBOX_ALREADY_STARTED is invoked when the current app called mini_sandbox_start twice. 
