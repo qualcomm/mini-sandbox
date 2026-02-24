@@ -83,6 +83,7 @@ check_exit $PYTHON test_read_only.py tap
 check_exit $PYTHON test_allow_all_domains.py 
 check_exit $PYTHON test_allow_all_domains_negative.py 
 
+check_exit $PYTHON test_nested_sandbox.py
 check_exit $PYTHON test_symlinks_bind.py
 check_exit $PYTHON test_symlinks_bind_2.py 
 check_exit $PYTHON test_symlinks_write.py
