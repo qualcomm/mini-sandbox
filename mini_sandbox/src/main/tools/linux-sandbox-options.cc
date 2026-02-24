@@ -629,6 +629,35 @@ int MiniSbxEnableLog(const std::string &path) {
   return res;
 }
 
+
+bool isInsideHomeDir(const fs::path path){
+  fs::path path_canon = fs::path(CanonicPath(path,true));
+  fs::path home_dir = GetHomeDir();
+  return isSubpath( home_dir,path_canon);
+}
+
+std::vector<std::string> getHomeSymlinkedDirs(std::string path){
+  std::vector<std::string> result;
+
+  fs::path path_canon = fs::path(CanonicPath(path,true));
+  // If the path itself doesn't exist or isn't a directory, return empty
+  if (!fs::exists(path_canon) || !fs::is_directory(path_canon)) {
+      return result;
+  }
+
+  // Iterate entries 
+  for (const auto& entry : fs::directory_iterator(path_canon)) {
+      // Check if the entry is a symbolic link
+      if (fs::is_symlink(entry.symlink_status())) {
+          fs::path resolved_symlink=fs::canonical(entry.path());
+          fs::path parent_path= resolved_symlink.parent_path();
+          result.push_back(parent_path.string());
+      }
+  }
+
+  return result;
+}
+
 int MiniSbxMountBind(const std::string &input_path) { // -M
   std::string path = CanonicPath(input_path, false);
   int res = 0;
@@ -642,6 +671,16 @@ int MiniSbxMountBind(const std::string &input_path) { // -M
     opt.bind_mount_sources.emplace_back(input_path);
     opt.bind_mount_targets.emplace_back(input_path);
   }
+  if(isInsideHomeDir(path)){
+
+    std::vector<std::string> add_folder=getHomeSymlinkedDirs(path);
+    for (auto i : add_folder){
+      opt.bind_mount_sources.emplace_back(i);
+      opt.bind_mount_targets.emplace_back(i);
+
+    }
+  }
+
   PRINT_DEBUG("%s(%s)\n", __func__, path.c_str());
   return res;
 }
@@ -664,6 +703,16 @@ int MiniSbxMountWrite(const std::string &input_path) { // -w
       opt.writable_files.emplace_back(input_path);
   }
   opt.writable_files.emplace_back(path);
+
+  if(isInsideHomeDir(path)){
+
+    std::vector<std::string> add_folder=getHomeSymlinkedDirs(path);
+    for (auto i : add_folder){
+      opt.bind_mount_sources.emplace_back(i);
+      opt.bind_mount_targets.emplace_back(i);
+
+    }
+  }
   PRINT_DEBUG("%s(%s)\n", __func__, path.c_str());
   return res;
 }
@@ -688,6 +737,14 @@ int MiniSbxMountOverlay(const std::string &input_path) {
     opt.overlayfsmount.emplace_back(overlayfsmount, 0, overlayfsmount.length());
     if(overlayfsmount!=input_path){
       opt.overlayfsmount.emplace_back(input_path, 0, overlayfsmount.length());
+    }
+    if(isInsideHomeDir(path)){
+
+      std::vector<std::string> add_folder=getHomeSymlinkedDirs(path);
+      for (auto i : add_folder){
+        opt.bind_mount_sources.emplace_back(i);
+        opt.bind_mount_targets.emplace_back(i);
+      }
     }
   } else {
     res = MiniSbxReportError(ErrorCode::OverlayOptionNotSet);

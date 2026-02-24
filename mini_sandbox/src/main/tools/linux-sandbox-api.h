@@ -42,6 +42,7 @@ int mini_sandbox_enable_log(const char* path);
 int mini_sandbox_get_last_error_code();
 const char* mini_sandbox_get_last_error_msg();
 
+bool mini_sandbox_is_running();
 
 #ifndef MINITAP
 int mini_sandbox_share_network();

@@ -113,4 +113,12 @@ check_last_command_failed
 set -e
 popd
 
+check_exit $PYTHON test_nested_sandbox.py
+check_exit $PYTHON test_symlinks_bind.py
+check_exit $PYTHON test_symlinks_bind_2.py 
+check_exit $PYTHON test_symlinks_write.py
+check_exit $PYTHON test_symlinks_write_2.py
+check_exit $PYTHON test_symlinks_overlay.py
+check_exit $PYTHON test_symlinks_overlay_2.py
+
 cd $ORIGINAL_DIR

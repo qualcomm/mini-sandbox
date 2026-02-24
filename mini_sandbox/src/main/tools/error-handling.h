@@ -44,6 +44,8 @@ enum class ErrorCode : int {
   GeneralOSError = -100,
   // Error codes from -201 are recoverables
   NestedSandbox = -201,
+  SandboxAlreadyStarted=-202,//The difference between this and NESTED_SANDBOX is that NESTED_SANDBOX is returned when the parent process started the sandbox, while SAN
+
   Unknown = -1000
 };
 
@@ -70,7 +72,9 @@ inline std::string GetErrorMessage(ErrorCode code) {
     case ErrorCode::FileReadAndWrite:
       return "Illegal configuration. File mounted as read and write at the same time";
     case ErrorCode::NestedSandbox:
-      return " Cannot nest multiple sandbox. The process is already running inside mini-sandbox.";
+      return " : Cannot nest multiple sandbox. The process is already running inside mini-sandbox.";
+    case ErrorCode::SandboxAlreadyStarted:
+      return " : Sandbox was already started. Cannot change the configuration.";
     case ErrorCode::GeneralOSError:
       return "OS Error";
     case ErrorCode::IllegalNetworkConfiguration:
