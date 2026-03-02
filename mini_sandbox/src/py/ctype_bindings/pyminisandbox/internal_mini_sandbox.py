@@ -66,7 +66,7 @@ def init(tap_mode = False):
         _lib.mini_sandbox_get_last_error_msg.restype = ctypes.c_char_p
 
 def is_platform_supported():
-    return platform.system() == "Linux" and platform.architecture() == "x86"
+    return platform.system() == "Linux" and (platform.machine() in ("x86_64", "i386", "i686"))
 
 def mini_sandbox_get_last_error_code():
     if _lib is None:
