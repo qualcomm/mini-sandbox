@@ -10,11 +10,11 @@
 #include "src/main/tools/linux-sandbox.h"
 
 
-static bool already_started=false;
+static int already_started=0;
 
 
   //This function returns true if mini_sandbox is already running. Either because one of the parent processes already started it or because the app already invoked mini_sandbox_start() 
-bool mini_sandbox_is_running(){
+int mini_sandbox_is_running(){
   if(already_started){
     return true;
   }else{
@@ -68,7 +68,7 @@ int mini_sandbox_start() {
   if(already_started){
     return MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
   }
-  already_started=true;
+  already_started=1;
   return MiniSbxStart();
 }
 
