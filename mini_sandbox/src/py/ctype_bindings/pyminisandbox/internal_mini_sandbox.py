@@ -15,7 +15,7 @@ script_dir = os.path.dirname( os.path.abspath(__file__))
 # LIB_NOT_LOADED -> something went wrong when loading the .so (see exception)
 # FEATURE_NOT_AVAILABLE -> the API is not available in the current shared object. Need to re-build
 # INVALID_ARG -> you called an API with wrong argument
-class MiniSandboxErrors(IntEnum):
+class MiniSandboxErrors():
     """Errors"""
     NOERROR = 0,
     INVALID_FUNCTIONING_MODE = -1
