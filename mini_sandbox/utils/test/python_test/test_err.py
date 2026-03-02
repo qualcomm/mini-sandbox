@@ -32,9 +32,6 @@ if __name__ == "__main__":
     assert(res==0)
     res=mn_sbx.mini_sandbox_start()
     err_code=mn_sbx.mini_sandbox_get_last_error_code()
-    assert(err_code == mn_sbx.MiniSandboxErrors.NESTED_SANDBOX)
-
-    print("Ok")
-
+    assert(err_code == mn_sbx.MiniSandboxErrors.SANDBOX_ALREADY_STARTED)
 
 
