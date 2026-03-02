@@ -1583,10 +1583,13 @@ int Pid1Main(void *args) {
 
   WaitPipe(pid1Args.pipe_from_parent, true);
 
-  // Start with default signal handlers and an empty signal mask.
-  ClearSignalMask();
 
 #if (!(LIBMINISANDBOX))
+  // Start with default signal handlers and an empty signal mask.
+  // If we run as lib, the main process may rely in signal handlers installed previously. So, we clear the signal only if we don't run as lib
+
+  ClearSignalMask();
+
   SetupSelfDestruction(pid1Args.pipe_to_parent);
 #endif
   SetupMountNamespace();
@@ -1670,10 +1673,11 @@ int Pid1Main(void *args) {
   InitDone();
   // Ignore terminal signals; we hand off the terminal to the child in
   // SpawnChild below.
-  IgnoreSignal(SIGTTIN);
-  IgnoreSignal(SIGTTOU);
+
 
 #if (!(LIBMINISANDBOX))
+  IgnoreSignal(SIGTTIN);
+  IgnoreSignal(SIGTTOU);
   // Fork the child process.
   SpawnChild(false);
   InstallSignalHandler(SIGTERM, ForwardSignal);
