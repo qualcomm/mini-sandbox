@@ -17,7 +17,7 @@ script_dir = os.path.dirname( os.path.abspath(__file__))
 # INVALID_ARG -> you called an API with wrong argument
 class MiniSandboxErrors():
     """Errors"""
-    NOERROR = 0,
+    NOERROR = 0
     INVALID_FUNCTIONING_MODE = -1
     SANDBOX_ROOT_NOT_UNIQUE = -2
     INVALID_FOLDER = -3
