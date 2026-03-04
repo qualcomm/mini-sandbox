@@ -110,6 +110,5 @@ int MiniSbxReportErrorAndMessage_impl(std::string err_msg, ErrorCode code, const
 MiniSbxError MiniSbxGetError();
 const char* MiniSbxGetErrorMsg();
 int MiniSbxGetErrorCode();
-
 #endif
 

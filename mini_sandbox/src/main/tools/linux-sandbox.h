@@ -21,4 +21,5 @@ extern gid_t global_outer_gid;
 
 int MiniSbxStart();
 bool MiniSbxIsNestedSandbox();
+bool MiniSbxIsRunning();
 #endif

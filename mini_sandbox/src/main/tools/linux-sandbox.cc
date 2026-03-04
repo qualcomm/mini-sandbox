@@ -372,6 +372,10 @@ static int StartLogging() {
 
 
 int MiniSbxStart() {
+  if (opt.is_running){
+    MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
+    return -1;
+  }
   int res;
   res = StartLogging();
   if (res < 0) return res;
@@ -467,6 +471,7 @@ int MiniSbxStart() {
 
   CloseFds();
 #endif
+  
   // Spawn the child that will fork the sandboxed program with fresh
   // namespaces etc.
 
@@ -561,6 +566,8 @@ int MiniSbxStart() {
           // process. In the other cases instead we wanna exit cause the exit signal is coming from the 
           // sandboxed process
           if (init_status == 0) {
+            //We consider mini sandbox as "running" from this moment onwards
+            opt.is_running=true;  
 #ifdef MINITAP
           // If we are in libminitapbox the pid executing this code is child of the one we forked in
           // RunTcpIp() . Thus we want to exit here and the father that is waiting for us will return for 
@@ -586,8 +593,13 @@ int MiniSbxStart() {
   Cleanup();
   return exit_res;
 #endif
+  
 }
 
 bool MiniSbxIsNestedSandbox(){
   return MiniSbxGetInternalEnv()==0;
+}
+
+bool MiniSbxIsRunning(){
+  return opt.is_running || MiniSbxIsNestedSandbox();
 }

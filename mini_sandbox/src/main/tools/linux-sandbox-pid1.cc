@@ -1673,7 +1673,7 @@ int Pid1Main(void *args) {
   InitDone();
   // Ignore terminal signals; we hand off the terminal to the child in
   // SpawnChild below.
-
+  opt.is_running=true;
 
 #if (!(LIBMINISANDBOX))
   IgnoreSignal(SIGTTIN);

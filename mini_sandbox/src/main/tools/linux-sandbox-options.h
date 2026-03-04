@@ -87,6 +87,7 @@ struct Options {
   // the mount point
   bool parents_writable = false;
   // path to firewall rules if tap mode is enabled
+  bool is_running = false;
 #ifdef MINITAP
   std::string firewall_rules_path;
   FirewallRules fw_rules;
