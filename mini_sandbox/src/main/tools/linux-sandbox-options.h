@@ -30,8 +30,8 @@
 #define MINI_SBX_INIT "mini-sandbox-init"
 
 enum NetNamespaceOption {NETNS_WITH_LOOPBACK,  NO_NETNS, NETNS};
-
 enum DockerMode {NO_CONTAINER, UNPRIVILEGED_CONTAINER, PRIVILEGED_CONTAINER};
+enum MiniSbxStatus {NOT_RUNNING, RUNNING, FAILED};
 extern DockerMode docker_mode;
 
 // Options parsing result.
@@ -86,8 +86,9 @@ struct Options {
   // but can be enabled via API to mount the parents of CWD as write until
   // the mount point
   bool parents_writable = false;
+  // tells if the sandbox is running or not
+  MiniSbxStatus is_running = NOT_RUNNING;
   // path to firewall rules if tap mode is enabled
-  bool is_running = false;
 #ifdef MINITAP
   std::string firewall_rules_path;
   FirewallRules fw_rules;

@@ -372,7 +372,7 @@ static int StartLogging() {
 
 
 int MiniSbxStart() {
-  if (opt.is_running){
+  if (opt.is_running != NOT_RUNNING) {
     MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
     return -1;
   }
@@ -567,7 +567,7 @@ int MiniSbxStart() {
           // sandboxed process
           if (init_status == 0) {
             //We consider mini sandbox as "running" from this moment onwards
-            opt.is_running=true;  
+            opt.is_running = FAILED;  
 #ifdef MINITAP
           // If we are in libminitapbox the pid executing this code is child of the one we forked in
           // RunTcpIp() . Thus we want to exit here and the father that is waiting for us will return for 
@@ -597,9 +597,9 @@ int MiniSbxStart() {
 }
 
 bool MiniSbxIsNestedSandbox(){
-  return MiniSbxGetInternalEnv()==0;
+  return MiniSbxGetInternalEnv() == 0;
 }
 
 bool MiniSbxIsRunning(){
-  return opt.is_running || MiniSbxIsNestedSandbox();
+  return (opt.is_running != NOT_RUNNING) || MiniSbxIsNestedSandbox();
 }

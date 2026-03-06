@@ -1518,6 +1518,8 @@ static void MountOverlayDirAsTmpfs() {
 
 
 static int InitDone() {
+
+    opt.is_running = RUNNING;
     const char* path = MINISBX_TMP_INIT;
     int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
     if (fd < 0) {
@@ -1670,12 +1672,11 @@ int Pid1Main(void *args) {
 
   EnterWorkingDirectory();
 
+  // Set up init status useful mostly in library mode
   InitDone();
+#if (!(LIBMINISANDBOX))
   // Ignore terminal signals; we hand off the terminal to the child in
   // SpawnChild below.
-  opt.is_running=true;
-
-#if (!(LIBMINISANDBOX))
   IgnoreSignal(SIGTTIN);
   IgnoreSignal(SIGTTOU);
   // Fork the child process.

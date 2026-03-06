@@ -556,7 +556,7 @@ static int ReadAllowedConnections(std::ifstream& file) {
 }
 
 int MiniSbxAllowConnections(const std::string& path) {
-    if (opt.is_running){
+    if (opt.is_running != NOT_RUNNING){
       MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
       return -1;
     }
@@ -574,7 +574,7 @@ int MiniSbxAllowConnections(const std::string& path) {
 }
 
 int MiniSbxAllowMaxConnections(int max_connections) {
-  if (opt.is_running){
+  if (opt.is_running != NOT_RUNNING){
     MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
     return -1;
   }
@@ -582,7 +582,7 @@ int MiniSbxAllowMaxConnections(int max_connections) {
 }
 
 int MiniSbxAllowAllDomains() {
-  if (opt.is_running){
+  if (opt.is_running != NOT_RUNNING){
     MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
     return -1;
   }
@@ -596,7 +596,7 @@ int MiniSbxAllowAllDomains() {
 }
 
 int MiniSbxAllowDomain(const std::string& domain) {
-  if (opt.is_running){
+  if (opt.is_running != NOT_RUNNING){
     MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
     return -1;
   }
@@ -610,7 +610,7 @@ int MiniSbxAllowDomain(const std::string& domain) {
 }
 
 int MiniSbxAllowIpv4(const std::string& ip) {
-  if (opt.is_running){
+  if (opt.is_running != NOT_RUNNING){
     MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
     return -1;
   }
@@ -625,7 +625,7 @@ int MiniSbxAllowIpv4(const std::string& ip) {
 }
 
 int MiniSbxAllowIpv4Subnet(const std::string& subnet) {
-  if (opt.is_running){
+  if (opt.is_running != NOT_RUNNING){
     MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
     return -1;
   }
@@ -642,7 +642,7 @@ int MiniSbxShareNetNamespace() {
 
 
 int MiniSbxEnableLog(const std::string &path) {
-  if (opt.is_running){
+  if (opt.is_running != NOT_RUNNING){
     MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
     return -1;
   }
@@ -707,7 +707,7 @@ void MountHomeSymlinks(const std::string path, std::vector<std::string>* sources
 }
 
 int MiniSbxMountBind(const std::string &input_path) { // -M
-  if (opt.is_running){
+  if (opt.is_running != NOT_RUNNING){
     MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
     return -1;
   }
@@ -730,7 +730,7 @@ int MiniSbxMountBind(const std::string &input_path) { // -M
 }
 
 int MiniSbxMountBindSourceToTarget(const std::string &c_source, const std::string& c_target) {
-  if (opt.is_running){
+  if (opt.is_running != NOT_RUNNING){
     MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
     return -1;
   }
@@ -743,7 +743,7 @@ int MiniSbxMountBindSourceToTarget(const std::string &c_source, const std::strin
 }
 
 int MiniSbxMountWrite(const std::string &input_path) { // -w
-  if (opt.is_running){
+  if (opt.is_running != NOT_RUNNING){
     MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
     return -1;
   }
@@ -762,7 +762,7 @@ int MiniSbxMountWrite(const std::string &input_path) { // -w
 }
 
 int MiniSbxMountTmpfs(const std::string &input_path) { // -w
-  if (opt.is_running){
+  if (opt.is_running != NOT_RUNNING){
     MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
     return -1;
   }
@@ -776,7 +776,7 @@ int MiniSbxMountTmpfs(const std::string &input_path) { // -w
 }
 
 int MiniSbxMountOverlay(const std::string &input_path) {
-  if (opt.is_running){
+  if (opt.is_running != NOT_RUNNING){
     MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
     return -1;
   }
@@ -845,7 +845,7 @@ int MiniSbxCreateInit() {
 
 
 int MiniSbxSetupDefault() {
-  if (opt.is_running){
+  if (opt.is_running != NOT_RUNNING){
     MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
     return -1;
   }
@@ -876,7 +876,7 @@ int MiniSbxSetupDefault() {
 
 int MiniSbxSetupCustom(const std::string &overlayfs_dir,
                               const std::string &sdbx_root) {
-  if (opt.is_running){
+  if (opt.is_running != NOT_RUNNING){
     MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
     return -1;
   }
@@ -890,7 +890,7 @@ int MiniSbxSetupCustom(const std::string &overlayfs_dir,
 }
 
 int MiniSbxSetupHermetic(const std::string &sdbx_root) {
-  if (opt.is_running){
+  if (opt.is_running != NOT_RUNNING){
     MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
     return -1;
   }
@@ -933,7 +933,7 @@ void SetupDefaultMounts(std::vector<std::string> &bind_mount_sources,
 
 
 int MiniSbxSetupOverlayfsFolder(std::string input_path) {
-  if (opt.is_running){
+  if (opt.is_running != NOT_RUNNING){
     MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
     return -1;
   }
@@ -947,7 +947,7 @@ int MiniSbxSetupOverlayfsFolder(std::string input_path) {
 }
 
 int MiniSbxSetupSandboxRootWithOverlay(const std::string& input_path) {
-  if (opt.is_running){
+  if (opt.is_running != NOT_RUNNING){
     MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
     return -1;
   }
@@ -965,7 +965,7 @@ int MiniSbxSetupSandboxRootWithOverlay(const std::string& input_path) {
 // This function is useful when you want to mount a single file as output,
 // instead of a whole directory The file must exists or is created.
 int MiniSbxMountEmptyOutputFile(const std::string &path_str) {
-  if (opt.is_running){
+  if (opt.is_running != NOT_RUNNING){
     MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
     return -1;
   }
@@ -989,7 +989,7 @@ int MiniSbxMountEmptyOutputFile(const std::string &path_str) {
 }
 
 int MiniSbxMountParentsWrite() {
-  if (opt.is_running){
+  if (opt.is_running != NOT_RUNNING){
     MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
     return -1;
   }
@@ -998,7 +998,7 @@ int MiniSbxMountParentsWrite() {
 }
 
 int MiniSbxSetWorkingDir(const std::string& input_path) {
-  if (opt.is_running){
+  if (opt.is_running != NOT_RUNNING){
     MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
     return -1;
   }
