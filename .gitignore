@@ -19,3 +19,4 @@ release/
 *.egg-info/
 dist/
 .vscode/**
+pypi_dist/
