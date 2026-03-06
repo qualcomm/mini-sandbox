@@ -1518,6 +1518,8 @@ static void MountOverlayDirAsTmpfs() {
 
 
 static int InitDone() {
+
+    opt.is_running = RUNNING;
     const char* path = MINISBX_TMP_INIT;
     int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
     if (fd < 0) {
@@ -1583,10 +1585,13 @@ int Pid1Main(void *args) {
 
   WaitPipe(pid1Args.pipe_from_parent, true);
 
-  // Start with default signal handlers and an empty signal mask.
-  ClearSignalMask();
 
 #if (!(LIBMINISANDBOX))
+  // Start with default signal handlers and an empty signal mask.
+  // If we run as lib, the main process may rely in signal handlers installed previously. So, we clear the signal only if we don't run as lib
+
+  ClearSignalMask();
+
   SetupSelfDestruction(pid1Args.pipe_to_parent);
 #endif
   SetupMountNamespace();
@@ -1667,13 +1672,13 @@ int Pid1Main(void *args) {
 
   EnterWorkingDirectory();
 
+  // Set up init status useful mostly in library mode
   InitDone();
+#if (!(LIBMINISANDBOX))
   // Ignore terminal signals; we hand off the terminal to the child in
   // SpawnChild below.
   IgnoreSignal(SIGTTIN);
   IgnoreSignal(SIGTTOU);
-
-#if (!(LIBMINISANDBOX))
   // Fork the child process.
   SpawnChild(false);
   InstallSignalHandler(SIGTERM, ForwardSignal);

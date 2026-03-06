@@ -94,13 +94,6 @@ void IgnoreSignal(int signum) {
   }
 }
 
-void InstallDefaultSignalHandler(int signum) {
-  // These signals can't be handled, so we'll just not do anything for these.
-  if (signum != SIGSTOP && signum != SIGKILL) {
-    InstallSignalHandler(signum, SIG_DFL);
-  }
-}
-
 
 void ClearSignalMask() {
   // Use an empty signal mask for the process.

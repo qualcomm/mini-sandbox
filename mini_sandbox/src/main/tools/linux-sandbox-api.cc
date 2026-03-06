@@ -9,6 +9,12 @@
 #include "src/main/tools/linux-sandbox-options.h"
 #include "src/main/tools/linux-sandbox.h"
 
+
+
+int mini_sandbox_is_running(){
+  return MiniSbxIsRunning();
+}
+
 int mini_sandbox_get_last_error_code() {
   return MiniSbxGetErrorCode();
 }
@@ -20,11 +26,13 @@ const char* mini_sandbox_get_last_error_msg() {
 
 
 int mini_sandbox_enable_log(const char* path) {
+
   return MiniSbxEnableLog(path);
 }
 
 
 int mini_sandbox_setup_default() {
+
   return MiniSbxSetupDefault();
 }
 

@@ -58,6 +58,7 @@ static int MiniSbxSetupSandboxRootWithOverlay(const std::string& path);
 static int MiniSbxSetupOverlayfsFolder(std::string path);
 static std::string CanonicPath(const std::string path_str,
                                 bool resolve_symlink);
+void MountHomeSymlinks(const std::string path, std::vector<std::string>* sources, std::vector<std::string>* targets );
 
 
 // Print out a usage error. argc and argv are the argument counter and vector,
@@ -555,6 +556,10 @@ static int ReadAllowedConnections(std::ifstream& file) {
 }
 
 int MiniSbxAllowConnections(const std::string& path) {
+    if (opt.is_running != NOT_RUNNING){
+      MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
+      return -1;
+    }
     int res = 0;
     if ((res = ValidateFilePath(path)) < 0)
       return res;
@@ -569,10 +574,18 @@ int MiniSbxAllowConnections(const std::string& path) {
 }
 
 int MiniSbxAllowMaxConnections(int max_connections) {
+  if (opt.is_running != NOT_RUNNING){
+    MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
+    return -1;
+  }
   return set_max_connections(max_connections, &(opt.fw_rules));
 }
 
 int MiniSbxAllowAllDomains() {
+  if (opt.is_running != NOT_RUNNING){
+    MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
+    return -1;
+  }
   PRINT_DEBUG("Allow all domains");
   if(reset_firewall_rules(&opt.fw_rules) == 0){
     return 0;
@@ -583,6 +596,10 @@ int MiniSbxAllowAllDomains() {
 }
 
 int MiniSbxAllowDomain(const std::string& domain) {
+  if (opt.is_running != NOT_RUNNING){
+    MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
+    return -1;
+  }
   const char* domain_str = domain.c_str();
   PRINT_DEBUG("allow domain %s", domain_str);
   if(set_firewall_rule(domain_str, &(opt.fw_rules))<0){
@@ -593,6 +610,10 @@ int MiniSbxAllowDomain(const std::string& domain) {
 }
 
 int MiniSbxAllowIpv4(const std::string& ip) {
+  if (opt.is_running != NOT_RUNNING){
+    MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
+    return -1;
+  }
   const char* ip_str = ip.c_str();
   PRINT_DEBUG("allow ip %s", ip_str);
   if(set_firewall_rule(ip_str, &(opt.fw_rules))<0){
@@ -604,6 +625,10 @@ int MiniSbxAllowIpv4(const std::string& ip) {
 }
 
 int MiniSbxAllowIpv4Subnet(const std::string& subnet) {
+  if (opt.is_running != NOT_RUNNING){
+    MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
+    return -1;
+  }
   return MiniSbxAllowIpv4(subnet);
 }
 #endif
@@ -617,6 +642,10 @@ int MiniSbxShareNetNamespace() {
 
 
 int MiniSbxEnableLog(const std::string &path) {
+  if (opt.is_running != NOT_RUNNING){
+    MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
+    return -1;
+  }
   int res = 0;
   if (opt.debug_path.empty()) {
     fs::path fs_path(path);
@@ -629,7 +658,59 @@ int MiniSbxEnableLog(const std::string &path) {
   return res;
 }
 
+
+bool isInsideHomeDir(const fs::path path){
+  fs::path path_canon = fs::path(CanonicPath(path,true));
+  fs::path home_dir = GetHomeDir();
+  return isSubpath( home_dir,path_canon);
+}
+
+std::vector<std::string> getSymlinkedDirs(std::string path){
+  std::vector<std::string> result;
+
+  fs::path path_canon = fs::path(CanonicPath(path,true));
+  // If the path itself doesn't exist or isn't a directory, return empty
+  try{
+    if (!fs::exists(path_canon) || !fs::is_directory(path_canon)) {
+        return result;
+    }
+
+    // Iterate entries 
+    for (const auto& entry : fs::directory_iterator(path_canon)) {
+        // Check if the entry is a symbolic link
+        if (fs::is_symlink(entry.symlink_status())) {
+            fs::path resolved_symlink=fs::canonical(entry.path());
+            fs::path parent_path= resolved_symlink.parent_path();
+            result.push_back(parent_path.string());
+        }
+    }
+  }
+  catch (fs::filesystem_error fs_exception){
+    return result; // Return empty in case we have a fs error e.g, permission denied.
+
+  }
+  return result;
+}
+
+void MountHomeSymlinks(const std::string path, std::vector<std::string>* sources, std::vector<std::string>* targets ){
+  if(isInsideHomeDir(path)){
+    std::vector<std::string> add_folder=getSymlinkedDirs(path);
+    for (auto i : add_folder){
+      if (sources != NULL){
+        sources->emplace_back(i);
+      }
+      if(targets != NULL){
+        targets->emplace_back(i);
+      }
+    }
+  }
+}
+
 int MiniSbxMountBind(const std::string &input_path) { // -M
+  if (opt.is_running != NOT_RUNNING){
+    MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
+    return -1;
+  }
   std::string path = CanonicPath(input_path, false);
   int res = 0;
   if ((res = ValidateDirPath(path)) < 0) {
@@ -642,11 +723,17 @@ int MiniSbxMountBind(const std::string &input_path) { // -M
     opt.bind_mount_sources.emplace_back(input_path);
     opt.bind_mount_targets.emplace_back(input_path);
   }
+ 
+  MountHomeSymlinks(input_path, &opt.bind_mount_sources, &opt.bind_mount_targets);
   PRINT_DEBUG("%s(%s)\n", __func__, path.c_str());
   return res;
 }
 
 int MiniSbxMountBindSourceToTarget(const std::string &c_source, const std::string& c_target) {
+  if (opt.is_running != NOT_RUNNING){
+    MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
+    return -1;
+  }
   std::string source = CanonicPath(c_source, false);
   std::string target = CanonicPath(c_target, false);
   ValidateDirPath(source);
@@ -656,6 +743,10 @@ int MiniSbxMountBindSourceToTarget(const std::string &c_source, const std::strin
 }
 
 int MiniSbxMountWrite(const std::string &input_path) { // -w
+  if (opt.is_running != NOT_RUNNING){
+    MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
+    return -1;
+  }
   std::string path = CanonicPath(input_path, false);
   int res = 0;
   if ((res = ValidateDirPath(path)) < 0)
@@ -664,11 +755,17 @@ int MiniSbxMountWrite(const std::string &input_path) { // -w
       opt.writable_files.emplace_back(input_path);
   }
   opt.writable_files.emplace_back(path);
+
+  MountHomeSymlinks(input_path, &opt.writable_files, NULL);
   PRINT_DEBUG("%s(%s)\n", __func__, path.c_str());
   return res;
 }
 
 int MiniSbxMountTmpfs(const std::string &input_path) { // -w
+  if (opt.is_running != NOT_RUNNING){
+    MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
+    return -1;
+  }
   std::string path = CanonicPath(input_path, false);
   int res = 0;
   if ((res = ValidateDirPath(path)) < 0)
@@ -679,6 +776,10 @@ int MiniSbxMountTmpfs(const std::string &input_path) { // -w
 }
 
 int MiniSbxMountOverlay(const std::string &input_path) {
+  if (opt.is_running != NOT_RUNNING){
+    MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
+    return -1;
+  }
   std::string path = CanonicPath(input_path, false);
   int res = 0;
   if (opt.use_overlayfs) {
@@ -689,11 +790,13 @@ int MiniSbxMountOverlay(const std::string &input_path) {
     if(overlayfsmount!=input_path){
       opt.overlayfsmount.emplace_back(input_path, 0, overlayfsmount.length());
     }
+    MountHomeSymlinks(input_path, &opt.overlayfsmount,NULL);
   } else {
     res = MiniSbxReportError(ErrorCode::OverlayOptionNotSet);
   }
   return res;
 }
+
 
 
 static void MiniSbxGetInitFile(std::string& init_path) {
@@ -742,6 +845,10 @@ int MiniSbxCreateInit() {
 
 
 int MiniSbxSetupDefault() {
+  if (opt.is_running != NOT_RUNNING){
+    MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
+    return -1;
+  }
   int res = 0;
   if (opt.hermetic || opt.use_overlayfs) {
     res = MiniSbxReportError(ErrorCode::InvalidFunctioningMode);
@@ -769,6 +876,10 @@ int MiniSbxSetupDefault() {
 
 int MiniSbxSetupCustom(const std::string &overlayfs_dir,
                               const std::string &sdbx_root) {
+  if (opt.is_running != NOT_RUNNING){
+    MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
+    return -1;
+  }
   int res = 0;
   if ((res = MiniSbxSetupSandboxRootWithOverlay(sdbx_root)) < 0)
     return res;
@@ -779,6 +890,10 @@ int MiniSbxSetupCustom(const std::string &overlayfs_dir,
 }
 
 int MiniSbxSetupHermetic(const std::string &sdbx_root) {
+  if (opt.is_running != NOT_RUNNING){
+    MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
+    return -1;
+  }
   int res = 0;
   if (opt.use_default || opt.use_overlayfs) {
     res = MiniSbxReportError(ErrorCode::InvalidFunctioningMode);
@@ -818,6 +933,10 @@ void SetupDefaultMounts(std::vector<std::string> &bind_mount_sources,
 
 
 int MiniSbxSetupOverlayfsFolder(std::string input_path) {
+  if (opt.is_running != NOT_RUNNING){
+    MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
+    return -1;
+  }
   std::string path = CanonicPath(input_path, true);
 
   if (opt.use_overlayfs == true) {
@@ -828,6 +947,10 @@ int MiniSbxSetupOverlayfsFolder(std::string input_path) {
 }
 
 int MiniSbxSetupSandboxRootWithOverlay(const std::string& input_path) {
+  if (opt.is_running != NOT_RUNNING){
+    MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
+    return -1;
+  }
   int res = 0;
   std::string path = CanonicPath(input_path, true);
   if (opt.use_default || opt.hermetic) {
@@ -842,6 +965,10 @@ int MiniSbxSetupSandboxRootWithOverlay(const std::string& input_path) {
 // This function is useful when you want to mount a single file as output,
 // instead of a whole directory The file must exists or is created.
 int MiniSbxMountEmptyOutputFile(const std::string &path_str) {
+  if (opt.is_running != NOT_RUNNING){
+    MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
+    return -1;
+  }
   std::error_code ec;
   std::string path = CanonicPath(path_str, false);
   if (!fs::exists(path, ec)) {
@@ -862,11 +989,19 @@ int MiniSbxMountEmptyOutputFile(const std::string &path_str) {
 }
 
 int MiniSbxMountParentsWrite() {
+  if (opt.is_running != NOT_RUNNING){
+    MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
+    return -1;
+  }
   opt.parents_writable = true;
   return 0;
 }
 
 int MiniSbxSetWorkingDir(const std::string& input_path) {
+  if (opt.is_running != NOT_RUNNING){
+    MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
+    return -1;
+  }
   std::string path = CanonicPath(input_path, false);
   int res = 0;
   if ((res = ValidateDirPath(path)) < 0)
