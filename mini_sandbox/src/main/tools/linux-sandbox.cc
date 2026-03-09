@@ -371,21 +371,13 @@ static int StartLogging() {
 }
 
 
-int MiniSbxStart() {
-  if (opt.is_running != NOT_RUNNING) {
-    MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
-    return -1;
-  }
-  int res;
+static int StartLoggingAndWorkingDir() {
+  int res = 0;
   res = StartLogging();
   if (res < 0) return res;
 
   LogSystem();
   PRINT_DEBUG("UserNamespaceSupported = %d", UserNamespaceSupported());
-
-#ifdef LIBMINISANDBOX
-  docker_mode = CheckDockerMode();   
-#endif
 
   // Ask the kernel to kill us with SIGKILL if our parent dies.
   if (prctl(PR_SET_PDEATHSIG, SIGKILL) < 0) {
@@ -399,16 +391,134 @@ int MiniSbxStart() {
     }
     opt.working_dir = std::string(working_dir);
   }
+  return res;
+
+}
+
+static int Prepare() {
+  int res = ValidateOptions();
+  res += MiniSbxCreateInit();
+  return res;
+}
+
+static int SetGlobalIDs() {
+  // Set up two globals used by the child process.
+  global_outer_uid = getuid();
+  global_outer_gid = getgid();
+}
+
+static int PrepareMiniTap() {
+  std::string rules = CreateRandomFilename(std::string("/tmp"));
+  DumpRules(&(opt.fw_rules), rules);
+  res = RunTCPIP(global_outer_uid, global_outer_gid, rules);
+  // In this case the Network namespace has been taken care of by RunTCPIP so
+  // we don't need to create a new one
+  opt.create_netns = NO_NETNS;
+  HANDLE(res);
+}
 
 
+int MiniSbxStartCLI() {
+  int res;
+  res = StartLoggingAndWorkingDir();
+  HANDLE(res);
 
   if (MiniSbxGetInternalEnv() == 0) {
     PRINT_DEBUG("Already running inside mini-sandbox. Not nesting another sandbox\n");
-#if (!(LIBMINISANDBOX))
-    SpawnChild(true);  
-#else
     return MiniSbxReportError(ErrorCode::NestedSandbox);
+  }
+
+  if (docker_mode == UNPRIVILEGED_CONTAINER) {
+    // In this case there's not much to do. If we're running
+    // inside a Docker container that doesn't use --privileged
+    // our best is to drop certain capabilities and either spawn
+    // a new child with the command line or just let the execution
+    // resume in the original caller if this is the library
+    DropCapabilities();
+    SpawnChild(false);  
+  }
+  else if (docker_mode == PRIVILEGED_CONTAINER) {
+    MiniSbxMountBind(ETC);
+  }
+
+  res = Prepare();
+  HANDLE(res);
+
+  // Start with default signal actions and a clear signal mask.
+  ClearSignalMask();
+  // Ignore SIGTTIN and SIGTTOU, as we hand off the terminal to the child in
+  // SpawnChild.
+  IgnoreSignal(SIGTTIN);
+  IgnoreSignal(SIGTTOU);
+  // Remember the parent pid so we can exit if the parent has exited.
+  // Doing this before prctl(PR_SET_PDEATHDIG, 0) ensures no race condition.
+  initial_ppid = getppid();
+
+#ifdef MINITAP
+  PrepareMiniTap();
 #endif
+  // Ensure we don't pass on any FDs from our parent to our child other than
+  // stdin, stdout, stderr and global_debug.
+  CloseFds();
+  
+  // Spawn the child that will fork the sandboxed program with fresh
+  // namespaces etc.
+
+  const pid_t child_pid = SpawnPid1();
+  if (child_pid < 0) {
+    PRINT_DEBUG("SpawnPid1 returned -1\n");
+    exit(-1);
+  }
+  // Let the signal handlers installed below know the PID of the child.
+   global_child_pid.store(child_pid, std::memory_order_relaxed);
+
+   // If a kill delay has been configured, let the signal handlers installed
+   // below know that it needs to be respected.
+   if (opt.kill_delay_secs > 0) {
+     global_need_polite_sigterm.store(1, std::memory_order_relaxed);
+   }
+
+   // OnTimeoutOrTerm, which is used for other signals below, assumes that it
+   // handles SIGALRM. We also explicitly invoke it after the timeout using
+   // alarm(2).
+
+   InstallSignalHandler(SIGALRM, OnTimeoutOrTerm);
+
+   // If requested, arrange for the child to be killed (optionally after
+   // being asked politely to terminate) once the timeout expires.
+   //
+   // Note that it's important to set this up before support for SIGTERM and
+   // SIGINT. Otherwise one of those signals could arrive before we get here,
+   // and then we would reset its opt.kill_delay_secs interval timer.
+   if (opt.timeout_secs > 0) {
+     alarm(opt.timeout_secs);
+   }
+
+   // Also ask/tell the child to quit on SIGTERM, and optionally for SIGINT
+   // too.
+   InstallSignalHandler(SIGTERM, OnTimeoutOrTerm);
+   if (opt.sigint_sends_sigterm) {
+     InstallSignalHandler(SIGINT, OnTimeoutOrTerm);
+   }
+
+
+   int exit_res = WaitForPid1(child_pid);
+
+   Cleanup();
+   return exit_res;
+
+  
+}
+
+
+
+int MiniSbxStart() {
+  int res;
+  res = StartLoggingAndWorkingDir();
+  HANDLE(res);
+
+  if (MiniSbxGetInternalEnv() == 0) {
+    return MiniSbxReportError(ErrorCode::NestedSandbox);
   }
 
   if (docker_mode == UNPRIVILEGED_CONTAINER) {

@@ -16,6 +16,12 @@
 #define SRC_MAIN_TOOLS_LINUX_SANDBOX_H_
 #include <sys/types.h>
 
+#define HANDLE(rc_)                       \
+    do {                                  \
+        int _rc = (rc_);                  \
+        if (_rc < 0) return _rc;          \
+    } while (0)
+
 extern uid_t global_outer_uid;
 extern gid_t global_outer_gid;
 

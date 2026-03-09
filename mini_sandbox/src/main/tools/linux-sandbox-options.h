@@ -32,10 +32,13 @@
 enum NetNamespaceOption {NETNS_WITH_LOOPBACK,  NO_NETNS, NETNS};
 enum DockerMode {NO_CONTAINER, UNPRIVILEGED_CONTAINER, PRIVILEGED_CONTAINER};
 enum MiniSbxStatus {NOT_RUNNING, RUNNING, FAILED};
+enum MiniSbxMode {NONE, RO, HERMETIC, CUSTOM, DEFAULT};
 extern DockerMode docker_mode;
 
 // Options parsing result.
 struct Options {
+  // MiniSbx Mode 
+  MiniSbxMode mode = NONE; 	
   // Working directory (-W)
   std::string working_dir;
   // How long to wait before killing the child (-T)
@@ -106,9 +109,12 @@ int ValidateTmpNotRemounted(std::vector<std::string>& paths);
 
 // Internal APIs
 int MiniSbxEnableLog(const std::string &path);
+
+// Modes of runing
 int MiniSbxSetupDefault();
 int MiniSbxSetupCustom(const std::string &overlayfs_dir, const std::string& sandbox_root);
 int MiniSbxSetupHermetic(const std::string& sandbox_root);
+int MiniSbxSetupReadOnly();
 
 int MiniSbxSetWorkingDir(const std::string& path);
 int MiniSbxMountBind(const std::string& path);

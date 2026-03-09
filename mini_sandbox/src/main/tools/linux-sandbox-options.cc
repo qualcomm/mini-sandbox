@@ -442,6 +442,9 @@ static void ParseCommandLine(unique_ptr<vector<char *>> args) {
       Usage(args->front(),
             "Illegal configuration: overlayfs folder inside sandbox root.");
   }
+
+  if (opt.mode == NONE)
+    MiniSbxSetupReadOnly();
 }
 
 // Expands a single argument, expanding options @filename to read in the content
@@ -844,16 +847,28 @@ int MiniSbxCreateInit() {
 }
 
 
-int MiniSbxSetupDefault() {
+static int PreSetup() {
   if (opt.is_running != NOT_RUNNING){
-    MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
-    return -1;
+    return MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
+
   }
-  int res = 0;
+  if (opt.mode != NONE) {
+    return MiniSbxReportError(ErrorCode::SandboxModeAlreadySet);
+  }
+  docker_mode = CheckDockerMode();
+  return 0;
+}
+
+int MiniSbxSetupDefault() {
+  int res = PreSetup();
+  if (res < 0)
+    return res;
+  
   if (opt.hermetic || opt.use_overlayfs) {
     res = MiniSbxReportError(ErrorCode::InvalidFunctioningMode);
     return res;
   }
+  opt.mode = DEFAULT;
 #ifndef MINITAP
   opt.create_netns = NETNS_WITH_LOOPBACK;
 #else
@@ -876,11 +891,10 @@ int MiniSbxSetupDefault() {
 
 int MiniSbxSetupCustom(const std::string &overlayfs_dir,
                               const std::string &sdbx_root) {
-  if (opt.is_running != NOT_RUNNING){
-    MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
-    return -1;
-  }
-  int res = 0;
+  int res = PreSetup();
+  if (res < 0)
+    return res;
+  opt.mode = CUSTOM; 
   if ((res = MiniSbxSetupSandboxRootWithOverlay(sdbx_root)) < 0)
     return res;
   if ((res = MiniSbxSetupOverlayfsFolder(overlayfs_dir)) < 0)
@@ -890,16 +904,27 @@ int MiniSbxSetupCustom(const std::string &overlayfs_dir,
 }
 
 int MiniSbxSetupHermetic(const std::string &sdbx_root) {
-  if (opt.is_running != NOT_RUNNING){
-    MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
-    return -1;
-  }
-  int res = 0;
+  int res = PreSetup();
+  if (res < 0)
+    return res;
+
   if (opt.use_default || opt.use_overlayfs) {
     res = MiniSbxReportError(ErrorCode::InvalidFunctioningMode);
+    return res;
   }
+
+  opt.mode = HERMETIC;
   opt.hermetic = true;
   res = CreateSandboxRoot(sdbx_root);
+  return res;
+}
+
+int MiniSbxSetupReadOnly() {
+  int res = PreSetup();
+  if (res < 0)
+    return res;
+
+  opt.mode = RO;
   return res;
 }
 
