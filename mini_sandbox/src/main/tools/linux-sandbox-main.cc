@@ -11,7 +11,7 @@ int main(int argc, char *argv[]) {
   int exit_code = 0;
   docker_mode = CheckDockerMode();
   ParseOptions(argc, argv);
-  exit_code = MiniSbxStart();
+  exit_code = MiniSbxStartCLI();
   return exit_code;
 
 }
