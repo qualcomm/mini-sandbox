@@ -90,10 +90,8 @@ namespace fs = std::experimental::filesystem;
 #include <stdexcept>
 #include <thread>
 
-//#ifdef VERSION
 __attribute__((used, section(".version")))
 const char build_version[] = VERSION;
-//#endif
 
 uid_t global_outer_uid;
 gid_t global_outer_gid;
