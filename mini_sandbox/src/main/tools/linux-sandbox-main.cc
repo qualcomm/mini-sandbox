@@ -6,6 +6,7 @@
 #include "src/main/tools/docker-support.h"
 #include "src/main/tools/linux-sandbox-options.h"
 #include "src/main/tools/linux-sandbox.h"
+#include "src/main/tools/ll-isolation.h"
 
 int main(int argc, char *argv[]) {
   int exit_code = 0;

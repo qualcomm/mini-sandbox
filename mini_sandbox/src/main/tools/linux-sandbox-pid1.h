@@ -15,10 +15,18 @@
 #ifndef SRC_MAIN_TOOLS_LINUX_SANDBOX_PID1_H_
 #define SRC_MAIN_TOOLS_LINUX_SANDBOX_PID1_H_
 
+#include <unordered_set>
+#include <set>
+
 struct Pid1Args {
   int *pipe_to_parent;
   int *pipe_from_parent;
 };
+
+extern std::set<std::string> ReadOnlyPaths;
+
+std::string GetTopLevelFolder(const std::string& mount_point, const std::string& home_dir);
+void AddLeftoverFoldersToReadOnlyPaths();
 
 #if defined(__cplusplus)
 extern "C" {
@@ -26,7 +34,6 @@ extern "C" {
 int Pid1Main(void *pid1Args);
 void SpawnChild(bool nested);
 void DropCapabilities();
-
 #if defined(__cplusplus)
 }
 #endif

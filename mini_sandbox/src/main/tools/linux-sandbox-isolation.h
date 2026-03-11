@@ -42,11 +42,12 @@ public:
   MiniSbxIsolationType Type() const override;
 };
 
-// TODO: Landlock isolation backend (placeholder for now)
-// class MiniSbxIsolationLandlock final : public MiniSbxIsolation {
-// public:
-//   int RunIsolation() override;
-// };
+
+class MiniSbxIsolationLandlock final : public MiniSbxIsolation {
+public:
+  int RunIsolation(MiniSbxExecMode mode) override;
+  MiniSbxIsolationType Type() const override;
+};
 
 std::unique_ptr<MiniSbxIsolation> MakeMiniSbxIsolation();
 

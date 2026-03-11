@@ -142,14 +142,14 @@ fs::path make_relative(const fs::path& target, const fs::path& base) {
 static int global_child_pid __attribute__((unused));
 extern DockerMode docker_mode;
 std::string home_dir;
-std::set<std::string> ReadOnlyPaths;
+
 
 
 void MountAllOverlayFs(std::vector<std::string> list_of_dirs, int depth);
 void MountOverlayFs(std::string lowerdir, int depth);
 std::vector<std::string> GenerateListForOverlayFS();
 bool isSubpath(const fs::path &base, const fs::path &sub);
-bool ToBeMounted(const char *str);
+bool ToBeMounted(const char *str, const char* home);
 
 static bool isDevPath(const char *str) { return std::strcmp(str, kDev) == 0; }
 
@@ -546,7 +546,7 @@ bool contains(const std::vector<std::string> &vec, const char *str) {
 // This method checks if any of the subpath of the root "/" is going to be mounted 
 // according to a specific policy, or if we should just mount it as read-only, which
 // is our default in most of the cases.
-bool ToBeMounted(const char *str) {
+bool ToBeMounted(const char *str, const char* home_str) {
 
   fs::path inputPath(str);
   PRINT_DEBUG("is %s already mounted?\n", str);
@@ -556,8 +556,8 @@ bool ToBeMounted(const char *str) {
 
   // The home directory is critical so we handle it and its subfolders
   // separately later
-  if (isSubpath(home_dir, inputPath) || isSubpath(inputPath, home_dir)) {
-    PRINT_DEBUG("home_dir subpath %s", home_dir.c_str());
+  if (isSubpath(home_str, inputPath) || isSubpath(inputPath, home_str)) {
+    PRINT_DEBUG("home_str subpath %s", home_str);
     return true;
   }
 
@@ -660,11 +660,12 @@ static bool CanIterateRoot() {
 // options (see opt struct) we add it ti opt.bind_mount_sources and the
 // following functions will make sure to mount it. The goal is to make sure that
 // all system folders are mounted (then we'll make them read-only)
-static void
+void
 AddLeftoverFoldersToReadOnlyPaths() {
 
   std::string root_path = ROOT;
   std::error_code ec;
+  std::string home_dir = GetHomeDir();
 
   fs::directory_iterator it(
     root_path,
@@ -691,7 +692,7 @@ AddLeftoverFoldersToReadOnlyPaths() {
         if (fs::is_directory(entry.status())) {
           std::string path = entry.path().string();
           const char *entry_path_str = path.c_str();
-          bool deferred_mount = ToBeMounted(entry_path_str); 
+          bool deferred_mount = ToBeMounted(entry_path_str, home_dir.c_str()); 
           PRINT_DEBUG(" result of ToBeMounted() == %d\n", deferred_mount);
   
           // If deferred_mount is false it means that nobody have indicated a policy
@@ -1416,11 +1417,9 @@ static int MountOverlaySubfolders(std::string& top_level_dir, std::string& workd
   return 0;
 }
 
-
-static void MountWorkingDirMountPoint(const std::string& mount_point) {
-  PRINT_DEBUG("mount_point -> %s\n", mount_point.c_str());
+std::string GetTopLevelFolder(const std::string& mount_point, const std::string& home) {
   if (mount_point.empty())
-    return;
+    return "";
 
   // top_level is the first directory between our CWD and its respective mount
   // point. For instance, if our mount point is /A and CWD is /A/B/C/D,
@@ -1430,22 +1429,31 @@ static void MountWorkingDirMountPoint(const std::string& mount_point) {
   std::string top_level = TopLevelRelativeFolder(mount_point, opt.working_dir);
 
   if (top_level == "" ) {
-    return;
+    return "";
   }
 
   // If the top_level folder contains the home dir we would end up mounting
   // the home dir as overlay but that might leak secrets so we try to get the
   // new top_level dir from the home_dir to our working dir
   // e.g., /home/user/top_level/working_dir -> top_level will be /home/user/top_level
-  if (isSubpath(top_level, home_dir) ) {
-    top_level = TopLevelRelativeFolder(home_dir, opt.working_dir);
+  if (isSubpath(top_level, home) ) {
+    top_level = TopLevelRelativeFolder(home, opt.working_dir);
   }
+
   PRINT_DEBUG("top_level -> %s\n", top_level.c_str());
+  return top_level;
+}
+
+
+static void MountWorkingDirMountPoint(const std::string& mount_point) {
+  PRINT_DEBUG("mount_point -> %s\n", mount_point.c_str());
+
+  std::string top_level = GetTopLevelFolder(mount_point, home_dir);
 
   // if the top_level folder is empty just return.
   // The code later will mount this as overlay
   // without mapping the files in the parents folder tho
-  if (top_level == "" ) {
+  if (top_level.empty()) {
     return;
   }
 
