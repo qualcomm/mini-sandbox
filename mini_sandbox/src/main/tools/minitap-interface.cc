@@ -6,6 +6,7 @@
 #include "src/main/tools/error-handling.h"
 #include "src/main/tools/process-tools.h"
 #include "src/main/tools/linux-sandbox-options.h"
+#include "src/main/tools/constants.h"
 
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -31,13 +32,14 @@ namespace fs = std::experimental::filesystem;
 
 char MinitapBin[PATH_MAX] = {0};
 
+extern uid_t global_outer_uid;
+extern gid_t global_outer_gid;
+
 volatile sig_atomic_t signal_received = 0;
 
 void handler(int sig) {
     signal_received = 1;
 }
-
-
 
 static std::string ResolveSymlink(const std::string& path) {
     std::error_code ec;
@@ -88,7 +90,7 @@ int GetMinitapBinDir() {
     // If already initialized we are done here
     if (MinitapBin[0] != '\0') 
       return 0;
-    const char* mini_tap_env = std::getenv("MINI_SANDBOX_TAP_BINARY");
+    const char* mini_tap_env = std::getenv(kMiniTapBinaryEnv);
     if (mini_tap_env) {
         strncpy(MinitapBin, mini_tap_env, PATH_MAX - 1);
         MinitapBin[PATH_MAX - 1] = '\0';
@@ -218,3 +220,15 @@ int RunTCPIP(uid_t outer_uid, gid_t outer_gid, std::string& rules) {
     }
   }
 }
+
+int RunMiniTap() {
+  int res = 0;
+  std::string rules = CreateRandomFilename(std::string("/tmp"));
+  DumpRules(&(opt.fw_rules), rules);
+  res = RunTCPIP(global_outer_uid, global_outer_gid, rules);
+  // In this case the Network namespace has been taken care of by RunTCPIP so
+  // we don't need to create a new one
+  opt.create_netns = NO_NETNS;
+  return res;
+}
+

@@ -74,6 +74,7 @@ namespace fs = std::experimental::filesystem;
 #include "src/main/tools/process-tools.h"
 #include "src/main/tools/linux-sandbox-pid1.h"
 #include "src/main/tools/docker-support.h"
+#include "src/main/tools/constants.h"
 
 #ifndef XFS_SUPER_MAGIC
 #define XFS_SUPER_MAGIC 0x58465342
@@ -150,7 +151,7 @@ std::vector<std::string> GenerateListForOverlayFS();
 bool isSubpath(const fs::path &base, const fs::path &sub);
 bool ToBeMounted(const char *str);
 
-static bool isDevPath(const char *str) { return std::strcmp(str, "/dev") == 0; }
+static bool isDevPath(const char *str) { return std::strcmp(str, kDev) == 0; }
 
 
 bool isXFS(const std::string &path) {
@@ -505,16 +506,16 @@ static bool ShouldBeWritable(const std::string &mnt_dir) {
     return true;
   }
 
-  if (ends_with(mnt_dir.c_str(), "/proc")) 
+  if (ends_with(mnt_dir.c_str(), kProc)) 
     return true;
 
-  if (ends_with(mnt_dir.c_str(), TMP))
+  if (ends_with(mnt_dir.c_str(), kTmp))
     return true;
 
-  if (starts_with(mnt_dir.c_str(), "/dev"))
+  if (starts_with(mnt_dir.c_str(), kDev))
     return true;
 
-  if (opt.enable_pty && mnt_dir == "/dev/pts") {
+  if (opt.enable_pty && mnt_dir == kDevPts) {
     return true;
   }
 
@@ -605,7 +606,7 @@ bool ToBeMounted(const char *str) {
   // /tmp and all its subpaths have to be excluded cause that's where
   // we're going to have the sandbox_root and the overlayfs work dir.
   // We'll have a dedicated policy for mounting /tmp
-  fs::path tmp(TMP);
+  fs::path tmp(kTmp);
   if (isSubpath(tmp, inputPath)) {
     PRINT_DEBUG("/tmp subpath");
     return true;
@@ -1336,48 +1337,6 @@ std::vector<std::string> GenerateListForOverlayFS() {
   return existingPaths;
 }
 
-static void dumpOpt() {
-#ifndef DEBUG
-  return;
-#endif
-
-  std::cout << "Working Directory: " << opt.working_dir << "\n";
-  std::cout << "Timeout (secs): " << opt.timeout_secs << "\n";
-  std::cout << "Kill Delay (secs): " << opt.kill_delay_secs << "\n";
-  std::cout << "SIGINT sends SIGTERM: " << std::boolalpha
-            << opt.sigint_sends_sigterm << "\n";
-  std::cout << "Writable Files: ";
-  for (const auto &f : opt.writable_files)
-    std::cout << f << " ";
-  std::cout << "\nTmpfs Dirs: ";
-  for (const auto &d : opt.tmpfs_dirs)
-    std::cout << d << " ";
-  std::cout << "\nBind Mount Sources: ";
-  for (const auto &s : opt.bind_mount_sources)
-    std::cout << s << " ";
-  std::cout << "\nBind Mount Targets: ";
-  for (const auto &t : opt.bind_mount_targets)
-    std::cout << t << " ";
-  std::cout << "\nFake Hostname: " << opt.fake_hostname << "\n";
-  std::cout << "Fake Root: " << opt.fake_root << "\n";
-  std::cout << "Fake Username: " << opt.fake_username << "\n";
-  std::cout << "Enable PTY: " << opt.enable_pty << "\n";
-  std::cout << "Debug Path: " << opt.debug_path << "\n";
-  std::cout << "Hermetic: " << opt.hermetic << "\n";
-  std::cout << "Sandbox Root: " << opt.sandbox_root << "\n";
-  std::cout << "Use OverlayFS: " << opt.use_overlayfs << "\n";
-  std::cout << "Tmp OverlayFS: " << opt.tmp_overlayfs << "\n";
-  std::cout << "OverlayFS Mounts: ";
-  for (const auto &m : opt.overlayfsmount)
-    std::cout << m << " ";
-  std::cout << "\nArgs: ";
-  for (const auto &a : opt.args)
-    std::cout << a << " ";
-  std::cout << "\nUse Default: " << opt.use_default << "\n";
-  //std::cout << "Firewall Rules Path: " << opt.firewall_rules_path << "\n";
-
-}
-
 static std::string TopLevelRelativeFolder(const std::string& mount_point, const std::string& workdir) {
   try {
     fs::path mount_fs = mount_point;
@@ -1527,9 +1486,8 @@ static int InitDone() {
         return -1;
     }
 
-    const char buf[] = "1\n";            // include newline if you like
-    ssize_t n = write(fd, buf, sizeof(buf) - 1);
-    if (n != (ssize_t)(sizeof(buf) - 1)) {
+    ssize_t n = write(fd, kInitStatus, sizeof(kInitStatus) - 1);
+    if (n != (ssize_t)(sizeof(kInitStatus) - 1)) {
         perror("write");
         close(fd);
         return -1;
@@ -1602,7 +1560,6 @@ int Pid1Main(void *args) {
     SetupUtsNamespace();
   }
 
-  dumpOpt();
   if (docker_mode == PRIVILEGED_CONTAINER) {
     if (opt.use_overlayfs)
         MountOverlayDirAsTmpfs();
@@ -1616,7 +1573,7 @@ int Pid1Main(void *args) {
     PRINT_DEBUG("opt.use_default && !CanIterateRoot");
     const std::string mount_point = GetMountPointOf(opt.working_dir);
     MiniSbxMountWrite(mount_point);
-    MiniSbxMountWrite(TMP);
+    MiniSbxMountWrite(kTmp);
     MountFilesystems();
     mounts = CountMounts();
     MakeFilesystemPartiallyReadOnly(false, mounts);
@@ -1658,7 +1615,7 @@ int Pid1Main(void *args) {
     // everything as read-only
     PRINT_DEBUG("Sandbox enabled in read-only mode\n");
 
-    MiniSbxMountWrite(TMP);
+    MiniSbxMountWrite(kTmp);
     MountFilesystems();
     mounts = CountMounts();
     // In this case overlay_dirs will be empty but we need it when
@@ -1679,6 +1636,7 @@ int Pid1Main(void *args) {
   // SpawnChild below.
   IgnoreSignal(SIGTTIN);
   IgnoreSignal(SIGTTOU);
+
   // Fork the child process.
   SpawnChild(false);
   InstallSignalHandler(SIGTERM, ForwardSignal);

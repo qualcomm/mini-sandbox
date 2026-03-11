@@ -20,10 +20,8 @@
 
 #include <string>
 #include <vector>
-
-#ifdef MINITAP
 #include "firewall.h"
-#endif
+
 
 #define TMP "/tmp"
 #define MINI_SBX_TMP "mini-sandbox-tmp"
@@ -92,10 +90,8 @@ struct Options {
   // tells if the sandbox is running or not
   MiniSbxStatus is_running = NOT_RUNNING;
   // path to firewall rules if tap mode is enabled
-#ifdef MINITAP
   std::string firewall_rules_path;
   FirewallRules fw_rules;
-#endif
 };
 
 extern struct Options opt;

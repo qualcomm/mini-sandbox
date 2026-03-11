@@ -42,6 +42,8 @@
 #include "src/main/tools/linux-sandbox-options.h"
 #include "src/main/tools/linux-sandbox-pid1.h"
 #include "src/main/tools/linux-sandbox-runtime.h"
+#include "src/main/tools/linux-sandbox-network.h"
+#include "src/main/tools/linux-sandbox-isolation.h"
 #include "src/main/tools/logging.h"
 #include "src/main/tools/minitap-interface.h"
 #include "src/main/tools/process-tools.h"
@@ -182,24 +184,12 @@ static int Prepare() {
   return res;
 }
 
+
 static void SetGlobalIDs() {
-  // Set up two globals used by the child process.
   global_outer_uid = getuid();
   global_outer_gid = getgid();
 }
 
-#ifdef MINITAP
-static int PrepareMiniTap() {
-  int res = 0;
-  std::string rules = CreateRandomFilename(std::string("/tmp"));
-  DumpRules(&(opt.fw_rules), rules);
-  res = RunTCPIP(global_outer_uid, global_outer_gid, rules);
-  // In this case the Network namespace has been taken care of by RunTCPIP so
-  // we don't need to create a new one
-  opt.create_netns = NO_NETNS;
-  return res;
-}
-#endif
 
 int MiniSbxStartImpl(MiniSbxRunTime& rt) {
   int res;
@@ -215,16 +205,16 @@ int MiniSbxStartImpl(MiniSbxRunTime& rt) {
     return MiniSbxReportError(ErrorCode::NestedSandbox);
   }
 
-  if (docker_mode == UNPRIVILEGED_CONTAINER) {
-    // In this case there's not much to do. If we're running
-    // inside a Docker container that doesn't use --privileged
-    // our best is to drop certain capabilities and either spawn
-    // a new child with the command line or just let the execution
-    // resume in the original caller if this is the library
-    DropCapabilities();
-    return rt.HandleUnprivilegedContainer();
-  }
-  else if (docker_mode == PRIVILEGED_CONTAINER) {
+  //if (docker_mode == UNPRIVILEGED_CONTAINER) {
+  //  // In this case there's not much to do. If we're running
+  //  // inside a Docker container that doesn't use --privileged
+  //  // our best is to drop certain capabilities and either spawn
+  //  // a new child with the command line or just let the execution
+  //  // resume in the original caller if this is the library
+  //  DropCapabilities();
+  //  return rt.HandleUnprivilegedContainer();
+  //}
+  if (docker_mode == PRIVILEGED_CONTAINER) {
     MiniSbxMountBind(ETC);
   }
 
@@ -232,12 +222,10 @@ int MiniSbxStartImpl(MiniSbxRunTime& rt) {
   HANDLE(res);
 
   rt.HandleSignals();
-
   SetGlobalIDs();
-#ifdef MINITAP
-  res = PrepareMiniTap();
+
+  res = rt.RunNet();
   HANDLE(res);
-#endif
   // Ensure we don't pass on any FDs from our parent to our child other than
   // stdin, stdout, stderr and global_debug.
   rt.MaybeCloseFds();
@@ -245,14 +233,18 @@ int MiniSbxStartImpl(MiniSbxRunTime& rt) {
 }
 
 int MiniSbxStartCLI() {
-    MiniSbxCLIRunTime rt;
+    auto net = MakeMiniSbxNetwork();
+    auto isolation = MakeMiniSbxIsolation();
+    MiniSbxCLIRunTime rt(std::move(isolation), std::move(net));
     return MiniSbxStartImpl(rt);
 }
 
 
 
 int MiniSbxStart() {
-  MiniSbxLibRunTime rt;
+  auto net = MakeMiniSbxNetwork();
+  auto isolation = MakeMiniSbxIsolation();
+  MiniSbxLibRunTime rt(std::move(isolation), std::move(net));
   return MiniSbxStartImpl(rt);
 }
 

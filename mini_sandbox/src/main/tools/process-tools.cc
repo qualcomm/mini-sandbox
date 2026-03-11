@@ -16,6 +16,7 @@
 #include "src/main/tools/logging.h"
 #include "src/main/tools/error-handling.h"
 #include "src/main/tools/linux-sandbox-options.h"
+#include "src/main/tools/constants.h"
 
 #include <mntent.h>
 
@@ -60,7 +61,7 @@ namespace fs = std::experimental::filesystem;
 #include <cctype>
 
 #define MAX_ATTEMPTS 100
-#define INTERNAL_MINI_SANDBOX_ENV "__INTERNAL_MINI_SANDBOX_ON"
+
 
 static UserNamespaceSupport user_ns_support = NON_INIT;
 
@@ -509,7 +510,7 @@ gid_t get_outer_gid() {
 
 
 int MiniSbxSetInternalEnv() {
-  if (setenv(INTERNAL_MINI_SANDBOX_ENV, "1", 1) != 0) {
+  if (setenv(kInternalMiniSandboxEnv, "1", 1) != 0) {
       std::cerr << "Failed to set environment variable." << std::endl;
       MiniSbxReportGenericError("Failed to set environment variable __INTERNAL_MINI_SANDBOX_ON");
   }
@@ -518,7 +519,7 @@ int MiniSbxSetInternalEnv() {
 
 
 int MiniSbxGetInternalEnv() {
-  const char* value = getenv(INTERNAL_MINI_SANDBOX_ENV);
+  const char* value = getenv(kInternalMiniSandboxEnv);
   if (value) {
     return 0;
   } 
@@ -661,9 +662,7 @@ bool CanCreateUserNamespace() {
 bool UserNamespaceSupported() {
   bool res = false;
   if (user_ns_support != NON_INIT)
-    res = (user_ns_support == USER_NS_SUPPORTED) ? true : false ;
-  else if (std::getenv("MINI_SANDBOX_FORCE_USER_NAMESPACE") != nullptr)
-    res = true;
+    res = (user_ns_support == USER_NS_SUPPORTED);
   else {
     res = HasUserNamespaceSupport() && CanCreateUserNamespace();
     user_ns_support = (res) ? USER_NS_SUPPORTED : USER_NS_NOT_SUPPORTED;
