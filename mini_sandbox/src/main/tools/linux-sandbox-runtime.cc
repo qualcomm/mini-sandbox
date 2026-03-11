@@ -15,44 +15,15 @@
 #include "src/main/tools/process-tools.h"
 #include "src/main/tools/error-handling.h"
 #include "src/main/tools/firewall.h"
-#include <ctype.h>
-#include <dirent.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <math.h>
-#include <sched.h>
-#include <signal.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/prctl.h>
-#include <sys/resource.h>
-#include <sys/stat.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <unistd.h>
-#include <grp.h>
-
-#if __has_include(<filesystem>)
-#include <filesystem>
-namespace fs = std::filesystem;
-#else
-#include <experimental/filesystem>
-namespace fs = std::experimental::filesystem;
-#define _EXPERIMENTAL_FILESYSTEM_
-#endif
-
-#include <atomic>
 #include <iostream>
 #include <string>
 #include <system_error>
 #include <vector>
-
+#include <dirent.h>
+#include <sys/types.h>
+#include <signal.h>
 #include <chrono>
 #include <cstring>
-#include <dirent.h>
 #include <numeric>
 #include <stdexcept>
 #include <thread>
@@ -142,3 +113,43 @@ int MiniSbxLibRunTime::RunTime() {
 int MiniSbxRunTime::RunNet() {
   return network().RunNetwork();
 }
+
+
+bool ValidateNetworkIsolationCompatibility(const MiniSbxNetwork& net,
+                                           const MiniSbxIsolation& isolation) {
+  MiniSbxIsolationType iso_ty = isolation.Type();
+  MiniSbxNetworkType net_ty = net.Type();
+
+  if (iso_ty == MiniSbxIsolationType::NONE)
+    return false;
+
+  if (iso_ty == MiniSbxIsolationType::CAPABILITIES && net_ty != MiniSbxNetworkType::SIMPLE)
+    return false;
+
+  return true;
+}
+
+
+
+std::unique_ptr<MiniSbxRunTime>
+MakeMiniSbxRunTime(MiniSbxExecMode mode) {
+    auto net = MakeMiniSbxNetwork();
+    auto isolation = MakeMiniSbxIsolation();
+
+    if (!ValidateNetworkIsolationCompatibility(*net, *isolation)) {
+        return nullptr;
+    }
+
+    switch (mode) {
+      case MiniSbxExecMode::CLI:
+          return std::make_unique<MiniSbxCLIRunTime>(
+              std::move(isolation), std::move(net));
+
+      case MiniSbxExecMode::LIB:
+          return std::make_unique<MiniSbxLibRunTime>(
+              std::move(isolation), std::move(net));
+    }
+    // Unreachable
+    std::abort();
+}
+

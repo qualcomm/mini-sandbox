@@ -39,6 +39,7 @@
 
 #include "src/main/tools/linux-sandbox.h"
 #include "src/main/tools/docker-support.h"
+#include "src/main/tools/constants.h"
 #include "src/main/tools/linux-sandbox-options.h"
 #include "src/main/tools/linux-sandbox-pid1.h"
 #include "src/main/tools/linux-sandbox-runtime.h"
@@ -205,15 +206,6 @@ int MiniSbxStartImpl(MiniSbxRunTime& rt) {
     return MiniSbxReportError(ErrorCode::NestedSandbox);
   }
 
-  //if (docker_mode == UNPRIVILEGED_CONTAINER) {
-  //  // In this case there's not much to do. If we're running
-  //  // inside a Docker container that doesn't use --privileged
-  //  // our best is to drop certain capabilities and either spawn
-  //  // a new child with the command line or just let the execution
-  //  // resume in the original caller if this is the library
-  //  DropCapabilities();
-  //  return rt.HandleUnprivilegedContainer();
-  //}
   if (docker_mode == PRIVILEGED_CONTAINER) {
     MiniSbxMountBind(ETC);
   }
@@ -226,28 +218,31 @@ int MiniSbxStartImpl(MiniSbxRunTime& rt) {
 
   res = rt.RunNet();
   HANDLE(res);
+
   // Ensure we don't pass on any FDs from our parent to our child other than
   // stdin, stdout, stderr and global_debug.
   rt.MaybeCloseFds();
   return rt.RunTime();
 }
 
-int MiniSbxStartCLI() {
-    auto net = MakeMiniSbxNetwork();
-    auto isolation = MakeMiniSbxIsolation();
-    MiniSbxCLIRunTime rt(std::move(isolation), std::move(net));
-    return MiniSbxStartImpl(rt);
+
+int MiniSbxStartMode(MiniSbxExecMode mode) {
+  auto rt = MakeMiniSbxRunTime(mode);
+  if (!rt)
+    return -1;
+
+  return MiniSbxStartImpl(*rt);
 }
 
+
+int MiniSbxStartCLI() {
+  return MiniSbxStartMode(MiniSbxExecMode::CLI);
+}
 
 
 int MiniSbxStart() {
-  auto net = MakeMiniSbxNetwork();
-  auto isolation = MakeMiniSbxIsolation();
-  MiniSbxLibRunTime rt(std::move(isolation), std::move(net));
-  return MiniSbxStartImpl(rt);
+  return MiniSbxStartMode(MiniSbxExecMode::LIB);
 }
-
 
 
 bool MiniSbxIsNestedSandbox(){

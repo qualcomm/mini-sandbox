@@ -7,7 +7,7 @@
 #ifndef SRC_MAIN_TOOLS_LINUX_SANDBOX_RUNTIME_H_
 #define SRC_MAIN_TOOLS_LINUX_SANDBOX_RUNTIME_H_
 
-
+#include "src/main/tools/constants.h"
 #include <memory>
 
 class MiniSbxNetwork;
@@ -62,11 +62,8 @@ class MiniSbxLibRunTime final : public MiniSbxRunTime {
     int RunTime() override;
 };
 
+std::unique_ptr<MiniSbxRunTime> MakeMiniSbxRunTime(MiniSbxExecMode mode);
 
-enum class MiniSbxExecMode {
-  CLI,
-  LIB,
-};
 
 
 #endif

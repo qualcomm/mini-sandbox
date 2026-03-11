@@ -8,17 +8,18 @@
 #define SRC_MAIN_TOOLS_LINUX_SANDBOX_ISOLATION_H_
 
 #include <memory>
-#include "linux-sandbox-runtime.h"
+#include "src/main/tools/constants.h"
+#include "src/main/tools/linux-sandbox-runtime.h"
 
 struct Options;
 extern Options opt;
 
 
-enum class MiniSbxIsolationKind {
-  None,
-  Namespaces,
-  Capabilities,
-  Landlock,
+enum class MiniSbxIsolationType {
+  NONE,
+  NAMESPACES,
+  CAPABILITIES,
+  LANDLOCK,
 };
 
 
@@ -26,16 +27,19 @@ class MiniSbxIsolation {
 public:
   virtual ~MiniSbxIsolation() = default;
   virtual int RunIsolation(MiniSbxExecMode mode) = 0;
+  virtual MiniSbxIsolationType Type() const = 0;
 };
 
 class MiniSbxIsolationNamespaces final : public MiniSbxIsolation {
 public:
   int RunIsolation(MiniSbxExecMode mode) override;
+  MiniSbxIsolationType Type() const override;
 };
 
 class MiniSbxIsolationCapabilities final : public MiniSbxIsolation {
 public:
   int RunIsolation(MiniSbxExecMode mode) override;
+  MiniSbxIsolationType Type() const override;
 };
 
 // TODO: Landlock isolation backend (placeholder for now)

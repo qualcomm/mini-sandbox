@@ -24,10 +24,19 @@ int MiniSbxNetworkSimple::RunNetwork() {
   return 0;
 }
 
+MiniSbxNetworkType MiniSbxNetworkSimple::Type() const {
+  return MiniSbxNetworkType::SIMPLE;
+}
+
 
 int MiniSbxNetworkTap::RunNetwork() {
   return RunMiniTap(); 
 }
+
+MiniSbxNetworkType MiniSbxNetworkTap::Type() const {
+  return MiniSbxNetworkType::TAP;
+}
+
 
 
 // This should return a network management depending on opt

@@ -14,6 +14,7 @@
 #include <cstdarg>
 #include <vector>
 #include <cstring>
+#include "src/main/tools/constants.h"
 
 #define MAX_ERR_LEN 255
 
@@ -21,12 +22,6 @@
 #define RECOVERABLE_FAIL -2
 #define RECOVERABLE_ERROR_CODES -200
 
-
-
-enum class Mode {
-    CLI,
-    Library
-};
 
 enum class ErrorCode : int {
   None = 0,

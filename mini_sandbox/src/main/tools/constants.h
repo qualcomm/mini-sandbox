@@ -31,4 +31,9 @@ inline constexpr const char kDevPts[] = "/dev/pts";
 inline constexpr const char kTmp[] = "/tmp";
 inline constexpr const char kDockerPath[] = "/.dockerenv";
 
+enum class MiniSbxExecMode {
+  CLI,
+  LIB,
+};
+
 #endif

@@ -369,6 +369,10 @@ int MiniSbxIsolationNamespaces::RunIsolation(MiniSbxExecMode mode) {
   }
 }
 
+MiniSbxIsolationType MiniSbxIsolationNamespaces::Type() const {
+  return MiniSbxIsolationType::NAMESPACES;
+}
+
 int MiniSbxIsolationCapabilities::RunIsolation(MiniSbxExecMode mode) {
   DropCapabilities();
   if (mode == MiniSbxExecMode::CLI) {
@@ -377,47 +381,51 @@ int MiniSbxIsolationCapabilities::RunIsolation(MiniSbxExecMode mode) {
   return 0;
 }
 
+MiniSbxIsolationType MiniSbxIsolationCapabilities::Type() const {
+  return MiniSbxIsolationType::CAPABILITIES;
+}
+
 // int MiniSbxIsolationLandlock::RunIsolation() {
 //   // TODO: landlock ruleset + restrictions here.
 //   return 0;
 // }
 
 
-static MiniSbxIsolationKind ParseIsolationKind(const char* s) {
-  if (!s) return MiniSbxIsolationKind::None;
+static MiniSbxIsolationType ParseIsolationType(const char* s) {
+  if (!s) return MiniSbxIsolationType::NONE;
 
   if (strcmp(s, "namespace") == 0 ||
       strcmp(s, "namespaces") == 0) {
-    return MiniSbxIsolationKind::Namespaces;
+    return MiniSbxIsolationType::NAMESPACES;
   }
 
   if (strcmp(s, "cap") == 0 ||
       strcmp(s, "caps") == 0 ||
       strcmp(s, "capabilities") == 0) {
-    return MiniSbxIsolationKind::Capabilities;
+    return MiniSbxIsolationType::CAPABILITIES;
   }
 
   if (strcmp(s, "landlock") == 0) {
-    return MiniSbxIsolationKind::Landlock;
+    return MiniSbxIsolationType::LANDLOCK;
   }
 
-  return MiniSbxIsolationKind::None;
+  return MiniSbxIsolationType::NONE;
 }
 
 
 std::unique_ptr<MiniSbxIsolation> MakeMiniSbxIsolation() {
   const char* env = std::getenv(kIsolationModeEnv);
-  auto kind = ParseIsolationKind(env);
+  auto kind = ParseIsolationType(env);
 
   
   switch (kind) {
-    case MiniSbxIsolationKind::Namespaces:
+    case MiniSbxIsolationType::NAMESPACES:
       return std::make_unique<MiniSbxIsolationNamespaces>();
 
-    case MiniSbxIsolationKind::Capabilities:
+    case MiniSbxIsolationType::CAPABILITIES:
       return std::make_unique<MiniSbxIsolationCapabilities>();
 
-    case MiniSbxIsolationKind::Landlock:
+    case MiniSbxIsolationType::LANDLOCK:
       return nullptr;
 
     default:

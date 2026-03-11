@@ -9,16 +9,25 @@
 
 #include <memory>
 
+
+enum class MiniSbxNetworkType {
+    SIMPLE,
+    TAP,
+};
+
+
 class MiniSbxNetwork {
   public:
     virtual ~MiniSbxNetwork() = default;
     virtual int RunNetwork () = 0;
+    virtual MiniSbxNetworkType Type() const = 0;
 };
 
 // Class used to share network with the host
 class MiniSbxNetworkSimple final : public MiniSbxNetwork {
   public:  
     int RunNetwork() override;
+    MiniSbxNetworkType Type() const override;
 };
 
 
@@ -26,6 +35,7 @@ class MiniSbxNetworkSimple final : public MiniSbxNetwork {
 class MiniSbxNetworkTap final : public MiniSbxNetwork {
   public:  
     int RunNetwork() override;
+    MiniSbxNetworkType Type() const override;
 };
 
 // We can add other classes to implement other ways to handle
