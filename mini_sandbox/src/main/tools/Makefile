@@ -58,7 +58,7 @@ all: mini-sandbox libmini-sandbox mini-tapbox libmini-tapbox
 mini-sandbox: $(BIN_mini_sandbox)
 
 $(BIN_mini_sandbox): $(OBJS_mini_sandbox)
-	$(CXX) $(STD) $(CXXFLAGS) $(FLAGS) $^ -o $@ $(LDFLAGS)
+	$(CXX) $(STD) $(CXXFLAGS) $(FLAGS) $^ -o $@ $(LDFLAGS) $(LDL)
 
 $(BUILD_mini_sandbox)/%.o: %.cc | $(BUILD_mini_sandbox)
 	$(CXX) $(STD) $(CXXFLAGS) $(FLAGS) -I$(INCLUDE_DIR) -c $< -o $@

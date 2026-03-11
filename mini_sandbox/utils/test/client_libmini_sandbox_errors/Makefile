@@ -41,7 +41,7 @@ all: $(TARGETS)
 
 # Pattern rule to build each binary
 %.bin: %.cc
-	$(CXX) $(FLAGS) $(CXXFLAGS) -I$(MINI) $< $(LIBS) -o $@ $(LDFLAGS)
+	$(CXX) $(FLAGS) $(CXXFLAGS) -I$(MINI) $< $(LIBS) -o $@ $(LDFLAGS) -ldl
 
 clean:
 	rm -f $(TARGETS)
