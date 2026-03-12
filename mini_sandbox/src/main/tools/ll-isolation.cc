@@ -60,7 +60,7 @@ namespace fs = std::experimental::filesystem;
 #include <thread>
 
 
-#include <linux/landlock.h>
+#include "landlock.h"
 #include <sys/syscall.h>
 
 std::set<std::string> ReadOnlyPaths;
