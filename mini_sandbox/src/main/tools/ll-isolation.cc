@@ -60,23 +60,26 @@ namespace fs = std::experimental::filesystem;
 #include <thread>
 
 
-#include "landlock.h"
+#include "landlock_compat.h"
 #include <sys/syscall.h>
 
 std::set<std::string> ReadOnlyPaths;
 
 static int SysLandlockCreateRuleset(const struct landlock_ruleset_attr* attr,
                                    size_t size, uint32_t flags) {
-  return (int)syscall(SYS_landlock_create_ruleset, attr, size, flags);
+  //return (int)syscall(SYS_landlock_create_ruleset, attr, size, flags);
+  return ll_landlock_create_ruleset(attr, size, flags);
 }
 
 static int SysLandlockAddRule(int ruleset_fd, enum landlock_rule_type rule_type,
                               const void* rule_attr, uint32_t flags) {
-  return (int)syscall(SYS_landlock_add_rule, ruleset_fd, rule_type, rule_attr, flags);
+  //return (int)syscall(SYS_landlock_add_rule, ruleset_fd, rule_type, rule_attr, flags);
+  return ll_landlock_add_rule(ruleset_fd, rule_type, rule_attr, flags);
 }
 
 static int SysLandlockRestrictSelf(int ruleset_fd, uint32_t flags) {
-  return (int)syscall(SYS_landlock_restrict_self, ruleset_fd, flags);
+  //return (int)syscall(SYS_landlock_restrict_self, ruleset_fd, flags);
+  return ll_landlock_restrict_self(ruleset_fd, flags);
 }
 
 
