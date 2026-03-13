@@ -70,11 +70,11 @@ inline std::string GetErrorMessage(ErrorCode code) {
     case ErrorCode::FileReadAndWrite:
       return "Illegal configuration. File mounted as read and write at the same time";
     case ErrorCode::NestedSandbox:
-      return " : Cannot nest multiple sandbox. The process is already running inside mini-sandbox.";
+      return "Cannot nest multiple sandbox. The process is already running inside mini-sandbox.";
     case ErrorCode::SandboxAlreadyStarted:
-      return " : Sandbox was already started. Cannot change the configuration.";
+      return "Sandbox was already started. Cannot change the configuration.";
     case ErrorCode::SandboxModeAlreadySet:
-      return " : Sandbox mode of running was already set. Cannot change mode";
+      return "Sandbox mode of running was already set. Cannot change mode";
     case ErrorCode::GeneralOSError:
       return "OS Error";
     case ErrorCode::IllegalNetworkConfiguration:

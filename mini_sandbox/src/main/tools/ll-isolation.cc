@@ -278,7 +278,7 @@ int LLRunTimeCLI() {
     return res;
   opt.args.push_back(nullptr);
   if (execvp(opt.args[0], opt.args.data()) < 0) {
-    MiniSbxReportError("execvp failed");  
+    MiniSbxReportGenericError("execvp failed");  
     return -1;
   }
   return res;
