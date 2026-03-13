@@ -36,6 +36,8 @@ enum class ErrorCode : int {
   FileReadAndWrite = -9,
   IllegalNetworkConfiguration = -10,
   TmpNotRemounted = -11,
+  LLNotSupported = -12,
+  UserNSNotSupported = -13,
   GeneralOSError = -100,
   // Error codes from -201 are recoverables
   NestedSandbox = -201,
@@ -79,6 +81,10 @@ inline std::string GetErrorMessage(ErrorCode code) {
       return "Cannot allow all domains after specifying one network rule";
     case ErrorCode::TmpNotRemounted:
       return "/tmp cannot be remounted when running in default mode";
+    case ErrorCode::LLNotSupported:
+      return "Landlock not supported";
+    case ErrorCode::UserNSNotSupported:
+      return "User Namespaces not supported";
     case ErrorCode::Unknown:
     default:
       return "Unknown error occurred";

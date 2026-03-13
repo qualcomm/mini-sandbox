@@ -26,7 +26,6 @@ class MiniSbxRunTime {
     MiniSbxRunTime& operator=(MiniSbxRunTime&&) noexcept = default;
     virtual ~MiniSbxRunTime() = default;
 
-    virtual int HandleUnprivilegedContainer () = 0;
     virtual void HandleSignals() = 0;
     virtual void MaybeCloseFds() = 0;
     virtual int RunTime() = 0;
@@ -45,7 +44,6 @@ class MiniSbxCLIRunTime final : public MiniSbxRunTime {
   public:  
     using MiniSbxRunTime::MiniSbxRunTime;
 
-    int HandleUnprivilegedContainer() override;
     void HandleSignals() override;
     void MaybeCloseFds() override;
     int RunTime() override;
@@ -56,7 +54,6 @@ class MiniSbxLibRunTime final : public MiniSbxRunTime {
   public:
     using MiniSbxRunTime::MiniSbxRunTime;
 
-    int HandleUnprivilegedContainer() override;
     void HandleSignals() override;
     void MaybeCloseFds() override;
     int RunTime() override;

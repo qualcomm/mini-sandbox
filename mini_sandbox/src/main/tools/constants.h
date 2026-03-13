@@ -31,6 +31,21 @@ inline constexpr const char kDevPts[] = "/dev/pts";
 inline constexpr const char kTmp[] = "/tmp";
 inline constexpr const char kDockerPath[] = "/.dockerenv";
 
+inline const char *devs[] = {"/dev/null", "/dev/random", "/dev/urandom", "/dev/zero",
+                      "/dev/full", "/dev/tty", "/dev/console", NULL };
+
+#define DEV_LINKS 4
+static const struct {
+    const char *link_path;
+    const char *target;
+} links[DEV_LINKS] = {
+    { "dev/fd",     "/proc/self/fd"   },
+    { "dev/stdin",  "/proc/self/fd/0" },
+    { "dev/stdout", "/proc/self/fd/1" },
+    { "dev/stderr", "/proc/self/fd/2" },
+};
+
+
 enum class MiniSbxExecMode {
   CLI,
   LIB,

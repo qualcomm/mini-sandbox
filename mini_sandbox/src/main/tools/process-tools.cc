@@ -670,3 +670,25 @@ bool UserNamespaceSupported() {
   return res;
 }
 
+
+
+bool IsDir(const char* path, int* out_fd) {
+  int fd = open(path, O_PATH | O_CLOEXEC);
+  if (fd < 0)
+      return false;
+
+  struct stat st{};
+  if (fstat(fd, &st) != 0) {
+      close(fd);
+      return false;
+  }
+
+  if (out_fd) {
+      *out_fd = fd;
+  } else {
+      close(fd);
+  }
+
+  return S_ISDIR(st.st_mode);
+}
+

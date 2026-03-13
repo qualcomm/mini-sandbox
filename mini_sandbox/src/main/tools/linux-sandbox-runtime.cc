@@ -72,13 +72,6 @@ static void CloseFds() {
 }
 
 
-// CLI RunTime specific methods
-int MiniSbxCLIRunTime::HandleUnprivilegedContainer()  {
-  // Keep current behavior: Spawn a new child (typically doesn't return).
-  SpawnChild(false);
-  return 0; 
-}
-
 void MiniSbxCLIRunTime::HandleSignals() {
   ClearSignalMask();
   IgnoreSignal(SIGTTIN);
@@ -95,10 +88,7 @@ int MiniSbxCLIRunTime::RunTime() {
 }
 
 
-// LIB RunTime specific methods
-int MiniSbxLibRunTime::HandleUnprivilegedContainer() {
-  return 0; 
-}
+
 
 void MiniSbxLibRunTime::HandleSignals() {}
 

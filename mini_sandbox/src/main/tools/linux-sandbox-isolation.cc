@@ -78,9 +78,11 @@ static MiniSbxIsolationType ParseIsolationType(const char* s) {
 
 std::unique_ptr<MiniSbxIsolation> MakeMiniSbxIsolation() {
   const char* env = std::getenv(kIsolationModeEnv);
+  // kind gets assigned only if we use the MINI_SANDBOX_ISOLATION_MODE 
+  // env variable. If that env is not defined we check what's supported
+  // in this os in the order namespaces -> landlock -> capabilities
   auto kind = ParseIsolationType(env);
-
-  
+ 
   switch (kind) {
     case MiniSbxIsolationType::NAMESPACES:
       return std::make_unique<MiniSbxIsolationNamespaces>();
@@ -99,7 +101,10 @@ std::unique_ptr<MiniSbxIsolation> MakeMiniSbxIsolation() {
   if (UserNamespaceSupported()) {
     return std::make_unique<MiniSbxIsolationNamespaces>();
   }
-  else {
+  else if (LandlockSupported()) {
+    return std::make_unique<MiniSbxIsolationLandlock>();
+  } else { 
     return std::make_unique<MiniSbxIsolationCapabilities>();
   }
+
 }

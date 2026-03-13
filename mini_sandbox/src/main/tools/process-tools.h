@@ -109,6 +109,7 @@ bool GetOSName(std::string& printable_name, std::string& version_id);
 bool GetKernelInfo(struct utsname* buf);
 bool UserNamespaceSupported();
 void KillAndWait(pid_t pid);
+bool IsDir(const char* path, int* out_fd);
 
 
 enum UserNamespaceSupport {

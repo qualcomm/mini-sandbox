@@ -10,10 +10,12 @@
 #include <memory>
 #include "src/main/tools/constants.h"
 
+#define MIN_LL_ABI 4
 struct Options;
 extern Options opt;
 
 int LLRunTimeLib();
 int LLRunTimeCLI();
+int LandlockSupported();
 
 #endif

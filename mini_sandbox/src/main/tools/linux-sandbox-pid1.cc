@@ -83,11 +83,7 @@ namespace fs = std::experimental::filesystem;
 #define ROOT "/"
 #define MINISBX_TMP_INIT "/tmp/mini-sandbox-init"
 
-#ifndef TMP
-#define TMP "/tmp"
-#endif
 
-#define DEV_LINKS 4
 #define CAP_VERSION _LINUX_CAPABILITY_VERSION_3
 #define CAP_WORDS   _LINUX_CAPABILITY_U32S_3
 #define BIT(n)                       (1UL << (n))
@@ -1092,8 +1088,6 @@ static void MountDev() {
   if (CreateTarget("dev", true) < 0) {
     DIE("CreateTarget /dev");
   }
-  const char *devs[] = {"/dev/null", "/dev/random", "/dev/urandom", "/dev/zero",
-                        "/dev/full", "/dev/tty", "/dev/console", NULL };
 
   for (int i = 0; devs[i] != NULL; i++) {
     struct stat st;
@@ -1104,17 +1098,7 @@ static void MountDev() {
       DIE("mount %s", devs[i]);
     }
   }
- 
-  static const struct {
-      const char *link_path;
-      const char *target;
-  } links[DEV_LINKS] = {
-      { "dev/fd",     "/proc/self/fd"   },
-      { "dev/stdin",  "/proc/self/fd/0" },
-      { "dev/stdout", "/proc/self/fd/1" },
-      { "dev/stderr", "/proc/self/fd/2" },
-  };
- 
+
   for (int i = 0; i < DEV_LINKS; i++) {
     PRINT_DEBUG("symlink(%s, %s)\n", links[i].target, links[i].link_path);
     if (symlink(links[i].target, links[i].link_path) < 0) {

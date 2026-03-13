@@ -11,6 +11,7 @@
 #include "src/main/tools/linux-sandbox-network.h"
 #include "src/main/tools/linux-sandbox-isolation.h"
 #include "src/main/tools/ns-isolation.h"
+#include "src/main/tools/ll-isolation.h"
 #include "src/main/tools/logging.h"
 #include "src/main/tools/minitap-interface.h"
 #include "src/main/tools/process-tools.h"
@@ -64,32 +65,35 @@ namespace fs = std::experimental::filesystem;
 #include <sys/syscall.h>
 
 std::set<std::string> ReadOnlyPaths;
+static int ruleset = -1;
 
 static int SysLandlockCreateRuleset(const struct landlock_ruleset_attr* attr,
                                    size_t size, uint32_t flags) {
-  //return (int)syscall(SYS_landlock_create_ruleset, attr, size, flags);
   return ll_landlock_create_ruleset(attr, size, flags);
 }
 
 static int SysLandlockAddRule(int ruleset_fd, enum landlock_rule_type rule_type,
                               const void* rule_attr, uint32_t flags) {
-  //return (int)syscall(SYS_landlock_add_rule, ruleset_fd, rule_type, rule_attr, flags);
-  return ll_landlock_add_rule(ruleset_fd, rule_type, rule_attr, flags);
+  int res = ll_landlock_add_rule(ruleset_fd, rule_type, rule_attr, flags);
+  return res;
 }
 
 static int SysLandlockRestrictSelf(int ruleset_fd, uint32_t flags) {
-  //return (int)syscall(SYS_landlock_restrict_self, ruleset_fd, flags);
   return ll_landlock_restrict_self(ruleset_fd, flags);
 }
 
+static int LandlockProbeABI() {
+  return ll_landlock_probe_abi();
+}
 
-static __u64 AccessRO() {
+
+static inline __u64 AccessRO() {
   return LANDLOCK_ACCESS_FS_READ_FILE |
          LANDLOCK_ACCESS_FS_READ_DIR |
          LANDLOCK_ACCESS_FS_EXECUTE;
 }
 
-static __u64 AccessRW() {
+static inline __u64 AccessRW() {
   return AccessRO() |
          LANDLOCK_ACCESS_FS_WRITE_FILE |
          LANDLOCK_ACCESS_FS_TRUNCATE |
@@ -106,54 +110,19 @@ static __u64 AccessRW() {
 }
 
 
-static int LLGetAbi() {
-  int abi = SysLandlockCreateRuleset(NULL, 0, LANDLOCK_CREATE_RULESET_VERSION);
-
-  printf("Landlock ABI: %d\n", abi);
-  if (abi < 0) {
-  	const int err = errno;
-  
-  	perror("Failed to check Landlock compatibility");
-  	switch (err) {
-  	case ENOSYS:
-  		fprintf(stderr,
-  			"Hint: Landlock is not supported by the current kernel. "
-  			"To support it, build the kernel with "
-  			"CONFIG_SECURITY_LANDLOCK=y and prepend "
-  			"\"landlock,\" to the content of CONFIG_LSM.\n");
-  		break;
-  	case EOPNOTSUPP:
-  		fprintf(stderr,
-  			"Hint: Landlock is currently disabled. "
-  			"It can be enabled in the kernel configuration by "
-  			"prepending \"landlock,\" to the content of CONFIG_LSM, "
-  			"or at boot time by setting the same content to the "
-  			"\"lsm\" kernel parameter.\n");
-  		break;
-  	}
-  	return 1;
-  }
-  return abi;
+static inline __u64 AccessFile() {
+  return LANDLOCK_ACCESS_FS_EXECUTE |
+         LANDLOCK_ACCESS_FS_WRITE_FILE |
+         LANDLOCK_ACCESS_FS_READ_FILE |
+         LANDLOCK_ACCESS_FS_TRUNCATE |
+         LANDLOCK_ACCESS_FS_IOCTL_DEV;
 }
 
 static int CreateBasicRulesetFd() {
+  int abi = LandlockProbeABI();
+
   struct landlock_ruleset_attr ruleset_attr = {};
-  ruleset_attr.handled_access_fs =
-      LANDLOCK_ACCESS_FS_EXECUTE |
-      LANDLOCK_ACCESS_FS_WRITE_FILE |
-      LANDLOCK_ACCESS_FS_READ_FILE |
-      LANDLOCK_ACCESS_FS_READ_DIR |
-      LANDLOCK_ACCESS_FS_REMOVE_DIR |
-      LANDLOCK_ACCESS_FS_REMOVE_FILE |
-      LANDLOCK_ACCESS_FS_MAKE_CHAR |
-      LANDLOCK_ACCESS_FS_MAKE_DIR |
-      LANDLOCK_ACCESS_FS_MAKE_REG |
-      LANDLOCK_ACCESS_FS_MAKE_SOCK |
-      LANDLOCK_ACCESS_FS_MAKE_FIFO |
-      LANDLOCK_ACCESS_FS_MAKE_BLOCK |
-      LANDLOCK_ACCESS_FS_MAKE_SYM |
-      LANDLOCK_ACCESS_FS_REFER |
-      LANDLOCK_ACCESS_FS_TRUNCATE;
+  ruleset_attr.handled_access_fs = ll_supported_fs_mask_for_abi(abi);
 
   // TODO Handle network in Network subclasses 
   // ruleset_attr.handled_access_net = 0;
@@ -165,17 +134,10 @@ static int CreateBasicRulesetFd() {
 }
 
 
-
-static int OpenPathFd(const std::string& path) {
-  int fd = open(path.c_str(), O_PATH | O_CLOEXEC);
-  return fd;
-}
-
-
-
 static int AddPathRule(int ruleset_fd, const std::string& path, __u64 allowed_access) {
  
-  int fd = OpenPathFd(path);
+  int fd = -1;
+  bool is_dir = IsDir(path.c_str(), &fd);
   if (fd < 0) {
     return -1;
   }
@@ -183,6 +145,10 @@ static int AddPathRule(int ruleset_fd, const std::string& path, __u64 allowed_ac
   struct landlock_path_beneath_attr rule = {};
   rule.allowed_access = allowed_access;
   rule.parent_fd = fd;
+
+  if (!is_dir) {
+    rule.allowed_access &= AccessFile();
+  }
 
   int rc = SysLandlockAddRule(ruleset_fd, LANDLOCK_RULE_PATH_BENEATH, &rule, 0);
   int saved_errno = errno;
@@ -193,30 +159,37 @@ static int AddPathRule(int ruleset_fd, const std::string& path, __u64 allowed_ac
 }
 
 
-static int LLMapReadOnlyPaths(int ruleset_fd) {  
+
+
+
+static int MapReadOnlyPath(const std::string& path) {
+  PRINT_DEBUG("Map %s as RO", path.c_str());
+  return AddPathRule(ruleset, path, AccessRO());  
+}
+
+
+static int MapReadWritePath(const std::string& path) {
+  PRINT_DEBUG("Map %s as RW", path.c_str());
+  return AddPathRule(ruleset, path, AccessRW());  
+}
+
+
+static int LLMapReadOnlyPaths() {  
   int rc = 0;
   for (const auto& p : opt.bind_mount_sources) {
-    printf("Mapping RO %s\n", p.c_str());
-    rc = AddPathRule(ruleset_fd, p, AccessRO());
-    if (rc < 0) { close(ruleset_fd); return rc; }
+    rc += MapReadOnlyPath(p);
   }
   
   for (const auto& p : ReadOnlyPaths) {
-    printf("Mapping (internal) RO %s\n", p.c_str());
-    rc = AddPathRule(ruleset_fd, p, AccessRO());
-    if (rc < 0) { close(ruleset_fd); return rc; }
-
+    rc += MapReadOnlyPath(p);
   }
   return rc;
 }
 
-static int LLMapReadWritePaths(int ruleset_fd) { 
+static int LLMapReadWritePaths() { 
   int rc = 0;
   for (const auto& p : opt.writable_files) {
-
-    printf("Mapping RW %s\n", p.c_str());
-    rc = AddPathRule(ruleset_fd, p, AccessRW());
-    if (rc < 0) { close(ruleset_fd); return rc; }
+    rc += MapReadWritePath(p);
   }
   return rc;
 }
@@ -231,76 +204,93 @@ static int MapWorkingDirMountPoint(const std::string& mount_point) {
     res = MiniSbxMountWrite(top_level);
   else 
     res = MiniSbxMountBind(top_level);
-  printf("Top level: %s\n", top_level.c_str());
+  PRINT_DEBUG("Top level: %s\n", top_level.c_str());
   return res;
 }
 
-static int MapAllFilesystem(const int ruleset_fd) {
-  int res = LLMapReadOnlyPaths(ruleset_fd);
-  res += LLMapReadWritePaths(ruleset_fd); 
+static int MapAllFilesystem() {
+  int res = LLMapReadOnlyPaths();
+  res += LLMapReadWritePaths(); 
   return res;
+}
+
+
+static void MapDev() {
+  struct stat st;
+  for (int i = 0; devs[i] != NULL; i++) {
+    if (stat(devs[i], &st) != 0)
+      continue;
+    MapReadWritePath(devs[i]);
+  }
+  for (int i = 0; i < DEV_LINKS; i++) {
+    std::string abs = links[i].link_path;   
+    if (!abs.empty() && abs.front() != '/') {
+      abs.insert(abs.begin(), '/');      
+      MapReadWritePath(abs);
+    }
+  }
 }
 
 static int LLRunTime() {
-  int abi = LLGetAbi() ;
-  printf("Final ABI: %d\n", abi);
 
-  const int ruleset_fd = CreateBasicRulesetFd();
+  if (! LandlockSupported() ) {
+    return MiniSbxReportError(ErrorCode::LLNotSupported);
+  }
+
+  ruleset = CreateBasicRulesetFd();
   int res = 0;
-  if (ruleset_fd < 0) return ruleset_fd;
+  if (ruleset < 0) return ruleset;
+
 
   if (opt.use_default) {
     const std::string mount_point = GetMountPointOf(opt.working_dir);
     MiniSbxMountWrite(kTmp);
     MiniSbxMountWrite(opt.working_dir);
-    MapWorkingDirMountPoint(mount_point);
+    res += MapWorkingDirMountPoint(mount_point);
     AddLeftoverFoldersToReadOnlyPaths();
-    MapAllFilesystem(ruleset_fd);
+    res += MapAllFilesystem();
+    MapDev();
 
   } else {
-    
-    res = LLMapReadOnlyPaths(ruleset_fd);
-    
-    res += LLMapReadWritePaths(ruleset_fd);
-
-    printf("After mapping paths get res == %d\n", res);
+    res = LLMapReadOnlyPaths(); 
+    res += LLMapReadWritePaths();
   }
  
   if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0)) {
-  	perror("Failed to restrict privileges");
-  	return -1;
+  	return MiniSbxReportGenericError("Failed to restrict privileges");
   } 
  
-  if (SysLandlockRestrictSelf(ruleset_fd, 0) < 0) {
-    int rc = -errno;
-    perror("Failure RestrictSelf");
-    close(ruleset_fd);
-    return rc;
+  if (SysLandlockRestrictSelf(ruleset, 0) < 0) {
+    close(ruleset);
+    return MiniSbxReportGenericError("LandlockRestrictSelf failed");
   }
-  printf("AAAAAAAAAAAAAAAAAA\n");
    
-  close(ruleset_fd);
-  return 0;
+  close(ruleset);
+  return res;
 
 }
 
 
 int LLRunTimeCLI() {
-  printf("Start landlock CLI isolation\n");
+  PRINT_DEBUG("Start landlock CLI isolation\n");
   int res = LLRunTime();
   if (res < 0) 
     return res;
   opt.args.push_back(nullptr);
   if (execvp(opt.args[0], opt.args.data()) < 0) {
-    perror("execvp");  
+    MiniSbxReportError("execvp failed");  
     return -1;
   }
   return res;
 }
 
 int LLRunTimeLib() {
-  printf("Start landlock LIB isolation");
+  PRINT_DEBUG("Start landlock LIB isolation");
   return LLRunTime();
 }
 
 
+int LandlockSupported() {
+  int abi = LandlockProbeABI();
+  return abi >= MIN_LL_ABI;
+}
