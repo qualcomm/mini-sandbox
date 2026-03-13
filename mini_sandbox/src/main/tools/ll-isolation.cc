@@ -66,6 +66,7 @@ namespace fs = std::experimental::filesystem;
 
 std::set<std::string> ReadOnlyPaths;
 static int ruleset = -1;
+static int gABI = -1;
 
 static int SysLandlockCreateRuleset(const struct landlock_ruleset_attr* attr,
                                    size_t size, uint32_t flags) {
@@ -86,15 +87,21 @@ static int LandlockProbeABI() {
   return ll_landlock_probe_abi();
 }
 
+static inline __u64 ABIMask() {
+  return ll_supported_fs_mask_for_abi(gABI);
+}
+
 
 static inline __u64 AccessRO() {
-  return LANDLOCK_ACCESS_FS_READ_FILE |
+  __u64 access = 
+         LANDLOCK_ACCESS_FS_READ_FILE |
          LANDLOCK_ACCESS_FS_READ_DIR |
          LANDLOCK_ACCESS_FS_EXECUTE;
+  return access & ABIMask();
 }
 
 static inline __u64 AccessRW() {
-  return AccessRO() |
+ __u64 access = AccessRO() |
          LANDLOCK_ACCESS_FS_WRITE_FILE |
          LANDLOCK_ACCESS_FS_TRUNCATE |
          LANDLOCK_ACCESS_FS_REMOVE_FILE |
@@ -105,24 +112,28 @@ static inline __u64 AccessRW() {
          LANDLOCK_ACCESS_FS_MAKE_FIFO |
          LANDLOCK_ACCESS_FS_MAKE_SOCK |
          LANDLOCK_ACCESS_FS_MAKE_CHAR |
-         LANDLOCK_ACCESS_FS_MAKE_BLOCK |
+         LANDLOCK_ACCESS_FS_MAKE_BLOCK;
          LANDLOCK_ACCESS_FS_REFER;
+  return access & ABIMask();
 }
 
 
 static inline __u64 AccessFile() {
-  return LANDLOCK_ACCESS_FS_EXECUTE |
+  __u64 access =
+         LANDLOCK_ACCESS_FS_EXECUTE |
          LANDLOCK_ACCESS_FS_WRITE_FILE |
          LANDLOCK_ACCESS_FS_READ_FILE |
          LANDLOCK_ACCESS_FS_TRUNCATE |
          LANDLOCK_ACCESS_FS_IOCTL_DEV;
+  return access & ABIMask();
 }
 
 static int CreateBasicRulesetFd() {
-  int abi = LandlockProbeABI();
+  if (gABI < 0)
+    gABI = LandlockProbeABI();
 
   struct landlock_ruleset_attr ruleset_attr = {};
-  ruleset_attr.handled_access_fs = ll_supported_fs_mask_for_abi(abi);
+  ruleset_attr.handled_access_fs = ll_supported_fs_mask_for_abi(gABI);
 
   // TODO Handle network in Network subclasses 
   // ruleset_attr.handled_access_net = 0;
@@ -163,14 +174,16 @@ static int AddPathRule(int ruleset_fd, const std::string& path, __u64 allowed_ac
 
 
 static int MapReadOnlyPath(const std::string& path) {
-  PRINT_DEBUG("Map %s as RO", path.c_str());
-  return AddPathRule(ruleset, path, AccessRO());  
+  int res = AddPathRule(ruleset, path, AccessRO());  
+  PRINT_DEBUG("Map %s as RO == %d", path.c_str(), res);
+  return res;
 }
 
 
 static int MapReadWritePath(const std::string& path) {
-  PRINT_DEBUG("Map %s as RW", path.c_str());
-  return AddPathRule(ruleset, path, AccessRW());  
+  int res = AddPathRule(ruleset, path, AccessRW());  
+  PRINT_DEBUG("Map %s as RW == %d", path.c_str(), res);
+  return res;
 }
 
 
@@ -274,6 +287,7 @@ static int LLRunTime() {
 int LLRunTimeCLI() {
   PRINT_DEBUG("Start landlock CLI isolation\n");
   int res = LLRunTime();
+
   if (res < 0) 
     return res;
   opt.args.push_back(nullptr);
@@ -291,6 +305,7 @@ int LLRunTimeLib() {
 
 
 int LandlockSupported() {
-  int abi = LandlockProbeABI();
-  return abi >= MIN_LL_ABI;
+  gABI = LandlockProbeABI();
+  PRINT_DEBUG("Landlock ABI: %d", gABI);
+  return gABI >= MIN_LL_ABI;
 }

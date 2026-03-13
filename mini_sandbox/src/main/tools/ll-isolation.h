@@ -10,7 +10,7 @@
 #include <memory>
 #include "src/main/tools/constants.h"
 
-#define MIN_LL_ABI 4
+#define MIN_LL_ABI 1
 struct Options;
 extern Options opt;
 
