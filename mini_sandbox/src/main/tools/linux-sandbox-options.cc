@@ -140,20 +140,19 @@ static int ValidateDirAndCreate(const std::string& dir) {
 }
 
 
-static int ValidatePath(const std::string &path) {
+static int ValidatePath(const std::string &path, bool* exist) {
   if (path[0] != '/') {
     return MiniSbxReportErrorAndMessage(path, ErrorCode::NotAnAbsolutePath);
   }
   fs::path fs_path(path);
   try {
-    if (!(fs::exists(fs_path))) {
-      return MiniSbxReportErrorAndMessage(path, ErrorCode::PathDoesNotExist);
-    }
+    *exist = fs::exists(fs_path);
+    return 0;
   } catch (const fs::filesystem_error &e) {
     PRINT_DEBUG("Filesystem error %s:", e.what());
-    return MiniSbxReportErrorAndMessage(path, ErrorCode::PathDoesNotExist);
+    *exist = false;
+    return 0;
   }
-  return 0;
 }
 
 
@@ -713,13 +712,16 @@ int MiniSbxMountBind(const std::string &input_path) { // -M
   }
   std::string path = CanonicPath(input_path, false);
   int res = 0;
-  if ((res = ValidateDirPath(path)) < 0) {
+  bool exist = false;
+  if ((res = ValidatePath(path, &exist)) < 0)
     return res;
-  }
+  if (!exist)
+    return res;
+
   // Add the current source path to both source and target lists
   opt.bind_mount_sources.emplace_back(path);
   opt.bind_mount_targets.emplace_back(path);
-  if(path!=input_path){
+  if(path != input_path){
     opt.bind_mount_sources.emplace_back(input_path);
     opt.bind_mount_targets.emplace_back(input_path);
   }
@@ -749,10 +751,13 @@ int MiniSbxMountWrite(const std::string &input_path) { // -w
   }
   std::string path = CanonicPath(input_path, false);
   int res = 0;
-  if ((res = ValidateDirPath(path)) < 0)
+  bool exist = false;
+  if ((res = ValidatePath(path, &exist)) < 0)
     return res;
-  if(path!=input_path){
-      opt.writable_files.emplace_back(input_path);
+  if (!exist)
+    return res;
+  if(path != input_path){
+    opt.writable_files.emplace_back(input_path);
   }
   opt.writable_files.emplace_back(path);
 
@@ -782,9 +787,10 @@ int MiniSbxMountOverlay(const std::string &input_path) {
   }
   std::string path = CanonicPath(input_path, false);
   int res = 0;
+  bool exist = false;
   if (opt.use_overlayfs) {
     std::string overlayfsmount(path);
-    if ((res = ValidatePath(path)) < 0)
+    if ((res = ValidatePath(path, &exist)) < 0)
       return res;
     opt.overlayfsmount.emplace_back(overlayfsmount, 0, overlayfsmount.length());
     if(overlayfsmount!=input_path){

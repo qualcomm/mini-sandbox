@@ -17,7 +17,7 @@
 int main() {
     printf("starting program out of the sandbox pid=%d\n", getpid());
     mini_sandbox_setup_default();
-    mini_sandbox_mount_write("/a/b/c");
+    mini_sandbox_mount_write("a/b/c");
     int err_code = mini_sandbox_get_last_error_code();
     printf("error code set to %d\n", err_code);
     const char* msg = mini_sandbox_get_last_error_msg();
