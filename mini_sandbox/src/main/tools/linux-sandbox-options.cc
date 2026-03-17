@@ -700,10 +700,10 @@ void MountHomeSymlinks(const std::string path, std::vector<std::string>* sources
     std::vector<std::string> add_folder=getSymlinkedDirs(path);
     for (auto i : add_folder){
       if (sources != NULL){
-        sources->emplace_back(i);
+        addIfNotPresent(*sources, i.c_str());        
       }
       if(targets != NULL){
-        targets->emplace_back(i);
+        addIfNotPresent(*targets, i.c_str());
       }
     }
   }
@@ -756,6 +756,7 @@ int MiniSbxMountWrite(const std::string &input_path) { // -w
     return res;
   if(path!=input_path){
       opt.writable_files.emplace_back(input_path);
+      printf("path != input_path - %s != %s\n", path.c_str(), input_path.c_str());
   }
   opt.writable_files.emplace_back(path);
 

@@ -189,15 +189,19 @@ static int MapReadWritePath(const std::string& path) {
 
 static int LLMapReadOnlyPaths() {  
   int rc = 0;
+  PRINT_DEBUG("Mount bind_mounts");
   for (const auto& p : opt.bind_mount_sources) {
     rc += MapReadOnlyPath(p);
   }
   
+  PRINT_DEBUG("Mount internal read_only");
   for (const auto& p : ReadOnlyPaths) {
     rc += MapReadOnlyPath(p);
   }
   return rc;
 }
+
+
 
 static int LLMapReadWritePaths() { 
   int rc = 0;
@@ -222,8 +226,10 @@ static int MapWorkingDirMountPoint(const std::string& mount_point) {
 }
 
 static int MapAllFilesystem() {
-  int res = LLMapReadOnlyPaths();
-  res += LLMapReadWritePaths(); 
+
+  int res = LLMapReadWritePaths(); 
+
+  res += LLMapReadOnlyPaths();
   return res;
 }
 
@@ -253,7 +259,6 @@ static int LLRunTime() {
   ruleset = CreateBasicRulesetFd();
   int res = 0;
   if (ruleset < 0) return ruleset;
-
 
   if (opt.use_default) {
     const std::string mount_point = GetMountPointOf(opt.working_dir);
