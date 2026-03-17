@@ -99,7 +99,7 @@ extern struct Options opt;
 
 // Handles parsing all command line flags and populates the global opt struct.
 void ParseOptions(int argc, char *argv[]);
-void SetupDefaultMounts(std::vector<std::string>& bind_mount_sources, std::vector<std::string>& bind_mount_targets);
+void SetupDefaultMounts();
 int ValidateOverlayOutOfFolder(const std::string& overlay_dir, const std::string& sandbox_dir);
 int ValidateReadWritePaths(std::vector<std::string>& readables, std::vector<std::string>& writables);
 int ValidateTmpNotRemounted(std::vector<std::string>& paths);
