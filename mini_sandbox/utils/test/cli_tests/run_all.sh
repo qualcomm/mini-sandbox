@@ -49,3 +49,4 @@ check_exit $SCRIPT_DIR/test_tap_firewall.sh
 check_exit $SCRIPT_DIR/test_readonly.sh
 check_exit $SCRIPT_DIR/test_custom_base.sh
 check_exit $SCRIPT_DIR/test_default_overlay_over_readonly.sh
+check_exit $SCRIPT_DIR/test_mount_single_file.sh
