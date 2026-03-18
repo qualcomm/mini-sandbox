@@ -936,8 +936,7 @@ int MiniSbxSetupReadOnly() {
   return res;
 }
 
-void SetupDefaultMounts(std::vector<std::string> &bind_mount_sources,
-                        std::vector<std::string> &bind_mount_targets) {
+void SetupDefaultMounts() {
   // Add ~/.local/lib|bin that contain python modules
   // that can be used by openssl as a seed
   std::vector<std::string> default_mounts = {"/proc", "/var", "/opt"};
