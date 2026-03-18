@@ -33,7 +33,6 @@ extern "C" {
 #endif
 int Pid1Main(void *pid1Args);
 void SpawnChild(bool nested);
-void DropCapabilities();
 #if defined(__cplusplus)
 }
 #endif

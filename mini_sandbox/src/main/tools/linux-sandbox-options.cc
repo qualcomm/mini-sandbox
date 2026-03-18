@@ -688,7 +688,7 @@ std::vector<std::string> getSymlinkedDirs(std::string path){
         }
     }
   }
-  catch (fs::filesystem_error fs_exception){
+  catch (const fs::filesystem_error& fs_exception){
     return result; // Return empty in case we have a fs error e.g, permission denied.
 
   }

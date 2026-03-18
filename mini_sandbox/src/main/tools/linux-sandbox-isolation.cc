@@ -11,6 +11,7 @@
 #include "src/main/tools/logging.h"
 #include "src/main/tools/ns-isolation.h"
 #include "src/main/tools/ll-isolation.h"
+#include "src/main/tools/caps-isolation.h"
 #include "src/main/tools/minitap-interface.h"
 #include "src/main/tools/process-tools.h"
 #include "src/main/tools/error-handling.h"
@@ -32,16 +33,11 @@ MiniSbxIsolationType MiniSbxIsolationNamespaces::Type() const {
 }
 
 int MiniSbxIsolationCapabilities::RunIsolation(MiniSbxExecMode mode) {
-
-  DropCapabilities();
-  if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) < 0) {
-      return MiniSbxReportError(ErrorCode::PRSetNoNewPrivsFail); 
-  }
-
   if (mode == MiniSbxExecMode::CLI) {
-    SpawnChild(true);
-  } 
-  return 0;
+    return CapsRunTimeCLI();
+  } else {
+    return CapsRunTimeLib();
+  }
 }
 
 MiniSbxIsolationType MiniSbxIsolationCapabilities::Type() const {

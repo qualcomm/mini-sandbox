@@ -81,7 +81,7 @@ void DumpRules(FirewallRules* fw_rules, std::string& filepath) {
   // Then we dump all the IP addresses/ domain names / subnets we wanna 
   // allow in the new network
     for (size_t i = 0; i < fw_rules->count; ++i) {
-      if (fw_rules->rules[i] != NULL) {
+      if (fw_rules->rules[i][0] != '\0') {
         fprintf(file, "%s\n", fw_rules->rules[i]);
       }
     }

@@ -83,9 +83,6 @@ namespace fs = std::experimental::filesystem;
 #define ROOT "/"
 #define MINISBX_TMP_INIT "/tmp/mini-sandbox-init"
 
-
-#define CAP_VERSION _LINUX_CAPABILITY_VERSION_3
-#define CAP_WORDS   _LINUX_CAPABILITY_U32S_3
 #define BIT(n)                       (1UL << (n))
 #define OVELAY_MAX_DEPTH 5
 #define OVELAY_DEPTH_THRESHOLD 2
@@ -915,43 +912,6 @@ static void EnterWorkingDirectory() {
   }
 }
 
-static void drop_caps_ep_except(uint64_t keep) {
-  struct __user_cap_header_struct hdr = {
-    .version = CAP_VERSION,
-    .pid = 0,
-  };
-  struct __user_cap_data_struct data[CAP_WORDS];
-  int i;
-
-  if (syscall(SYS_capget, &hdr, data))
-    DIE("Couldn't get current capabilities"); 
-
-  for (i = 0; i < CAP_WORDS; i++) {
-    uint32_t mask = (uint32_t)(keep >> (32 * i));
-
-    data[i].effective &= mask;
-    data[i].permitted &= mask;
-    data[i].inheritable &= mask;
-  }
-
-  if (syscall(SYS_capset, &hdr, data))
-    DIE("Couldn't drop capabilities");
-}
-
-
-void DropCapabilities() {
-  std::cout << "Warning: Sandbox cannot be fully enabled (either due to Docker or AppArmor). "
-          "We'll just drop the capabilities of the current process but cannot provide advanced "
-          "features such as usernamespace, overlayfs, rootless firewall, etc." << std::endl;
-
-  uint64_t keep;
-  keep = BIT(CAP_NET_BIND_SERVICE) | BIT(CAP_CHOWN) | BIT(CAP_DAC_READ_SEARCH) |
-         BIT(CAP_KILL) | BIT(CAP_SYS_RESOURCE) | BIT(CAP_FOWNER);
-
-  drop_caps_ep_except(keep);
-  return;
-}
-
 #if (!(LIBMINISANDBOX))
 static void ForwardSignal(int signum) { kill(-global_child_pid, signum); }
 
@@ -1634,7 +1594,7 @@ int Pid1Main(void *args) {
   InstallSignalHandler(SIGTERM, ForwardSignal);
   return WaitForChild();
 #else
-  drop_caps_ep_except(0);
+  DropCapabilities();
   return 0;
 #endif
 }

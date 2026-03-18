@@ -39,6 +39,8 @@ enum class ErrorCode : int {
   LLNotSupported = -12,
   UserNSNotSupported = -13,
   PRSetNoNewPrivsFail = -14,
+  SysCapset = -15,
+  SysCapget = -16,
   GeneralOSError = -100,
   // Error codes from -201 are recoverables
   NestedSandbox = -201,
@@ -88,6 +90,10 @@ inline std::string GetErrorMessage(ErrorCode code) {
       return "User Namespaces not supported";
     case ErrorCode::PRSetNoNewPrivsFail:
       return "prctl(PR_SET_NO_NEW_PRIVS) failed";
+    case ErrorCode::SysCapset:
+      return "SYS_capset failed";
+    case ErrorCode::SysCapget:
+      return "SYS_capget failed";
     case ErrorCode::Unknown:
     default:
       return "Unknown error occurred";

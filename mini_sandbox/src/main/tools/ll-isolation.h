@@ -10,7 +10,10 @@
 #include <memory>
 #include "src/main/tools/constants.h"
 
-#define MIN_LL_ABI 1
+// Landlock ABI < 4 does break basic operations such as rename
+// and others
+#define MIN_LL_ABI 4
+
 struct Options;
 extern Options opt;
 
