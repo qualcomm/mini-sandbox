@@ -378,6 +378,11 @@ std::string GetLocalLib() {
   return home_dir.append("/.local/lib");
 }
 
+std::string GetRngSeed() {
+  std::string home_dir = GetHomeDir();
+  return home_dir.append("/.rnd");
+}
+
 void addIfNotPresent(std::vector<std::string> &paths, const char *path_to_check) {
   // Convert the const char* to std::string for comparison
   std::string pathStr(path_to_check);

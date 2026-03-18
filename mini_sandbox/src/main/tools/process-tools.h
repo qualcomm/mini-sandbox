@@ -96,6 +96,7 @@ std::string GetParentCWD();
 std::string GetHomeDir();
 std::string GetLocalBin();
 std::string GetLocalLib();
+std::string GetRngSeed();
 uid_t get_outer_uid();
 gid_t get_outer_gid();
 

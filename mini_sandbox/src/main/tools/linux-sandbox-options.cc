@@ -140,20 +140,21 @@ static int ValidateDirAndCreate(const std::string& dir) {
 }
 
 
-static int ValidatePath(const std::string &path) {
+static int ValidatePath(const std::string &path, bool* exist) {
   if (path[0] != '/') {
+    *exist = false;
     return MiniSbxReportErrorAndMessage(path, ErrorCode::NotAnAbsolutePath);
   }
-  fs::path fs_path(path);
+
   try {
-    if (!(fs::exists(fs_path))) {
-      return MiniSbxReportErrorAndMessage(path, ErrorCode::PathDoesNotExist);
-    }
+    fs::path fs_path(path);
+    *exist = fs::exists(fs_path);
+    return 0;
   } catch (const fs::filesystem_error &e) {
     PRINT_DEBUG("Filesystem error %s:", e.what());
-    return MiniSbxReportErrorAndMessage(path, ErrorCode::PathDoesNotExist);
+    *exist = false;
+    return 0;
   }
-  return 0;
 }
 
 
@@ -716,13 +717,16 @@ int MiniSbxMountBind(const std::string &input_path) { // -M
   }
   std::string path = CanonicPath(input_path, false);
   int res = 0;
-  if ((res = ValidateDirPath(path)) < 0) {
+  bool exist = false;
+  if ((res = ValidatePath(path, &exist)) < 0)
     return res;
-  }
+  if (!exist)
+    return res;
+
   // Add the current source path to both source and target lists
   opt.bind_mount_sources.emplace_back(path);
   opt.bind_mount_targets.emplace_back(path);
-  if(path!=input_path){
+  if(path != input_path){
     opt.bind_mount_sources.emplace_back(input_path);
     opt.bind_mount_targets.emplace_back(input_path);
   }
@@ -752,11 +756,13 @@ int MiniSbxMountWrite(const std::string &input_path) { // -w
   }
   std::string path = CanonicPath(input_path, false);
   int res = 0;
-  if ((res = ValidateDirPath(path)) < 0)
+  bool exist = false;
+  if ((res = ValidatePath(path, &exist)) < 0)
     return res;
-  if(path!=input_path){
-      opt.writable_files.emplace_back(input_path);
-      printf("path != input_path - %s != %s\n", path.c_str(), input_path.c_str());
+  if (!exist)
+    return res;
+  if(path != input_path){
+    opt.writable_files.emplace_back(input_path);
   }
   opt.writable_files.emplace_back(path);
 
@@ -786,9 +792,10 @@ int MiniSbxMountOverlay(const std::string &input_path) {
   }
   std::string path = CanonicPath(input_path, false);
   int res = 0;
+  bool exist = false;
   if (opt.use_overlayfs) {
     std::string overlayfsmount(path);
-    if ((res = ValidatePath(path)) < 0)
+    if ((res = ValidatePath(path, &exist)) < 0)
       return res;
     opt.overlayfsmount.emplace_back(overlayfsmount, 0, overlayfsmount.length());
     if(overlayfsmount!=input_path){
@@ -883,7 +890,7 @@ int MiniSbxSetupDefault() {
   if (res < 0)
     return res;
   MiniSbxMountBindSourceToTarget(sbx_temp_dir, tmp);
-  SetupDefaultMounts(opt.bind_mount_sources, opt.bind_mount_targets);
+  SetupDefaultMounts();
   res += CreateSandboxRoot(tmp);
   res += CreateOverlayfsDir(tmp);
   PRINT_DEBUG("Sandbox root %s\n", opt.sandbox_root.c_str());
@@ -929,32 +936,31 @@ int MiniSbxSetupReadOnly() {
   return res;
 }
 
-void SetupDefaultMounts(std::vector<std::string> &bind_mount_sources,
-                        std::vector<std::string> &bind_mount_targets) {
+void SetupDefaultMounts() {
   // Add ~/.local/lib|bin that contain python modules
+  // that can be used by openssl as a seed
   std::vector<std::string> default_mounts = {"/proc", "/var", "/opt"};
   std::string local_bin = GetLocalBin();
   std::string local_lib = GetLocalLib();
+  std::string rng = GetRngSeed();
+  bool exists = false;
 
-  try {
-    if (fs::exists(local_bin))
-      default_mounts.push_back(local_bin);
-  } catch (const fs::filesystem_error &e) {
-    PRINT_DEBUG("Filesystem error: %s\n", local_bin.c_str());
-  }
+  ValidatePath(local_bin, &exists);
+  if (exists)
+    default_mounts.push_back(local_bin);
 
-  try {
-    if (fs::exists(local_lib))
-      default_mounts.push_back(local_lib);
-  } catch (const fs::filesystem_error &e) {
-    PRINT_DEBUG("Filesystem error: %s\n", local_lib.c_str());
-  }
-
+  ValidatePath(local_lib, &exists);
+  if (exists)
+    default_mounts.push_back(local_lib);
 
   for (auto mount : default_mounts) {
-    bind_mount_sources.emplace_back(mount);
-    bind_mount_targets.emplace_back(mount);
+    opt.bind_mount_sources.emplace_back(mount);
+    opt.bind_mount_targets.emplace_back(mount);
   }
+
+  ValidatePath(rng, &exists);
+  if (exists)
+    opt.writable_files.emplace_back(rng);
 }
 
 
