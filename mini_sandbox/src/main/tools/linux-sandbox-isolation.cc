@@ -33,11 +33,11 @@ MiniSbxIsolationType MiniSbxIsolationNamespaces::Type() const {
 
 int MiniSbxIsolationCapabilities::RunIsolation(MiniSbxExecMode mode) {
 
+  DropCapabilities();
   if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) < 0) {
-      return -1;
+      return MiniSbxReportError(ErrorCode::PRSetNoNewPrivsFail); 
   }
 
-  DropCapabilities();
   if (mode == MiniSbxExecMode::CLI) {
     SpawnChild(true);
   } 

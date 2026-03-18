@@ -38,6 +38,7 @@ enum class ErrorCode : int {
   TmpNotRemounted = -11,
   LLNotSupported = -12,
   UserNSNotSupported = -13,
+  PRSetNoNewPrivsFail = -14,
   GeneralOSError = -100,
   // Error codes from -201 are recoverables
   NestedSandbox = -201,
@@ -85,6 +86,8 @@ inline std::string GetErrorMessage(ErrorCode code) {
       return "Landlock not supported";
     case ErrorCode::UserNSNotSupported:
       return "User Namespaces not supported";
+    case ErrorCode::PRSetNoNewPrivsFail:
+      return "prctl(PR_SET_NO_NEW_PRIVS) failed";
     case ErrorCode::Unknown:
     default:
       return "Unknown error occurred";
