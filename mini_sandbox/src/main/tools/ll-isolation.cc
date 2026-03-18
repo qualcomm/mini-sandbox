@@ -226,10 +226,8 @@ static int MapWorkingDirMountPoint(const std::string& mount_point) {
 }
 
 static int MapAllFilesystem() {
-
-  int res = LLMapReadWritePaths(); 
-
-  res += LLMapReadOnlyPaths();
+  int res = LLMapReadOnlyPaths();
+  res += LLMapReadWritePaths(); 
   return res;
 }
 
@@ -249,6 +247,7 @@ static void MapDev() {
     }
   }
 }
+
 
 static int LLRunTime() {
 
@@ -270,8 +269,7 @@ static int LLRunTime() {
     MapDev();
 
   } else {
-    res = LLMapReadOnlyPaths(); 
-    res += LLMapReadWritePaths();
+    res = MapAllFilesystem(); 
   }
  
   if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0)) {
