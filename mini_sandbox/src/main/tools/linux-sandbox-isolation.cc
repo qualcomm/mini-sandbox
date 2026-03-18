@@ -16,6 +16,8 @@
 #include "src/main/tools/error-handling.h"
 #include "src/main/tools/constants.h"
 
+#include <sys/prctl.h>
+
 
 int MiniSbxIsolationNamespaces::RunIsolation(MiniSbxExecMode mode) {
   if (mode == MiniSbxExecMode::CLI) {
@@ -30,6 +32,11 @@ MiniSbxIsolationType MiniSbxIsolationNamespaces::Type() const {
 }
 
 int MiniSbxIsolationCapabilities::RunIsolation(MiniSbxExecMode mode) {
+
+  if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) < 0) {
+      return -1;
+  }
+
   DropCapabilities();
   if (mode == MiniSbxExecMode::CLI) {
     SpawnChild(true);
