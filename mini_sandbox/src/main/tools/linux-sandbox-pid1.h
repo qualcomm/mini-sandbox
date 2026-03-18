@@ -25,16 +25,9 @@ struct Pid1Args {
 
 extern std::set<std::string> ReadOnlyPaths;
 
-std::string GetTopLevelFolder(const std::string& mount_point, const std::string& home_dir);
-void AddLeftoverFoldersToReadOnlyPaths();
 
-#if defined(__cplusplus)
-extern "C" {
-#endif
+void AddLeftoverFoldersToReadOnlyPaths();
 int Pid1Main(void *pid1Args);
 void SpawnChild(bool nested);
-#if defined(__cplusplus)
-}
-#endif
 
 #endif

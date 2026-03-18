@@ -51,7 +51,6 @@ namespace fs = std::filesystem;
 #else
 #include <experimental/filesystem>
 namespace fs = std::experimental::filesystem;
-#define _EXPERIMENTAL_FILESYSTEM_
 #endif
 #include <chrono>
 #include <cstring>
@@ -73,6 +72,7 @@ namespace fs = std::experimental::filesystem;
 #include "src/main/tools/logging.h"
 #include "src/main/tools/process-tools.h"
 #include "src/main/tools/linux-sandbox-pid1.h"
+#include "src/main/tools/caps-isolation.h"
 #include "src/main/tools/docker-support.h"
 #include "src/main/tools/constants.h"
 
@@ -83,7 +83,6 @@ namespace fs = std::experimental::filesystem;
 #define ROOT "/"
 #define MINISBX_TMP_INIT "/tmp/mini-sandbox-init"
 
-#define BIT(n)                       (1UL << (n))
 #define OVELAY_MAX_DEPTH 5
 #define OVELAY_DEPTH_THRESHOLD 2
 
@@ -99,38 +98,6 @@ namespace fs = std::experimental::filesystem;
     _rc;                                                                       \
   })
 #endif // TEMP_FAILURE_RETRY
-
-#ifdef  _EXPERIMENTAL_FILESYSTEM_
-fs::path make_relative(const fs::path& target, const fs::path& base) {
-    auto target_abs = fs::canonical(target);
-    auto base_abs = fs::canonical(base);
-
-    auto target_it = target_abs.begin();
-    auto base_it = base_abs.begin();
-
-    // Skip common prefix
-    while (target_it != target_abs.end() && base_it != base_abs.end() && *target_it == *base_it) {
-        ++target_it;
-        ++base_it;
-    }
-
-    if (base_it != base_abs.end())
-        // This should be unreachable as we assume that the mount dir
-        // always contains the CWD
-        return "";
-
-    fs::path result;
-
-
-    for (; target_it != target_abs.end(); ++target_it) {
-        result /= *target_it;
-    }
-
-    if (result == ".")
-        result = fs::path("");
-    return result;
-}
-#endif
 
 static int global_child_pid __attribute__((unused));
 extern DockerMode docker_mode;
@@ -1282,37 +1249,6 @@ std::vector<std::string> GenerateListForOverlayFS() {
   return existingPaths;
 }
 
-static std::string TopLevelRelativeFolder(const std::string& mount_point, const std::string& workdir) {
-  try {
-    fs::path mount_fs = mount_point;
-    fs::path wd_fs = workdir;
-
-#ifndef  _EXPERIMENTAL_FILESYSTEM_
-    fs::path rel = fs::relative(wd_fs, mount_fs);
-#else
-    fs::path rel = make_relative(wd_fs, mount_fs);
-#endif
-    PRINT_DEBUG("Relative path from WorkingDir to MountFS is: %s", rel.string().c_str());
-    auto it = rel.begin();
-    if (std::distance(it, rel.end()) >= 1) {
-      if (rel.filename() == fs::path("."))
-        return "";
-      fs::path top_level_fs = mount_fs / *it;
-      return fs::absolute(top_level_fs).string();
-    } else {
-      return "";
-    }
-  } catch (const fs::filesystem_error &e) {
-    std::string msg = e.what();
-    PRINT_DEBUG("Filesystem error: %s\n", msg.c_str());
-  } catch (const std::exception &e) {
-    std::string msg = e.what();
-    PRINT_DEBUG("General error: %s\n", msg.c_str());
-  }
-  return "";
-}
-
-
 static int MountOverlaySubfolders(std::string& top_level_dir, std::string& workdir) {
   fs::path top_level = top_level_dir;
   fs::path working_dir = workdir;
@@ -1334,65 +1270,36 @@ static int MountOverlaySubfolders(std::string& top_level_dir, std::string& workd
   }
   fs::path current = top_level;
   while (true) {
-      if (current == working_dir) {
-          break;
-      }
-      fs::path rel;
-        
-      try {
-#ifndef  _EXPERIMENTAL_FILESYSTEM_
-      rel = fs::relative(working_dir, current);
-#else
-      rel = make_relative(working_dir, current);
-#endif
-      } catch (fs::filesystem_error& e) {
-        std::string msg = e.what();
-        PRINT_DEBUG("Could not invoke relative() %s\n", msg.c_str());
-        rel.clear();
-      }
+    if (current == working_dir) {
+        break;
+    }
+    fs::path rel;
+      
+    try {
+      GetRelative(working_dir, current);
+    } catch (fs::filesystem_error& e) {
+      std::string msg = e.what();
+      PRINT_DEBUG("Could not invoke relative() %s\n", msg.c_str());
+      rel.clear();
+    }
 
-      if (rel.empty() || rel.filename() == fs::path(".") ) 
-          break;
-      std::string current_str = current.string();
-      PRINT_DEBUG("Adding %s to the overlayfs\n", current_str.c_str());
-      MiniSbxMountOverlay(current);
-      current /= *rel.begin();
+    if (rel.empty() || rel.filename() == fs::path(".") ) 
+        break;
+    std::string current_str = current.string();
+    PRINT_DEBUG("Adding %s to the overlayfs\n", current_str.c_str());
+    MiniSbxMountOverlay(current);
+    current /= *rel.begin();
   }
   return 0;
 }
 
-std::string GetTopLevelFolder(const std::string& mount_point, const std::string& home) {
-  if (mount_point.empty())
-    return "";
 
-  // top_level is the first directory between our CWD and its respective mount
-  // point. For instance, if our mount point is /A and CWD is /A/B/C/D,
-  // the top_level dir will be /A/B . The top_level dirs and all subdirs until
-  // the CWD will be mounted as overlay and their content will be mapped to allow
-  // by default access to parent folder' files
-  std::string top_level = TopLevelRelativeFolder(mount_point, opt.working_dir);
-
-  if (top_level == "" ) {
-    return "";
-  }
-
-  // If the top_level folder contains the home dir we would end up mounting
-  // the home dir as overlay but that might leak secrets so we try to get the
-  // new top_level dir from the home_dir to our working dir
-  // e.g., /home/user/top_level/working_dir -> top_level will be /home/user/top_level
-  if (isSubpath(top_level, home) ) {
-    top_level = TopLevelRelativeFolder(home, opt.working_dir);
-  }
-
-  PRINT_DEBUG("top_level -> %s\n", top_level.c_str());
-  return top_level;
-}
 
 
 static void MountWorkingDirMountPoint(const std::string& mount_point) {
   PRINT_DEBUG("mount_point -> %s\n", mount_point.c_str());
 
-  std::string top_level = GetTopLevelFolder(mount_point, home_dir);
+  std::string top_level = GetTopLevelFolder(mount_point, home_dir, opt.working_dir);
 
   // if the top_level folder is empty just return.
   // The code later will mount this as overlay
@@ -1524,7 +1431,8 @@ int Pid1Main(void *args) {
     // the read-only sandbox. 
     PRINT_DEBUG("opt.use_default && !CanIterateRoot");
     const std::string mount_point = GetMountPointOf(opt.working_dir);
-    MiniSbxMountWrite(mount_point);
+    if (!mount_point.empty())
+      MiniSbxMountWrite(mount_point);
     MiniSbxMountWrite(kTmp);
     MountFilesystems();
     mounts = CountMounts();
@@ -1542,7 +1450,8 @@ int Pid1Main(void *args) {
       PRINT_DEBUG("opt.default");
       const std::string mount_point = GetMountPointOf(opt.working_dir);
       mounts = CountMounts();
-      MountWorkingDirMountPoint(mount_point);
+      if (!mount_point.empty())
+        MountWorkingDirMountPoint(mount_point);
       AddLeftoverFoldersToReadOnlyPaths();
       MountAllMounts();
       MakeFilesystemPartiallyReadOnly(true, mounts);

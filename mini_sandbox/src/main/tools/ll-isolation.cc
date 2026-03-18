@@ -214,7 +214,7 @@ static int LLMapReadWritePaths() {
 static int MapWorkingDirMountPoint(const std::string& mount_point) {
   int res = 0;
   std::string home_dir = GetHomeDir();
-  std::string top_level = GetTopLevelFolder(mount_point,home_dir);
+  std::string top_level = GetTopLevelFolder(mount_point, home_dir, opt.working_dir);
   if (top_level.empty()) 
     return -1;
   if (opt.parents_writable)

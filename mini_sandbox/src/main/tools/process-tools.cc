@@ -320,45 +320,40 @@ static int ValidateDevId(const char* mnt_dir, dev_t st_dev ) {
 }
 
 std::string GetMountPointOf(const std::string& dir) {
-    PRINT_DEBUG("Executing %s\n", __func__);
+  const char* dir_str = dir.c_str();  
+  struct stat dirStat;
+  if (stat(dir_str, &dirStat) != 0) {  
+    return "";
+  }
 
-    const char* dir_str = dir.c_str();
-    
-    struct stat dirStat;
-    if (stat(dir_str, &dirStat) != 0) {
-        perror("stat");
-        return "";
+  FILE* mtab = setmntent("/etc/mtab", "r");
+  if (!mtab) {      
+    return "";
+  }
+
+  std::string mountPoint;
+  size_t currMountPointLen = 0;
+  struct mntent* ent;
+  while ((ent = getmntent(mtab)) != nullptr) {
+    if (isSubpath(ent->mnt_dir, dir_str)) {
+      if (ValidateDevId(ent->mnt_dir, dirStat.st_dev) == 0) {
+        if (mountPoint.empty()) {
+          mountPoint = ent->mnt_dir;
+          currMountPointLen = strlen(ent->mnt_dir);
+        } 
+        else {
+          size_t newMountPointLen = strlen(ent->mnt_dir);
+          if (newMountPointLen > currMountPointLen) {
+              mountPoint = ent->mnt_dir;
+          }
+        } 
+      }
     }
+  }
+  PRINT_DEBUG("Final mount point -> %s\n", mountPoint.c_str());
 
-    FILE* mtab = setmntent("/etc/mtab", "r");
-    if (!mtab) {
-        perror("setmntent");
-        return "";
-    }
-
-    std::string mountPoint;
-    size_t currMountPointLen = 0;
-    struct mntent* ent;
-    while ((ent = getmntent(mtab)) != nullptr) {
-        if (isSubpath(ent->mnt_dir, dir_str)) {
-	    if (ValidateDevId(ent->mnt_dir, dirStat.st_dev) == 0) {
-                if (mountPoint.empty()) {
-                    mountPoint = ent->mnt_dir;
-                    currMountPointLen = strlen(ent->mnt_dir);
-                } 
-                else {
-                    size_t newMountPointLen = strlen(ent->mnt_dir);
-                    if (newMountPointLen > currMountPointLen) {
-                        mountPoint = ent->mnt_dir;
-                    }
-                } 
-            }
-        }
-    }
-    PRINT_DEBUG("Final mount point -> %s\n", mountPoint.c_str());
-
-    endmntent(mtab);
-    return mountPoint;
+  endmntent(mtab);
+  return mountPoint;
 }
 
 
@@ -690,5 +685,101 @@ bool IsDir(const char* path, int* out_fd) {
   }
 
   return S_ISDIR(st.st_mode);
+}
+
+#ifdef  _EXPERIMENTAL_FILESYSTEM_
+static fs::path make_relative(const fs::path& target, const fs::path& base) {
+    auto target_abs = fs::canonical(target);
+    auto base_abs = fs::canonical(base);
+
+    auto target_it = target_abs.begin();
+    auto base_it = base_abs.begin();
+
+    // Skip common prefix
+    while (target_it != target_abs.end() && base_it != base_abs.end() && *target_it == *base_it) {
+        ++target_it;
+        ++base_it;
+    }
+
+    if (base_it != base_abs.end())
+        // This should be unreachable as we assume that the mount dir
+        // always contains the CWD
+        return "";
+
+    fs::path result;
+
+
+    for (; target_it != target_abs.end(); ++target_it) {
+        result /= *target_it;
+    }
+
+    if (result == ".")
+        result = fs::path("");
+    return result;
+}
+#endif
+
+
+fs::path GetRelative( const fs::path& target, const fs::path& base) {
+    fs::path rel;
+#ifndef  _EXPERIMENTAL_FILESYSTEM_
+    rel = fs::relative(target, base);
+#else
+    rel = make_relative(target, base);
+#endif
+   return rel;
+}
+
+
+std::string TopLevelRelativeFolder(const std::string& mount_point, const std::string& workdir) {
+  try {
+    fs::path mount_fs = mount_point;
+    fs::path wd_fs = workdir;
+    fs::path rel = GetRelative(wd_fs, mount_fs);
+    PRINT_DEBUG("Relative path from WorkingDir to MountFS is: %s", rel.string().c_str());
+    auto it = rel.begin();
+    if (std::distance(it, rel.end()) >= 1) {
+      if (rel.filename() == fs::path("."))
+        return "";
+      fs::path top_level_fs = mount_fs / *it;
+      return fs::absolute(top_level_fs).string();
+    } else {
+      return "";
+    }
+  } catch (const fs::filesystem_error &e) {
+    std::string msg = e.what();
+    PRINT_DEBUG("Filesystem error: %s\n", msg.c_str());
+  } catch (const std::exception &e) {
+    std::string msg = e.what();
+    PRINT_DEBUG("General error: %s\n", msg.c_str());
+  }
+  return "";
+}
+
+std::string GetTopLevelFolder(const std::string& mount_point, const std::string& home, const std::string& working_dir) {
+  if (mount_point.empty())
+    return "";
+
+  // top_level is the first directory between our CWD and its respective mount
+  // point. For instance, if our mount point is /A and CWD is /A/B/C/D,
+  // the top_level dir will be /A/B . The top_level dirs and all subdirs until
+  // the CWD will be mounted as overlay and their content will be mapped to allow
+  // by default access to parent folder' files
+  std::string top_level = TopLevelRelativeFolder(mount_point, working_dir);
+
+  if (top_level == "" ) {
+    return "";
+  }
+
+  // If the top_level folder contains the home dir we would end up mounting
+  // the home dir as overlay but that might leak secrets so we try to get the
+  // new top_level dir from the home_dir to our working dir
+  // e.g., /home/user/top_level/working_dir -> top_level will be /home/user/top_level
+  if (isSubpath(top_level, home) ) {
+    top_level = TopLevelRelativeFolder(home, working_dir);
+  }
+
+  PRINT_DEBUG("top_level -> %s\n", top_level.c_str());
+  return top_level;
 }
 
