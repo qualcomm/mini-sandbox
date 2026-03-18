@@ -112,7 +112,7 @@ static inline __u64 AccessRW() {
          LANDLOCK_ACCESS_FS_MAKE_FIFO |
          LANDLOCK_ACCESS_FS_MAKE_SOCK |
          LANDLOCK_ACCESS_FS_MAKE_CHAR |
-         LANDLOCK_ACCESS_FS_MAKE_BLOCK;
+         LANDLOCK_ACCESS_FS_MAKE_BLOCK |
          LANDLOCK_ACCESS_FS_REFER;
   return access & ABIMask();
 }
