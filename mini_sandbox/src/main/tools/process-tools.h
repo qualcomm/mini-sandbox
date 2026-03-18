@@ -38,9 +38,6 @@ void InstallSignalHandler(int signum, void (*handler)(int));
 // Set the signal handler for `signum` to SIG_IGN (ignore).
 void IgnoreSignal(int signum);
 
-// Set the signal handler for `signum` to SIG_DFL (default).
-void InstallDefaultSignalHandler(int sig);
-
 // Use an empty signal mask for the process and set all signal handlers to their
 // default.
 void ClearSignalMask();
@@ -99,6 +96,7 @@ std::string GetParentCWD();
 std::string GetHomeDir();
 std::string GetLocalBin();
 std::string GetLocalLib();
+std::string GetRngSeed();
 uid_t get_outer_uid();
 gid_t get_outer_gid();
 

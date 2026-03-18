@@ -18,4 +18,5 @@ release/
 .venv*/
 *.egg-info/
 dist/
+.vscode/**
 pypi_dist/

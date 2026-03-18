@@ -94,13 +94,6 @@ void IgnoreSignal(int signum) {
   }
 }
 
-void InstallDefaultSignalHandler(int signum) {
-  // These signals can't be handled, so we'll just not do anything for these.
-  if (signum != SIGSTOP && signum != SIGKILL) {
-    InstallSignalHandler(signum, SIG_DFL);
-  }
-}
-
 
 void ClearSignalMask() {
   // Use an empty signal mask for the process.
@@ -387,6 +380,11 @@ std::string GetLocalBin() {
 std::string GetLocalLib() {
   std::string home_dir = GetHomeDir();
   return home_dir.append("/.local/lib");
+}
+
+std::string GetRngSeed() {
+  std::string home_dir = GetHomeDir();
+  return home_dir.append("/.rnd");
 }
 
 void addIfNotPresent(std::vector<std::string> &paths, const char *path_to_check) {
