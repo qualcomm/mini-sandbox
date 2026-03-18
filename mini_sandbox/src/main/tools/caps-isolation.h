@@ -4,7 +4,7 @@
  */
 
 
-#ifndef SRC_MAIN_TOOLS_CAPS_ISOLATION__H_
+#ifndef SRC_MAIN_TOOLS_CAPS_ISOLATION_H_
 #define SRC_MAIN_TOOLS_CAPS_ISOLATION_H_
 
 #include <memory>
@@ -17,6 +17,7 @@
 struct Options;
 extern Options opt;
 
+void DropCapabilitiesExcept(uint64_t keep);
 void DropCapabilities();
 int CapsRunTimeLib();
 int CapsRunTimeCLI();

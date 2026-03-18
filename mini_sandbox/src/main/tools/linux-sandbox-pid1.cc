@@ -1272,11 +1272,10 @@ static int MountOverlaySubfolders(std::string& top_level_dir, std::string& workd
   while (true) {
     if (current == working_dir) {
         break;
-    }
+    }  
     fs::path rel;
-      
     try {
-      GetRelative(working_dir, current);
+      rel = GetRelative(working_dir, current);
     } catch (fs::filesystem_error& e) {
       std::string msg = e.what();
       PRINT_DEBUG("Could not invoke relative() %s\n", msg.c_str());
@@ -1503,7 +1502,7 @@ int Pid1Main(void *args) {
   InstallSignalHandler(SIGTERM, ForwardSignal);
   return WaitForChild();
 #else
-  DropCapabilities();
+  DropCapabilitiesExcept(0);
   return 0;
 #endif
 }

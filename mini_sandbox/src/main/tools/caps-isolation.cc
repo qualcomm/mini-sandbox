@@ -62,7 +62,7 @@ namespace fs = std::experimental::filesystem;
 #include <sys/syscall.h>
 
 
-static void DropCapabilitiesExcept(uint64_t keep) {
+void DropCapabilitiesExcept(uint64_t keep) {
   struct __user_cap_header_struct hdr = {
     .version = CAP_VERSION,
     .pid = 0,
