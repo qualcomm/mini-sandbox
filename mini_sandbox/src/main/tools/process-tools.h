@@ -110,7 +110,10 @@ bool GetOSName(std::string& printable_name, std::string& version_id);
 bool GetKernelInfo(struct utsname* buf);
 bool UserNamespaceSupported();
 void KillAndWait(pid_t pid);
+bool IsDir(const char* path, int* out_fd);
 
+std::string GetTopLevelFolder(const std::string& mount_point, const std::string& home, const std::string& working_dir);
+fs::path GetRelative( const fs::path& target, const fs::path& base);
 
 enum UserNamespaceSupport {
     NON_INIT,
