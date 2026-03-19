@@ -689,7 +689,7 @@ std::vector<std::string> getSymlinkedDirs(std::string path){
         }
     }
   }
-  catch (fs::filesystem_error fs_exception){
+  catch (const fs::filesystem_error& fs_exception){
     return result; // Return empty in case we have a fs error e.g, permission denied.
 
   }
@@ -701,7 +701,7 @@ void MountHomeSymlinks(const std::string path, std::vector<std::string>* sources
     std::vector<std::string> add_folder=getSymlinkedDirs(path);
     for (auto i : add_folder){
       if (sources != NULL){
-        addIfNotPresent(*sources, i.c_str());
+        addIfNotPresent(*sources, i.c_str());        
       }
       if(targets != NULL){
         addIfNotPresent(*targets, i.c_str());

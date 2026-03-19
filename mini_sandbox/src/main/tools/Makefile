@@ -23,14 +23,14 @@ ifeq ($(HAS_FILESYSTEM),no)
         LDFLAGS += -lstdc++fs
 endif
 
-INCLUDE_DIR = ../../../
+INCLUDE_DIR = -I../../../ -I../landlock_inc/
 MINITAP ?= ../../../../minitap
 MINITAP_OUT = $(MINITAP)/out
 MINISANDBOX := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 LIBMINITAP = $(MINITAP_OUT)/libminitap.a
 MINITAP_BIN = $(MINITAP_OUT)/minitap
 
-SRCS = linux-sandbox.cc linux-sandbox-options.cc linux-sandbox-pid1.cc logging.cc process-tools.cc docker-support.cc linux-sandbox-api.cc error-handling.cc linux-sandbox-runtime.cc linux-sandbox-network.cc linux-sandbox-isolation.cc minitap-interface.cc firewall.cc ns-isolation.cc
+SRCS = linux-sandbox.cc linux-sandbox-options.cc linux-sandbox-pid1.cc logging.cc process-tools.cc docker-support.cc linux-sandbox-api.cc error-handling.cc linux-sandbox-runtime.cc linux-sandbox-network.cc linux-sandbox-isolation.cc minitap-interface.cc firewall.cc ns-isolation.cc ll-isolation.cc caps-isolation.cc
 CLI_SRCS = linux-sandbox-main.cc $(SRCS) 
 MINITAP_CLI_SRCS = $(CLI_SRCS)
 MINITAP_LIB_SRCS = $(SRCS)
@@ -61,7 +61,7 @@ $(BIN_mini_sandbox): $(OBJS_mini_sandbox)
 	$(CXX) $(STD) $(CXXFLAGS) $(FLAGS) $^ -o $@ $(LDFLAGS) $(LDL)
 
 $(BUILD_mini_sandbox)/%.o: %.cc | $(BUILD_mini_sandbox)
-	$(CXX) $(STD) $(CXXFLAGS) $(FLAGS) -I$(INCLUDE_DIR) -c $< -o $@
+	$(CXX) $(STD) $(CXXFLAGS) $(FLAGS) $(INCLUDE_DIR) -c $< -o $@
 
 $(BUILD_mini_sandbox):
 	mkdir -p $@
@@ -78,7 +78,7 @@ $(MINITAP_BIN):
 	$(CP) $(MINITAP_BIN) $(OUT_DIR)
 
 $(BUILD_mini_tapbox)/%.o: %.cc | $(BUILD_mini_tapbox)
-	$(CXX) $(STD) $(CXXFLAGS) $(FLAGS) -DMINITAP -I$(MINITAP_OUT) -I$(INCLUDE_DIR) -c $< -o $@
+	$(CXX) $(STD) $(CXXFLAGS) $(FLAGS) -DMINITAP -I$(MINITAP_OUT) $(INCLUDE_DIR) -c $< -o $@
 
 $(BUILD_mini_tapbox):
 	mkdir -p $@
@@ -93,7 +93,7 @@ $(LIB_mini_sandbox).a: $(OBJS_libmini_sandbox)
 	$(RANLIB) $@
 
 $(BUILD_libmini_sandbox)/%.o: %.cc | $(BUILD_libmini_sandbox)
-	$(CXX) $(STD) $(FLAGS) $(CXXFLAGS) -DLIBMINISANDBOX -I$(INCLUDE_DIR) -fPIC -c $< -o $@
+	$(CXX) $(STD) $(FLAGS) $(CXXFLAGS) -DLIBMINISANDBOX $(INCLUDE_DIR) -fPIC -c $< -o $@
 
 $(BUILD_libmini_sandbox):
 	mkdir -p $@
@@ -108,7 +108,7 @@ $(LIB_mini_tapbox).so: $(OBJS_libmini_tapbox) $(MINITAP_BIN)
 	$(CXX) $(STD) $(FLAGS) $(CXXFLAGS) -shared -o $@ $(OBJS_libmini_tapbox) $(LDFLAGS)
 
 $(BUILD_libmini_tapbox)/%.o: %.cc | $(BUILD_libmini_tapbox)
-	$(CXX) $(STD) $(FLAGS) $(CXXFLAGS) -DLIBMINISANDBOX -DMINITAP -I$(INCLUDE_DIR) -I$(MINITAP_OUT) -fPIC -c $< -o $@
+	$(CXX) $(STD) $(FLAGS) $(CXXFLAGS) -DLIBMINISANDBOX -DMINITAP $(INCLUDE_DIR) -I$(MINITAP_OUT) -fPIC -c $< -o $@
 
 $(BUILD_libmini_tapbox):
 	mkdir -p $@

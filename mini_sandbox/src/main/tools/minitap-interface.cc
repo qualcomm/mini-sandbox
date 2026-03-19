@@ -124,10 +124,12 @@ int GetMinitapBinDir() {
 
 static int RunMinitap(std::string& rules) {
     signal(SIGUSR1, handler);
-    if (GetMinitapBinDir() < 0) 
+    if (GetMinitapBinDir() < 0) {
         // If all our heuristics for finding the minitap binary go wrong
         // we try to see if it's in PATH
-        strncpy(MinitapBin, MINITAPBIN, sizeof(MINITAPBIN));
+        strncpy(MinitapBin, MINITAPBIN, PATH_MAX - 1);
+        MinitapBin[PATH_MAX - 1] = '\0';
+    }
 
     char* const  m_args[] = {MinitapBin, (char*)rules.c_str(), NULL};
 

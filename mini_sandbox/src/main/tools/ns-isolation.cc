@@ -234,9 +234,12 @@ static int WaitForPid1(const pid_t child_pid) {
 }
 
 int NSRunTimeCLI() {
+  if (! UserNamespaceSupported() ) {
+    return MiniSbxReportError(ErrorCode::UserNSNotSupported);
+  }
+
   // Spawn the child that will fork the sandboxed program with fresh
   // namespaces etc.
-
   const pid_t child_pid = SpawnPid1();
   if (child_pid < 0) {
     PRINT_DEBUG("SpawnPid1 returned -1\n");
@@ -280,6 +283,10 @@ int NSRunTimeCLI() {
 
 
 int NSRunTimeLib() {
+  if (! UserNamespaceSupported() ) {
+    return MiniSbxReportError(ErrorCode::UserNSNotSupported);
+  }
+
   // Spawn the child that will fork the sandboxed program with fresh
   // namespaces etc.
   pid_t pid = fork();

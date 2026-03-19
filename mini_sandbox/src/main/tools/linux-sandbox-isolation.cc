@@ -10,10 +10,14 @@
 #include "src/main/tools/linux-sandbox-isolation.h"
 #include "src/main/tools/logging.h"
 #include "src/main/tools/ns-isolation.h"
+#include "src/main/tools/ll-isolation.h"
+#include "src/main/tools/caps-isolation.h"
 #include "src/main/tools/minitap-interface.h"
 #include "src/main/tools/process-tools.h"
 #include "src/main/tools/error-handling.h"
 #include "src/main/tools/constants.h"
+
+#include <sys/prctl.h>
 
 
 int MiniSbxIsolationNamespaces::RunIsolation(MiniSbxExecMode mode) {
@@ -29,21 +33,28 @@ MiniSbxIsolationType MiniSbxIsolationNamespaces::Type() const {
 }
 
 int MiniSbxIsolationCapabilities::RunIsolation(MiniSbxExecMode mode) {
-  DropCapabilities();
   if (mode == MiniSbxExecMode::CLI) {
-    SpawnChild(true);
-  } 
-  return 0;
+    return CapsRunTimeCLI();
+  } else {
+    return CapsRunTimeLib();
+  }
 }
 
 MiniSbxIsolationType MiniSbxIsolationCapabilities::Type() const {
   return MiniSbxIsolationType::CAPABILITIES;
 }
 
-// int MiniSbxIsolationLandlock::RunIsolation() {
-//   // TODO: landlock ruleset + restrictions here.
-//   return 0;
-// }
+int MiniSbxIsolationLandlock::RunIsolation(MiniSbxExecMode mode) {
+  if (mode == MiniSbxExecMode::CLI) {
+    return LLRunTimeCLI();
+  } else {
+    return LLRunTimeLib();
+  } 
+}
+
+MiniSbxIsolationType MiniSbxIsolationLandlock::Type() const {
+  return MiniSbxIsolationType::LANDLOCK;
+}
 
 
 static MiniSbxIsolationType ParseIsolationType(const char* s) {
@@ -70,9 +81,11 @@ static MiniSbxIsolationType ParseIsolationType(const char* s) {
 
 std::unique_ptr<MiniSbxIsolation> MakeMiniSbxIsolation() {
   const char* env = std::getenv(kIsolationModeEnv);
+  // kind gets assigned only if we use the MINI_SANDBOX_ISOLATION_MODE 
+  // env variable. If that env is not defined we check what's supported
+  // in this os in the order namespaces -> landlock -> capabilities
   auto kind = ParseIsolationType(env);
-
-  
+ 
   switch (kind) {
     case MiniSbxIsolationType::NAMESPACES:
       return std::make_unique<MiniSbxIsolationNamespaces>();
@@ -81,7 +94,7 @@ std::unique_ptr<MiniSbxIsolation> MakeMiniSbxIsolation() {
       return std::make_unique<MiniSbxIsolationCapabilities>();
 
     case MiniSbxIsolationType::LANDLOCK:
-      return nullptr;
+      return std::make_unique<MiniSbxIsolationLandlock>();;
 
     default:
       break;
@@ -91,7 +104,10 @@ std::unique_ptr<MiniSbxIsolation> MakeMiniSbxIsolation() {
   if (UserNamespaceSupported()) {
     return std::make_unique<MiniSbxIsolationNamespaces>();
   }
-  else {
+  else if (LandlockSupported()) {
+    return std::make_unique<MiniSbxIsolationLandlock>();
+  } else { 
     return std::make_unique<MiniSbxIsolationCapabilities>();
   }
+
 }
