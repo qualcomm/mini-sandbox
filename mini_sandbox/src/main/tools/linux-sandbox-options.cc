@@ -933,9 +933,7 @@ void SetupDefaultMounts() {
     opt.bind_mount_targets.emplace_back(mount);
   }
 
-  ValidatePath(rng, &exists);
-  if (exists)
-    opt.writable_files.emplace_back(rng);
+  MiniSbxMountEmptyOutputFile(rng);
 }
 
 
@@ -981,10 +979,10 @@ int MiniSbxMountEmptyOutputFile(const std::string &path_str) {
   if (!fs::exists(path, ec)) {
     int handle = open(path.c_str(), O_CREAT | O_WRONLY | O_EXCL, 0666);
     if (handle < 0) {
-      MiniSbxReportGenericError("open failed");
+      return MiniSbxReportGenericError("open failed");
     }
     if (close(handle) < 0) {
-      MiniSbxReportGenericError("close failed");
+      return MiniSbxReportGenericError("close failed");
     }
   }
   if (ec) {
