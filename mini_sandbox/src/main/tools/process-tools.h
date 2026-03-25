@@ -97,6 +97,10 @@ std::string GetHomeDir();
 std::string GetLocalBin();
 std::string GetLocalLib();
 std::string GetRngSeed();
+bool EndsWith(const char* dir, const char* suffix);
+bool StartsWith(const char* dir, const char* prefix);
+bool ShouldBeWritable(const std::string &mnt_dir);
+
 uid_t get_outer_uid();
 gid_t get_outer_gid();
 

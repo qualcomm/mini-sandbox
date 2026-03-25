@@ -438,67 +438,6 @@ void MountOverlayFs(std::string lowerdir, int depth) {
 }
 
 
-static bool ends_with(const char *mnt_dir, const char *suffix) {
-  if (!mnt_dir || !suffix) return false;
-  size_t len_dir = strlen(mnt_dir);
-  size_t len_suffix = strlen(suffix);
-  if (len_dir < len_suffix)
-    return false;
-  return strcmp(mnt_dir + len_dir - len_suffix, suffix) == 0;
-}
-
-
-static bool starts_with(const char* mnt_dir, const char* prefix) {
-  if (!mnt_dir || !prefix) return false;
-  size_t len_dir = strlen(mnt_dir);
-  size_t len_prefix = strlen(prefix);
-  if (len_dir < len_prefix)
-    return false;
-  return strncmp(mnt_dir, prefix, len_prefix) == 0;
-  
-}
-
-
-// We later remount everything read-only, except the paths for which this method
-// returns true.
-static bool ShouldBeWritable(const std::string &mnt_dir) {
-  if (mnt_dir == opt.working_dir) {
-    return true;
-  }
-
-  if (ends_with(mnt_dir.c_str(), kProc)) 
-    return true;
-
-  if (ends_with(mnt_dir.c_str(), kTmp))
-    return true;
-
-  if (starts_with(mnt_dir.c_str(), kDev))
-    return true;
-
-  if (opt.enable_pty && mnt_dir == kDevPts) {
-    return true;
-  }
-
-  for (const std::string &writable_file : opt.writable_files) {
-    if (mnt_dir == writable_file) {
-      return true;
-    }
-  }
-
-  for (const std::string &tmpfs_dir : opt.tmpfs_dirs) {
-    if (mnt_dir == tmpfs_dir) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-bool contains(const std::vector<std::string> &vec, const char *str) {
-  return std::find(vec.begin(), vec.end(), std::string(str)) != vec.end();
-}
-
-
 // When we are running in opt.default mode, we wanna try to mount the filesystem
 // starting from root as read-only. However, we want to do this by taking into 
 // account the user input that tell us how to mount certain locations
@@ -681,7 +620,7 @@ AddLeftoverFoldersToReadOnlyPaths() {
 // uses the parent's root, we use the toggle 'need_mount' to state that we need to mount before remounting as read-only.
 static void MakeFilesystemPartiallyReadOnly(bool need_mount, int num_of_mounts) {
 
-  FILE *mounts = setmntent("/proc/self/mounts", "r");
+  FILE *mounts = setmntent(kMounts, "r");
   if (mounts == nullptr) {
     DIE("setmntent");
   }
@@ -694,7 +633,7 @@ static void MakeFilesystemPartiallyReadOnly(bool need_mount, int num_of_mounts) 
       break;
 
     count +=1;
-    if (ends_with(ent->mnt_dir, "/proc"))
+    if (EndsWith(ent->mnt_dir, kProc))
       continue;
 
     std::string mnt_dir(ent->mnt_dir);
@@ -806,7 +745,7 @@ static void MakeFilesystemPartiallyReadOnly(bool need_mount, int num_of_mounts) 
 static void MountProcAndSys() {
 // Mount a new proc on top of the old one, because the old one still refers to
 // our parent PID namespace.
-  if (mount("/proc", "/proc", "proc", MS_NODEV | MS_NOEXEC | MS_NOSUID,
+  if (mount(kProc, kProc, "proc", MS_NODEV | MS_NOEXEC | MS_NOSUID,
             nullptr) < 0) {
     DIE("mount /proc");
   }

@@ -890,7 +890,7 @@ int MiniSbxSetupDefault() {
   if (res < 0)
     return res;
   MiniSbxMountBindSourceToTarget(sbx_temp_dir, tmp);
-  SetupDefaultMounts();
+  SetupEssentialMounts();
   res += CreateSandboxRoot(tmp);
   res += CreateOverlayfsDir(tmp);
   PRINT_DEBUG("Sandbox root %s\n", opt.sandbox_root.c_str());
@@ -936,7 +936,7 @@ int MiniSbxSetupReadOnly() {
   return res;
 }
 
-void SetupDefaultMounts() {
+void SetupEssentialMounts() {
   // Add ~/.local/lib|bin that contain python modules
   // that can be used by openssl as a seed
   std::vector<std::string> default_mounts = {"/proc", "/var", "/opt"};

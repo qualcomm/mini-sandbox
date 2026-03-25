@@ -283,7 +283,7 @@ int GetCWD(std::string& res) {
 
 
 int CountMounts() {
-    FILE* fp = setmntent("/proc/self/mounts", "r");
+    FILE* fp = setmntent(kMounts, "r");
     if (!fp) return -1;
 
     int count = 0;
@@ -788,3 +788,56 @@ std::string GetTopLevelFolder(const std::string& mount_point, const std::string&
   return top_level;
 }
 
+bool EndsWith(const char *mnt_dir, const char *suffix) {
+  if (!mnt_dir || !suffix) return false;
+  size_t len_dir = strlen(mnt_dir);
+  size_t len_suffix = strlen(suffix);
+  if (len_dir < len_suffix)
+    return false;
+  return strcmp(mnt_dir + len_dir - len_suffix, suffix) == 0;
+}
+
+
+bool StartsWith(const char* mnt_dir, const char* prefix) {
+  if (!mnt_dir || !prefix) return false;
+  size_t len_dir = strlen(mnt_dir);
+  size_t len_prefix = strlen(prefix);
+  if (len_dir < len_prefix)
+    return false;
+  return strncmp(mnt_dir, prefix, len_prefix) == 0;
+  
+}
+
+
+bool ShouldBeWritable(const std::string &mnt_dir) {
+  if (mnt_dir == opt.working_dir) {
+    return true;
+  }
+
+  if (EndsWith(mnt_dir.c_str(), kProc)) 
+    return true;
+
+  if (EndsWith(mnt_dir.c_str(), kTmp))
+    return true;
+
+  if (StartsWith(mnt_dir.c_str(), kDev))
+    return true;
+
+  if (opt.enable_pty && mnt_dir == kDevPts) {
+    return true;
+  }
+
+  for (const std::string &writable_file : opt.writable_files) {
+    if (mnt_dir == writable_file) {
+      return true;
+    }
+  }
+
+  for (const std::string &tmpfs_dir : opt.tmpfs_dirs) {
+    if (mnt_dir == tmpfs_dir) {
+      return true;
+    }
+  }
+
+  return false;
+}

@@ -18,6 +18,9 @@
 #include "src/main/tools/error-handling.h"
 #include "src/main/tools/firewall.h"
 #include "src/main/tools/constants.h"
+
+#include "landlock_compat.h"
+
 #include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
@@ -52,16 +55,13 @@ namespace fs = std::experimental::filesystem;
 #include <string>
 #include <system_error>
 #include <vector>
-
 #include <chrono>
 #include <cstring>
 #include <dirent.h>
 #include <numeric>
 #include <stdexcept>
 #include <thread>
-
-
-#include "landlock_compat.h"
+#include <mntent.h>
 #include <sys/syscall.h>
 
 std::set<std::string> ReadOnlyPaths;
@@ -234,12 +234,18 @@ static int MapAllFilesystem() {
 
 static void MapDev() {
   struct stat st;
-  for (int i = 0; devs[i] != NULL; i++) {
+  int i = 0;
+  for (i = 0; ll_devs[i] != NULL; i++) {
+    if (stat(ll_devs[i], &st) != 0) 
+      continue;
+    MapReadWritePath(ll_devs[i]);
+  }
+  for (i = 0; devs[i] != NULL; i++) {
     if (stat(devs[i], &st) != 0)
       continue;
     MapReadWritePath(devs[i]);
   }
-  for (int i = 0; i < DEV_LINKS; i++) {
+  for (i = 0; i < DEV_LINKS; i++) {
     std::string abs = links[i].link_path;   
     if (!abs.empty() && abs.front() != '/') {
       abs.insert(abs.begin(), '/');      
@@ -248,6 +254,28 @@ static void MapDev() {
   }
 }
 
+
+static int MapFilesystemPartiallyReadOnly() {
+  int res = 0;
+  FILE *mounts = setmntent(kMounts, "r");  
+  if (mounts == nullptr) { 
+    return MiniSbxReportGenericError("setmntent failed");
+  }
+
+  struct mntent* ent;
+  while ((ent = getmntent(mounts)) != nullptr) {
+    if (EndsWith(ent->mnt_dir, kProc))    
+      continue;
+
+    if (!ShouldBeWritable(ent->mnt_dir) ) {
+      res += MapReadOnlyPath(ent->mnt_dir);
+    }
+    else {
+      res += MapReadWritePath(ent->mnt_dir);
+    }
+  }
+  return res;
+}
 
 static int LLRunTime() {
 
@@ -268,8 +296,13 @@ static int LLRunTime() {
     res += MapAllFilesystem();
     MapDev();
 
-  } else {
+  } else if (opt.hermetic || opt.use_overlayfs) {
     res = MapAllFilesystem(); 
+  }
+  else {
+    MiniSbxMountWrite(kTmp);
+    MiniSbxMountWrite(opt.working_dir);
+    MapFilesystemPartiallyReadOnly();
   }
  
   if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0)) {

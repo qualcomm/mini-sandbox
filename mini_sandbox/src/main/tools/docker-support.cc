@@ -13,7 +13,7 @@ static bool isDockerEnvPresent() {
 }
 
 static bool isRootInOverlay() {
-  FILE *mounts = setmntent("/proc/self/mounts", "r");
+  FILE *mounts = setmntent(kMounts, "r");
   struct mntent *ent;
   if (mounts == nullptr) {
     return false;

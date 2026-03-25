@@ -30,6 +30,7 @@ inline constexpr const char kProc[] = "/proc";
 inline constexpr const char kDevPts[] = "/dev/pts";
 inline constexpr const char kTmp[] = "/tmp";
 inline constexpr const char kDockerPath[] = "/.dockerenv";
+inline constexpr const char kMounts[] = "/proc/self/mounts";
 
 inline const char *devs[] = {"/dev/null", "/dev/random", "/dev/urandom", "/dev/zero",
                       "/dev/full", "/dev/tty", "/dev/console", NULL };
