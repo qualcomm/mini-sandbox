@@ -710,11 +710,9 @@ static fs::path make_relative(const fs::path& target, const fs::path& base) {
     if (base_it != base_abs.end())
         // This should be unreachable as we assume that the mount dir
         // always contains the CWD
-        return "";
+        return fs::path("");
 
     fs::path result;
-
-
     for (; target_it != target_abs.end(); ++target_it) {
         result /= *target_it;
     }
@@ -727,13 +725,22 @@ static fs::path make_relative(const fs::path& target, const fs::path& base) {
 
 
 fs::path GetRelative( const fs::path& target, const fs::path& base) {
-    fs::path rel;
+  fs::path rel("");
+  try {
 #ifndef  _EXPERIMENTAL_FILESYSTEM_
     rel = fs::relative(target, base);
 #else
     rel = make_relative(target, base);
 #endif
-   return rel;
+  }
+  catch (const fs::filesystem_error &e) {
+    std::string msg = e.what();
+    PRINT_DEBUG("Filesystem error: %s\n", msg.c_str());
+  } catch (const std::exception &e) {
+    std::string msg = e.what();
+    PRINT_DEBUG("General error: %s\n", msg.c_str());
+  }
+  return rel;
 }
 
 
@@ -846,16 +853,21 @@ bool ShouldBeWritable(const std::string &mnt_dir) {
 
 // This function is intended for usage in the APIs, so it's safe to assume that
 // every error is not recoverable
-std::string CanonicPath(const std::string path_str, bool resolve_symlink) {
-  try {
+std::string CanonicPath(const std::string path_str, bool resolve_symlink, bool* is_symlink_out) {
+  bool is_symlink = false;
+  std::string res;
+  try {    
     fs::path path(path_str);
     if (fs::exists(path)) {
-      if (!resolve_symlink && fs::is_symlink(path)) {
-        return fs::absolute(path).string();
+      is_symlink = fs::is_symlink(path);
+      if (!resolve_symlink && is_symlink) {
+        res = fs::absolute(path).string();
+      } 
+      else {
+        res = fs::canonical(path).string();
       }
-      return fs::canonical(path).string();
     } else {
-      return path.string(); 
+      res = path.string(); 
       // If the path doesn't exist the best that we can do is
       // to return the original path. The parsing will likely
       // fail when we call ValidateDirPath, which instead requires
@@ -864,13 +876,17 @@ std::string CanonicPath(const std::string path_str, bool resolve_symlink) {
   } catch (const fs::filesystem_error &e) {
     PRINT_DEBUG("Filesystem error %s:", e.what());
     MiniSbxReportGenericError("Fs exception");
-    return nullptr;    
+    res = "";    
   }
+  if (is_symlink_out)
+    *is_symlink_out = is_symlink;
+  return res;
+
 }
 
 
 bool isInsideHomeDir(const fs::path path){
-  fs::path path_canon = fs::path(CanonicPath(path,true));
+  fs::path path_canon = fs::path(CanonicPath(path, true, nullptr));
   fs::path home_dir = GetHomeDir();
   return isSubpath( home_dir,path_canon);
 }
@@ -886,22 +902,16 @@ int SetEnvHome(const std::string& value) {
 
 static int CreateSymlinksToHomeFiles(std::vector<std::string>& files, const fs::path& fakeHome) {
   const fs::path realHome = fs::path(GetHomeDir());
-  std::error_code ec;
   for (const std::string& p : files) {
-
     if (!isInsideHomeDir(p)) continue;
 
     const fs::path src = fs::path(p);
-    fs::path rel;
-    {
-      std::error_code ec;
-      rel = fs::relative(src, realHome, ec);
+    fs::path rel = GetRelative(src, realHome);
 
-      // If relative() fails or escapes home, fall back to basename.
-      // (The ".." check prevents weird paths like "../../etc/passwd".)
-      if (ec || rel.empty() || rel.native().rfind("..", 0) == 0) {
-        rel = src.filename();
-      }
+    // If relative() fails or escapes home, fall back to basename.
+    // (The ".." check prevents weird paths like "../etc".)
+    if (rel.empty() || rel.native().rfind("..", 0) == 0) {
+      rel = src.filename();
     }
 
     const fs::path linkPath = fakeHome / rel;

@@ -100,7 +100,7 @@ std::string GetRngSeed();
 bool EndsWith(const char* dir, const char* suffix);
 bool StartsWith(const char* dir, const char* prefix);
 bool ShouldBeWritable(const std::string &mnt_dir);
-std::string CanonicPath(const std::string path_str, bool resolve_symlink);
+std::string CanonicPath(const std::string path_str, bool resolve_symlink, bool* is_symlink_out);
 bool isInsideHomeDir(const fs::path path);
 int SetEnvHome(const std::string& value);
 int MakeFakeHome(const std::string& kFakeHome) ;
