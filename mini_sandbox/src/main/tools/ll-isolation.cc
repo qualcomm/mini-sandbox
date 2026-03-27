@@ -277,6 +277,8 @@ static int MapFilesystemPartiallyReadOnly() {
   return res;
 }
 
+
+
 static int LLRunTime() {
 
   if (! LandlockSupported() ) {
@@ -295,6 +297,7 @@ static int LLRunTime() {
     AddLeftoverFoldersToReadOnlyPaths();
     res += MapAllFilesystem();
     MapDev();
+    MakeFakeHome(kFakeHome);
 
   } else if (opt.hermetic || opt.use_overlayfs) {
     res = MapAllFilesystem(); 

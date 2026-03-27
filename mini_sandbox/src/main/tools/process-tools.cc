@@ -43,6 +43,7 @@
 #include <sys/wait.h>
 #include <sys/utsname.h>
 #include <unistd.h>
+#include <system_error>
 #if __has_include(<filesystem>)
 #include <filesystem>
 namespace fs = std::filesystem;
@@ -840,4 +841,108 @@ bool ShouldBeWritable(const std::string &mnt_dir) {
   }
 
   return false;
+}
+
+
+// This function is intended for usage in the APIs, so it's safe to assume that
+// every error is not recoverable
+std::string CanonicPath(const std::string path_str, bool resolve_symlink) {
+  try {
+    fs::path path(path_str);
+    if (fs::exists(path)) {
+      if (!resolve_symlink && fs::is_symlink(path)) {
+        return fs::absolute(path).string();
+      }
+      return fs::canonical(path).string();
+    } else {
+      return path.string(); 
+      // If the path doesn't exist the best that we can do is
+      // to return the original path. The parsing will likely
+      // fail when we call ValidateDirPath, which instead requires
+      // that the path exists.
+    }
+  } catch (const fs::filesystem_error &e) {
+    PRINT_DEBUG("Filesystem error %s:", e.what());
+    MiniSbxReportGenericError("Fs exception");
+    return nullptr;    
+  }
+}
+
+
+bool isInsideHomeDir(const fs::path path){
+  fs::path path_canon = fs::path(CanonicPath(path,true));
+  fs::path home_dir = GetHomeDir();
+  return isSubpath( home_dir,path_canon);
+}
+
+
+int SetEnvHome(const std::string& value) {
+  if (::setenv("HOME", value.c_str(), /*overwrite=*/1) != 0) {
+    return -1;
+  }
+  return 0;
+}
+
+
+static int CreateSymlinksToHomeFiles(std::vector<std::string>& files, const fs::path& fakeHome) {
+  const fs::path realHome = fs::path(GetHomeDir());
+  std::error_code ec;
+  for (const std::string& p : files) {
+
+    if (!isInsideHomeDir(p)) continue;
+
+    const fs::path src = fs::path(p);
+    fs::path rel;
+    {
+      std::error_code ec;
+      rel = fs::relative(src, realHome, ec);
+
+      // If relative() fails or escapes home, fall back to basename.
+      // (The ".." check prevents weird paths like "../../etc/passwd".)
+      if (ec || rel.empty() || rel.native().rfind("..", 0) == 0) {
+        rel = src.filename();
+      }
+    }
+
+    const fs::path linkPath = fakeHome / rel;
+    std::error_code ec;
+    fs::create_directories(linkPath.parent_path(), ec);
+    if (ec) return -1;
+
+    if (fs::exists(linkPath, ec)) {
+      if (ec) return -1;
+      fs::remove(linkPath, ec);
+      if (ec) return -1;
+    } else if (ec) {
+      return -1;
+    }
+
+    fs::create_symlink(src, linkPath, ec);
+    if (ec) return -1;
+  }
+  return 0;
+}
+
+
+// Returns 0 on success, -1 on failure.
+int MakeFakeHome(const std::string& fakeHomeStr) {
+  const fs::path fakeHome = fs::path(fakeHomeStr);
+
+  {
+    std::error_code ec;
+    if (fs::exists(fakeHome, ec)) {
+      if (ec) return -1;
+      fs::remove_all(fakeHome, ec);
+      if (ec) return -1;
+    } else if (ec) {
+      return -1;
+    }
+
+    fs::create_directories(fakeHome, ec);
+    if (ec) return -1;
+  }
+  CreateSymlinksToHomeFiles(opt.writable_files, fakeHome);
+  CreateSymlinksToHomeFiles(opt.bind_mount_sources, fakeHome);
+  SetEnvHome(fakeHomeStr);
+  return 0;
 }

@@ -52,4 +52,6 @@ enum class MiniSbxExecMode {
   LIB,
 };
 
+inline constexpr const char kFakeHome[] = "/tmp/sbx-fake-home";
+
 #endif

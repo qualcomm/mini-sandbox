@@ -56,8 +56,6 @@ using std::vector;
 struct Options opt;
 static int MiniSbxSetupSandboxRootWithOverlay(const std::string& path);
 static int MiniSbxSetupOverlayfsFolder(std::string path);
-static std::string CanonicPath(const std::string path_str,
-                                bool resolve_symlink);
 void MountHomeSymlinks(const std::string path, std::vector<std::string>* sources, std::vector<std::string>* targets );
 
 
@@ -268,31 +266,6 @@ static int CreateOverlayfsDir(std::string& base_dir) {
   }
   opt.tmp_overlayfs.assign(tmp_overlayfs, 0, tmp_overlayfs.length());
   return res;
-}
-
-
-// This function is intended for usage in the APIs, so it's safe to assume that
-// every error is not recoverable
-std::string CanonicPath(const std::string path_str, bool resolve_symlink) {
-  try {
-    fs::path path(path_str);
-    if (fs::exists(path)) {
-      if (!resolve_symlink && fs::is_symlink(path)) {
-        return fs::absolute(path).string();
-      }
-      return fs::canonical(path).string();
-    } else {
-      return path.string(); 
-      // If the path doesn't exist the best that we can do is
-      // to return the original path. The parsing will likely
-      // fail when we call ValidateDirPath, which instead requires
-      // that the path exists.
-    }
-  } catch (const fs::filesystem_error &e) {
-    PRINT_DEBUG("Filesystem error %s:", e.what());
-    MiniSbxReportGenericError("Fs exception");
-    return nullptr;    
-  }
 }
 
 // Parses command line flags from an argv array and puts the results into an
@@ -663,11 +636,7 @@ int MiniSbxEnableLog(const std::string &path) {
 }
 
 
-bool isInsideHomeDir(const fs::path path){
-  fs::path path_canon = fs::path(CanonicPath(path,true));
-  fs::path home_dir = GetHomeDir();
-  return isSubpath( home_dir,path_canon);
-}
+
 
 std::vector<std::string> getSymlinkedDirs(std::string path){
   std::vector<std::string> result;
