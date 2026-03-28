@@ -134,10 +134,9 @@ static int CreateBasicRulesetFd() {
 
   struct landlock_ruleset_attr ruleset_attr = {};
   ruleset_attr.handled_access_fs = ll_supported_fs_mask_for_abi(gABI);
-
-  // TODO Handle network in Network subclasses 
-  // ruleset_attr.handled_access_net = 0;
-  // ruleset_attr.scoped = 0;
+  if (opt.create_netns == NETNS_WITH_LOOPBACK || opt.create_netns == NETNS)  
+    ruleset_attr.handled_access_net = ll_supported_net_mask_for_abi(gABI);
+  ruleset_attr.scoped = ll_supported_scope_mask_for_abi(gABI);
 
   int fd = SysLandlockCreateRuleset(&ruleset_attr, sizeof(ruleset_attr), 0);
   if (fd < 0) return -errno;
