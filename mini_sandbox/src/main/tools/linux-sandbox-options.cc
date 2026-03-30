@@ -669,6 +669,7 @@ void MountHomeSymlinks(const std::string path, std::vector<std::string>* sources
   if(isInsideHomeDir(path)){
     std::vector<std::string> add_folder=getSymlinkedDirs(path);
     for (auto i : add_folder){
+      printf("Symlink TO BE ADDED: %s\n", i.c_str());
       if (sources != NULL){
         addIfNotPresent(*sources, i.c_str());        
       }
