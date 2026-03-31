@@ -1430,7 +1430,7 @@ int Pid1Main(void *args) {
 
   // Set up init status useful mostly in library mode
   InitDone();
-  MakeFakeHome(kFakeHome);
+
 #if (!(LIBMINISANDBOX))
   // Ignore terminal signals; we hand off the terminal to the child in
   // SpawnChild below.
