@@ -7,6 +7,8 @@
 #ifndef SRC_MAIN_TOOLS_CONSTANTS_H_
 #define SRC_MAIN_TOOLS_CONSTANTS_H_
 
+#include <cstdint>
+
 // The isolation mode that it's going to be used if this env var is specified, 
 // "namespaces", "landlock" or "capabilities"
 inline constexpr const char kIsolationModeEnv[] = "MINI_SANDBOX_ISOLATION_MODE";
