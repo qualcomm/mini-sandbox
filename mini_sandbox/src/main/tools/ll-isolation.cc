@@ -264,6 +264,10 @@ static int MapWorkingDirMountPoint(const std::string& mount_point) {
 }
 
 static int MapAllFilesystem() {
+  for (auto overlay_path : opt.overlayfsmount) {
+    PRINT_DEBUG("Move %s from overlay into writables", overlay_path.c_str());
+    addIfNotPresent(opt.writable_files, overlay_path.c_str());
+  }
   int res = LLMapReadOnlyPaths();
   res += LLMapReadWritePaths(); 
   return res;
@@ -315,6 +319,8 @@ static int MapFilesystemPartiallyReadOnly() {
   return res;
 }
 
+
+
 static int LLRunTime() {
 
   if (! LandlockSupported() ) {
@@ -333,6 +339,7 @@ static int LLRunTime() {
     AddLeftoverFoldersToReadOnlyPaths();
     res += MapAllFilesystem();
     MapDev();
+    MakeFakeHome(kFakeHome);
 
   } else if (opt.hermetic || opt.use_overlayfs) {
     res = MapAllFilesystem(); 

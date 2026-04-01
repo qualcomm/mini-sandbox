@@ -54,6 +54,11 @@ enum class MiniSbxExecMode {
   LIB,
 };
 
+
 #define DEFAULT_PORTS 3
 inline constexpr const uint16_t kDefaultPorts[3] = { 80, 443, 53 };
+
+inline constexpr const char kFakeHome[] = "/tmp/sbx-fake-home";
+
+
 #endif
