@@ -47,6 +47,7 @@ enum class ErrorCode : int {
   //The difference between this and NESTED_SANDBOX is that NESTED_SANDBOX is returned when the parent process started the sandbox
   SandboxAlreadyStarted = -202,
   SandboxModeAlreadySet = -203,
+  LLPortsNotSet = -204,
   Unknown = -1000
 };
 
@@ -94,6 +95,8 @@ inline std::string GetErrorMessage(ErrorCode code) {
       return "SYS_capset failed";
     case ErrorCode::SysCapget:
       return "SYS_capget failed";
+    case ErrorCode::LLPortsNotSet:
+      return "Landlock could not add net rules for requested ports";
     case ErrorCode::Unknown:
     default:
       return "Unknown error occurred";

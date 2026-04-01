@@ -44,11 +44,11 @@ MiniSbxNetworkType MiniSbxNetworkTap::Type() const {
 // only have two network management which are defined
 // at compile time
 std::unique_ptr<MiniSbxNetwork> MakeMiniSbxNetwork() {
-#ifndef MINITAP
-  return std::make_unique<MiniSbxNetworkSimple>();
-#else
-  return std::make_unique<MiniSbxNetworkTap>();
+#ifdef MINITAP
+  if (UserNamespaceSupported())
+    return std::make_unique<MiniSbxNetworkTap>();
 #endif
+  return std::make_unique<MiniSbxNetworkSimple>();
 }
 
 

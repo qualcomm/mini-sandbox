@@ -65,7 +65,7 @@ namespace fs = std::experimental::filesystem;
 #include <sys/syscall.h>
 
 std::set<std::string> ReadOnlyPaths;
-static int ruleset = -1;
+static int gRuleset = -1;
 static int gABI = -1;
 
 static int SysLandlockCreateRuleset(const struct landlock_ruleset_attr* attr,
@@ -128,17 +128,56 @@ static inline __u64 AccessFile() {
   return access & ABIMask();
 }
 
+static int AddTcpRule(int ruleset_fd, uint64_t port) {
+  struct landlock_net_port_attr rule = {
+    .allowed_access = LANDLOCK_ACCESS_NET_CONNECT_TCP,
+    .port = port,
+  };
+
+  if (SysLandlockAddRule(ruleset_fd, LANDLOCK_RULE_NET_PORT, &rule, 0) < 0)
+    return -1;
+  return 0;
+}
+
+static int MapPorts(int ruleset_fd, const uint16_t* ports, size_t num_ports) { 
+  int res = 0;
+  if (!ports && num_ports != 0)
+    return -1;
+  
+  for (size_t i = 0; i < num_ports; ++i) {
+    res += AddTcpRule(ruleset_fd, (uint64_t)ports[i]);
+  }
+  
+  return res;
+}
+
 static int CreateBasicRulesetFd() {
   if (gABI < 0)
     gABI = LandlockProbeABI();
 
   struct landlock_ruleset_attr ruleset_attr = {};
   ruleset_attr.handled_access_fs = ll_supported_fs_mask_for_abi(gABI);
-  if (opt.create_netns == NETNS_WITH_LOOPBACK || opt.create_netns == NETNS)  
+
+  // We set up the network policy here. We can have three distinct cases
+  // Case1: User wants to have a firewall like behavior as we used to have 
+  // with minitap. For now the best effort is to allow only a subset of TCP
+  // ports
+  if (opt.fw_rules.mode == FirewallMode::FirewallEnabled) {
     ruleset_attr.handled_access_net = ll_supported_net_mask_for_abi(gABI);
+  }
+  // Case2: We don't add any ports' rule meaning that all TCP ports are denied
+  else if (opt.create_netns == NETNS_WITH_LOOPBACK || opt.create_netns == NETNS) {
+    ruleset_attr.handled_access_net = ll_supported_net_mask_for_abi(gABI);
+  }
+  // Case3: We don't add any network restriction meaning that all connections are
+  // allowed
+  else
+    ruleset_attr.handled_access_net = 0;
+
   ruleset_attr.scoped = ll_supported_scope_mask_for_abi(gABI);
 
   int fd = SysLandlockCreateRuleset(&ruleset_attr, sizeof(ruleset_attr), 0);
+
   if (fd < 0) return -errno;
   return fd;
 }
@@ -173,14 +212,14 @@ static int AddPathRule(int ruleset_fd, const std::string& path, __u64 allowed_ac
 
 
 static int MapReadOnlyPath(const std::string& path) {
-  int res = AddPathRule(ruleset, path, AccessRO());  
+  int res = AddPathRule(gRuleset, path, AccessRO());  
   PRINT_DEBUG("Map %s as RO == %d", path.c_str(), res);
   return res;
 }
 
 
 static int MapReadWritePath(const std::string& path) {
-  int res = AddPathRule(ruleset, path, AccessRW());  
+  int res = AddPathRule(gRuleset, path, AccessRW());  
   PRINT_DEBUG("Map %s as RW == %d", path.c_str(), res);
   return res;
 }
@@ -282,9 +321,9 @@ static int LLRunTime() {
     return MiniSbxReportError(ErrorCode::LLNotSupported);
   }
 
-  ruleset = CreateBasicRulesetFd();
+  gRuleset = CreateBasicRulesetFd();
   int res = 0;
-  if (ruleset < 0) return ruleset;
+  if (gRuleset < 0) return gRuleset;
 
   if (opt.use_default) {
     const std::string mount_point = GetMountPointOf(opt.working_dir);
@@ -303,17 +342,26 @@ static int LLRunTime() {
     MiniSbxMountWrite(opt.working_dir);
     MapFilesystemPartiallyReadOnly();
   }
+
+
+  if (opt.fw_rules.mode == FirewallMode::FirewallEnabled) {    
+    SetPorts(&opt.fw_rules);
+    res = MapPorts(gRuleset, opt.fw_rules.ports, opt.fw_rules.ports_count);    
+    if (res < 0)
+      return MiniSbxReportError(ErrorCode::LLPortsNotSet);
+  } 
+
  
   if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0)) {
   	return MiniSbxReportGenericError("Failed to restrict privileges");
   } 
  
-  if (SysLandlockRestrictSelf(ruleset, 0) < 0) {
-    close(ruleset);
+  if (SysLandlockRestrictSelf(gRuleset, 0) < 0) {
+    close(gRuleset);
     return MiniSbxReportGenericError("LandlockRestrictSelf failed");
   }
    
-  close(ruleset);
+  close(gRuleset);
   return res;
 
 }

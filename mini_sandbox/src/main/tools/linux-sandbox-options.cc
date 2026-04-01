@@ -517,6 +517,7 @@ void ParseOptions(int argc, char *argv[]) {
 std::regex ipv4_regex(R"(^(\d{1,3}\.){3}\d{1,3}$)");
 std::regex domain_regex(R"(^([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$)");
 std::regex subnet_regex(R"(^(\d{1,3}\.){3}\d{1,3}/\d{1,2}$)");
+std::regex port_regex(R"(^[0-9]+$)");
 
 static int ValidateFilePath(const std::string &path) {
   std::error_code ec;
@@ -546,11 +547,13 @@ static int ReadAllowedConnections(std::ifstream& file) {
       line.erase(line.find_last_not_of(" \t\r\n") + 1);
 
       if (std::regex_match(line, ipv4_regex)) {
-          MiniSbxAllowIpv4(line.c_str());
+          MiniSbxAllowIpv4(line);
       } else if (std::regex_match(line, domain_regex)) {
-          MiniSbxAllowDomain(line.c_str());
+          MiniSbxAllowDomain(line);
       } else if (std::regex_match(line, subnet_regex)) {
-          MiniSbxAllowIpv4Subnet(line.c_str());
+          MiniSbxAllowIpv4Subnet(line);
+      } else if (std::regex_match(line, port_regex)) {
+          MiniSbxAllowPort(line);
       } else {
           std::cerr << "Warning: Unrecognized rule format: " << line << "\n";
           res = -1;
@@ -582,7 +585,7 @@ int MiniSbxAllowMaxConnections(int max_connections) {
     MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
     return -1;
   }
-  return set_max_connections(max_connections, &(opt.fw_rules));
+  return SetMaxConnections(max_connections, &(opt.fw_rules));
 }
 
 int MiniSbxAllowAllDomains() {
@@ -591,7 +594,7 @@ int MiniSbxAllowAllDomains() {
     return -1;
   }
   PRINT_DEBUG("Allow all domains");
-  if(reset_firewall_rules(&opt.fw_rules) == 0){
+  if(ResetFirewallRules(&opt.fw_rules) == 0){
     return 0;
   }else{
     return MiniSbxReportError(ErrorCode::IllegalNetworkConfiguration);
@@ -606,7 +609,7 @@ int MiniSbxAllowDomain(const std::string& domain) {
   }
   const char* domain_str = domain.c_str();
   PRINT_DEBUG("allow domain %s", domain_str);
-  if(set_firewall_rule(domain_str, &(opt.fw_rules))<0){
+  if(SetFirewallRule(domain_str, &(opt.fw_rules))<0){
     return MiniSbxReportError(ErrorCode::IllegalNetworkConfiguration);
   }else{
     return 0;
@@ -620,9 +623,9 @@ int MiniSbxAllowIpv4(const std::string& ip) {
   }
   const char* ip_str = ip.c_str();
   PRINT_DEBUG("allow ip %s", ip_str);
-  if(set_firewall_rule(ip_str, &(opt.fw_rules))<0){
+  if(SetFirewallRule(ip_str, &(opt.fw_rules))<0){
     return MiniSbxReportError(ErrorCode::IllegalNetworkConfiguration);
-  }else{
+  } else {
     return 0;
   }
   return 0;
@@ -634,6 +637,20 @@ int MiniSbxAllowIpv4Subnet(const std::string& subnet) {
     return -1;
   }
   return MiniSbxAllowIpv4(subnet);
+}
+
+int MiniSbxAllowPort(const std::string& port) { 
+  if (opt.is_running != NOT_RUNNING){
+    MiniSbxReportError(ErrorCode::SandboxAlreadyStarted);
+    return -1;
+  }
+  unsigned long p = std::stoul(port);
+  if (p == 0 || p > 65535) {
+    return MiniSbxReportError(ErrorCode::IllegalNetworkConfiguration);
+  }
+  if(SetFirewallPort((uint16_t)p, &opt.fw_rules) < 0)
+    return MiniSbxReportError(ErrorCode::IllegalNetworkConfiguration);
+  return 0;
 }
 #endif
 
@@ -663,7 +680,7 @@ int MiniSbxEnableLog(const std::string &path) {
 }
 
 
-bool isInsideHomeDir(const fs::path path){
+bool IsInsideHomeDir(const fs::path path){
   fs::path path_canon = fs::path(CanonicPath(path,true));
   fs::path home_dir = GetHomeDir();
   return isSubpath( home_dir,path_canon);
@@ -697,7 +714,7 @@ std::vector<std::string> getSymlinkedDirs(std::string path){
 }
 
 void MountHomeSymlinks(const std::string path, std::vector<std::string>* sources, std::vector<std::string>* targets ){
-  if(isInsideHomeDir(path)){
+  if(IsInsideHomeDir(path)){
     std::vector<std::string> add_folder=getSymlinkedDirs(path);
     for (auto i : add_folder){
       if (sources != NULL){

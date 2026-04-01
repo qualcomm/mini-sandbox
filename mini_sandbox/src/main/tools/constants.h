@@ -52,4 +52,6 @@ enum class MiniSbxExecMode {
   LIB,
 };
 
+#define DEFAULT_PORTS 3
+inline constexpr const uint16_t kDefaultPorts[3] = { 80, 443, 53 };
 #endif

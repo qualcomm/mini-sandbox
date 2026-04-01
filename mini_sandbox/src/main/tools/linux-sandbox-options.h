@@ -131,6 +131,7 @@ int MiniSbxShareNetNamespace() ;
 int MiniSbxAllowConnections(const std::string& path);
 int MiniSbxAllowMaxConnections(int max_connections);
 int MiniSbxAllowIpv4(const std::string& ip);
+int MiniSbxAllowPort(const std::string& port);
 int MiniSbxAllowDomain(const std::string& domain);
 int MiniSbxAllowAllDomains();
 int MiniSbxAllowIpv4Subnet(const std::string& subnet);
