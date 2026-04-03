@@ -905,6 +905,8 @@ static int CreateSymlinksToHomeFiles(std::vector<std::string>& files, const fs::
   for (const std::string& p : files) {
     if (!IsInsideHomeDir(p)) continue;
 
+    std::error_code ec;
+
     const fs::path src = fs::path(p);
     fs::path rel = GetRelative(src, realHome);
 
@@ -914,21 +916,25 @@ static int CreateSymlinksToHomeFiles(std::vector<std::string>& files, const fs::
       rel = src.filename();
     }
 
-    const fs::path linkPath = fakeHome / rel;
-    std::error_code ec;
-    fs::create_directories(linkPath.parent_path(), ec);
-    if (ec) return -1;
 
-    if (fs::exists(linkPath, ec)) {
-      if (ec) return -1;
-      fs::remove(linkPath, ec);
-      if (ec) return -1;
-    } else if (ec) {
-      return -1;
+    const fs::path linkPath = fakeHome / rel;
+    // We dont want to create the symlink the entire path that we requested via -w/-M but
+    // only to its top level directory from the home. If the path we added as write is
+    // $HOME/a/b/c , we wanna create the symlink so that we have $FAKE_HOME/a -> $HOME/a 
+    std::string topLvl = TopLevelRelativeFolder(fakeHome, linkPath.string());
+    const fs::path topLvlP = fs::path(topLvl);
+    if (fs::exists(topLvlP, ec)) {
+      PRINT_DEBUG("No need to re-create link for %s , we already have %s", linkPath.c_str(), topLvl.c_str());
+      return 0;
     }
 
-    fs::create_symlink(src, linkPath, ec);
+    std::string topLvlReal = TopLevelRelativeFolder(realHome, p);
+    const fs::path topLvlRealP = fs::path(topLvlReal);
+
+    PRINT_DEBUG("Create symlink src: %s, linkPath: %s\n", src.c_str(), linkPath.c_str());
+    fs::create_symlink(topLvlRealP, topLvlP, ec);
     if (ec) return -1;
+    PRINT_DEBUG("Created");
   }
   return 0;
 }
@@ -951,8 +957,12 @@ int MakeFakeHome(const std::string& fakeHomeStr) {
     fs::create_directories(fakeHome, ec);
     if (ec) return -1;
   }
-  CreateSymlinksToHomeFiles(opt.writable_files, fakeHome);
+  PRINT_DEBUG("Create links to binds");
   CreateSymlinksToHomeFiles(opt.bind_mount_sources, fakeHome);
+
+  PRINT_DEBUG("Create links to writable files");
+  CreateSymlinksToHomeFiles(opt.writable_files, fakeHome);
+
   SetEnvHome(fakeHomeStr);
   return 0;
 }

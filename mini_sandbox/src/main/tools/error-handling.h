@@ -41,8 +41,7 @@ enum class ErrorCode : int {
   PRSetNoNewPrivsFail = -14,
   SysCapset = -15,
   SysCapget = -16,
-  LLFailedRuleset = -17,
-  LLFailedAddRule = -18,
+  LLFailedRuleset = -17,  
   GeneralOSError = -100,
   // Error codes from -201 are recoverables
   NestedSandbox = -201,
@@ -51,6 +50,7 @@ enum class ErrorCode : int {
   SandboxModeAlreadySet = -203,
   LLPortsNotSet = -204,
   LLDirNotExist = -205,
+  LLFailedAddRule = -206,
   Unknown = -1000
 };
 

@@ -342,7 +342,6 @@ static int LLRunTime() {
     ll_res = MapAllFilesystem();
     MapDev();
     MakeFakeHome(kFakeHome);
-
   } else if (opt.hermetic || opt.use_overlayfs) {
     ll_res = MapAllFilesystem(); 
   }
@@ -350,6 +349,7 @@ static int LLRunTime() {
     MiniSbxMountWrite(kTmp);
     MiniSbxMountWrite(opt.working_dir);
     ll_res = MapFilesystemPartiallyReadOnly();
+    ll_res += MapAllFilesystem();
   }  
 
   if (opt.fw_rules.mode == FirewallMode::FirewallEnabled) {    
@@ -378,15 +378,12 @@ static int LLRunTime() {
 
 int LLRunTimeCLI() {
   PRINT_DEBUG("Start landlock CLI isolation\n");
-  int res = LLRunTime();
 
+  int res = LLRunTime();
   if (res < 0) 
     return res;
-  opt.args.push_back(nullptr);
-  if (execvp(opt.args[0], opt.args.data()) < 0) {
-    MiniSbxReportGenericError("execvp failed");  
-    return -1;
-  }
+
+  SpawnChild(true);
   return res;
 }
 
