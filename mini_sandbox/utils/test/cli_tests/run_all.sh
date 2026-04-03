@@ -7,6 +7,7 @@
 set -ex
 
 uname -a
+cat /sys/kernel/security/lsm
 
 SCRIPT_PATH="$(realpath "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
@@ -52,7 +53,8 @@ if [[ "${LANDLOCK_TEST:-}" != "1" ]]; then
   check_exit $SCRIPT_DIR/test_default_overlay_over_readonly.sh
 else
   mini-sandbox -D /tmp/dbg.log -- echo 'Ok'
-  cat /tmp/dbg.log | grep "Landlock ABI"
+  grep "Landlock ABI" /tmp/dbg.log
+
 fi
 
 check_exit $SCRIPT_DIR/test_default_base.sh  
