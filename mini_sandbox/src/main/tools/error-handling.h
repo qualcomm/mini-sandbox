@@ -41,6 +41,7 @@ enum class ErrorCode : int {
   PRSetNoNewPrivsFail = -14,
   SysCapset = -15,
   SysCapget = -16,
+  LLFailedRuleset = -17,  
   GeneralOSError = -100,
   // Error codes from -201 are recoverables
   NestedSandbox = -201,
@@ -48,6 +49,8 @@ enum class ErrorCode : int {
   SandboxAlreadyStarted = -202,
   SandboxModeAlreadySet = -203,
   LLPortsNotSet = -204,
+  LLDirNotExist = -205,
+  LLFailedAddRule = -206,
   Unknown = -1000
 };
 
@@ -97,6 +100,12 @@ inline std::string GetErrorMessage(ErrorCode code) {
       return "SYS_capget failed";
     case ErrorCode::LLPortsNotSet:
       return "Landlock could not add net rules for requested ports";
+    case ErrorCode::LLFailedRuleset:
+      return "Landlock failed to create ruleset";
+    case ErrorCode::LLFailedAddRule:
+      return "Landlock failed to add a new rule";
+    case ErrorCode::LLDirNotExist:
+      return "Landlock dir does not exist";
     case ErrorCode::Unknown:
     default:
       return "Unknown error occurred";

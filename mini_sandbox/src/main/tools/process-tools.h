@@ -103,7 +103,8 @@ bool ShouldBeWritable(const std::string &mnt_dir);
 std::string CanonicPath(const std::string path_str, bool resolve_symlink, bool* is_symlink_out);
 bool IsInsideHomeDir(const fs::path path);
 int SetEnvHome(const std::string& value);
-int MakeFakeHome(const std::string& kFakeHome) ;
+int MakeFakeHome(const std::string& fakeHome) ;
+int MaybeChdirWorkingDirUnderFakeHome( const std::string& fakeHome, std::string& newWorkingDir);
 uid_t get_outer_uid();
 gid_t get_outer_gid();
 

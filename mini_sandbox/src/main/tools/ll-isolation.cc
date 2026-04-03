@@ -188,7 +188,7 @@ static int AddPathRule(int ruleset_fd, const std::string& path, __u64 allowed_ac
   int fd = -1;
   bool is_dir = IsDir(path.c_str(), &fd);
   if (fd < 0) {
-    return -1;
+    return MiniSbxReportErrorAndMessage(path, ErrorCode::LLDirNotExist);
   }
 
   struct landlock_path_beneath_attr rule = {};
@@ -200,10 +200,9 @@ static int AddPathRule(int ruleset_fd, const std::string& path, __u64 allowed_ac
   }
 
   int rc = SysLandlockAddRule(ruleset_fd, LANDLOCK_RULE_PATH_BENEATH, &rule, 0);
-  int saved_errno = errno;
   close(fd);
 
-  if (rc < 0) return -saved_errno;
+  if (rc < 0) return MiniSbxReportErrorAndMessage(path, ErrorCode::LLFailedAddRule);
   return 0;
 }
 
@@ -249,18 +248,21 @@ static int LLMapReadWritePaths() {
   return rc;
 }
 
-static int MapWorkingDirMountPoint(const std::string& mount_point) {
-  int res = 0;
+static void MapWorkingDirMountPoint(const std::string& mount_point) {
+
   std::string home_dir = GetHomeDir();
   std::string top_level = GetTopLevelFolder(mount_point, home_dir, opt.working_dir);
-  if (top_level.empty()) 
-    return -1;
+  if (top_level.empty()) {
+    MiniSbxReportGenericError("Top level folder is empty");
+    return;
+  }
+
   if (opt.parents_writable)
-    res = MiniSbxMountWrite(top_level);
+    MiniSbxMountWrite(top_level);
   else 
-    res = MiniSbxMountBind(top_level);
+    MiniSbxMountBind(top_level);
   PRINT_DEBUG("Top level: %s\n", top_level.c_str());
-  return res;
+  return;
 }
 
 static int MapAllFilesystem() {
@@ -328,34 +330,33 @@ static int LLRunTime() {
   }
 
   gRuleset = CreateBasicRulesetFd();
-  int res = 0;
-  if (gRuleset < 0) return gRuleset;
+  int ll_res = 0, port_res = 0;
+  if (gRuleset < 0) return MiniSbxReportError(ErrorCode::LLFailedRuleset);
 
   if (opt.use_default) {
     const std::string mount_point = GetMountPointOf(opt.working_dir);
     MiniSbxMountWrite(kTmp);
     MiniSbxMountWrite(opt.working_dir);
-    res += MapWorkingDirMountPoint(mount_point);
+    MapWorkingDirMountPoint(mount_point);
     AddLeftoverFoldersToReadOnlyPaths();
-    res += MapAllFilesystem();
+    ll_res = MapAllFilesystem();
     MapDev();
     MakeFakeHome(kFakeHome);
-
   } else if (opt.hermetic || opt.use_overlayfs) {
-    res = MapAllFilesystem(); 
+    ll_res = MapAllFilesystem(); 
   }
   else {
     MiniSbxMountWrite(kTmp);
     MiniSbxMountWrite(opt.working_dir);
-    MapFilesystemPartiallyReadOnly();
-  }
-
+    ll_res = MapFilesystemPartiallyReadOnly();
+    ll_res += MapAllFilesystem();
+  }  
 
   if (opt.fw_rules.mode == FirewallMode::FirewallEnabled) {    
     SetPorts(&opt.fw_rules);
-    res = MapPorts(gRuleset, opt.fw_rules.ports, opt.fw_rules.ports_count);    
-    if (res < 0)
-      return MiniSbxReportError(ErrorCode::LLPortsNotSet);
+    port_res = MapPorts(gRuleset, opt.fw_rules.ports, opt.fw_rules.ports_count);    
+    if (port_res < 0)
+      MiniSbxReportError(ErrorCode::LLPortsNotSet);
   } 
 
  
@@ -369,22 +370,20 @@ static int LLRunTime() {
   }
    
   close(gRuleset);
-  return res;
+  
+  return (ll_res < 0) ? ll_res : port_res;
 
 }
 
 
 int LLRunTimeCLI() {
   PRINT_DEBUG("Start landlock CLI isolation\n");
-  int res = LLRunTime();
 
+  int res = LLRunTime();
   if (res < 0) 
     return res;
-  opt.args.push_back(nullptr);
-  if (execvp(opt.args[0], opt.args.data()) < 0) {
-    MiniSbxReportGenericError("execvp failed");  
-    return -1;
-  }
+
+  SpawnChild(true);
   return res;
 }
 

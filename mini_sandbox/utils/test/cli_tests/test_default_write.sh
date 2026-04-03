@@ -69,8 +69,13 @@ echo "sandbox-test" > $PWD/../test.txt
 check_last_command
 
 echo -e "\nTest writing in parent of the parent folder $PWD/../../"
-echo "sandbox-test" > $PWD/../../test.txt
-check_last_command
+if [ "$LANDLOCK_TEST" = "1" ]; then
+  echo "sandbox-test" > $PWD/../../test.txt
+  check_last_command_failed
+else
+  echo "sandbox-test" > $PWD/../../test.txt
+  check_last_command
+fi
 
 EOF
 
