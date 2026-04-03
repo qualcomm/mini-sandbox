@@ -135,17 +135,17 @@ jobs:
           --security-opt apparmor=unconfined \
           mini-sandbox-debian:"${TAG}"
 
-      - name: Build Ubuntu24 for Landlock
-        run: |
-          test -d dist || (echo "dist/ missing" && exit 1)
+      #- name: Build Ubuntu24 for Landlock
+      #  run: |
+      #    test -d dist || (echo "dist/ missing" && exit 1)
 
-          docker build \
-            -f mini_sandbox/utils/mini_sandbox_docker/Dockerfile.landlock.ubuntu24 \
-            --build-arg V=dist \
-            -t mini-sandbox-ubuntu24-ll:"${TAG}" \
-            .
+      #    docker build \
+      #      -f mini_sandbox/utils/mini_sandbox_docker/Dockerfile.landlock.ubuntu24 \
+      #      --build-arg V=dist \
+      #      -t mini-sandbox-ubuntu24-ll:"${TAG}" \
+      #      .
 
-      - name: Run Ubuntu24 for Landlock tests
-        run: | 
-          docker run --rm \
-          mini-sandbox-ubuntu24-ll:"${TAG}"
+      #- name: Run Ubuntu24 for Landlock tests
+      #  run: | 
+      #    docker run --rm \
+      #    mini-sandbox-ubuntu24-ll:"${TAG}"

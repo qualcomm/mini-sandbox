@@ -396,6 +396,5 @@ int LLRunTimeLib() {
 int LandlockSupported() {
   gABI = LandlockProbeABI();
   PRINT_DEBUG("Landlock ABI: %d", gABI);
-  printf("Landlock ABI: %d\n", gABI);
   return gABI >= MIN_LL_ABI;
 }
