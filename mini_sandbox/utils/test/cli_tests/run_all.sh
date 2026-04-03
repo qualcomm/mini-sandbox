@@ -6,6 +6,8 @@
 
 set -ex
 
+uname -a
+
 SCRIPT_PATH="$(realpath "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
 WORKSPACE="/local/mnt/workspace/"
@@ -25,7 +27,6 @@ check_exit() {
 
 check_exit $SCRIPT_DIR/test_err.sh
 check_exit $SCRIPT_DIR/test_tap_err.sh
-check_exit $SCRIPT_DIR/test_default_base.sh  
 
 # Following tests are for overlayfs and work only for 
 # namespaces sandbox so we dont run them if we're testing
@@ -49,8 +50,12 @@ if [[ "${LANDLOCK_TEST:-}" != "1" ]]; then
   done
 
   check_exit $SCRIPT_DIR/test_default_overlay_over_readonly.sh
+else
+  mini-sandbox -D /tmp/dbg.log -- echo 'Ok'
+  cat /tmp/dbg.log | grep "Landlock ABI"
 fi
 
+check_exit $SCRIPT_DIR/test_default_base.sh  
 check_exit $SCRIPT_DIR/test_default_write.sh
 check_exit $SCRIPT_DIR/test_default_tap.sh
 check_exit $SCRIPT_DIR/test_tap_firewall.sh
