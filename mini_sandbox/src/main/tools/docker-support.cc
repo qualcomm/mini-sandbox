@@ -3,16 +3,17 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "docker-support.h"
+#include "src/main/tools/docker-support.h"
 #include "src/main/tools/process-tools.h"
+#include "src/main/tools/constants.h"
 
 static bool isDockerEnvPresent() {
-  fs::path path("/.dockerenv");
+  fs::path path(kDockerPath);
   return fs::exists(path);
 }
 
 static bool isRootInOverlay() {
-  FILE *mounts = setmntent("/proc/self/mounts", "r");
+  FILE *mounts = setmntent(kMounts, "r");
   struct mntent *ent;
   if (mounts == nullptr) {
     return false;
@@ -31,21 +32,14 @@ bool isRunningInDocker() { return isDockerEnvPresent() || isRootInOverlay(); }
 enum DockerMode CheckDockerMode() {
   enum DockerMode res;
  
-  if (std::getenv("MINI_SANDBOX_DOCKER_UNPRIVILEGED") != nullptr)
+  if (std::getenv(kDockerUnprivilegedEnv) != nullptr)
     res = UNPRIVILEGED_CONTAINER;
-  else if (std::getenv("MINI_SANDBOX_DOCKER_PRIVILEGED"))
+  else if (std::getenv(kDockerPrivilegedEnv))
     res = PRIVILEGED_CONTAINER;
   else if (isRunningInDocker())
     res = UNPRIVILEGED_CONTAINER;
   else 
     res = NO_CONTAINER;
-
-  bool user_namespace = UserNamespaceSupported();
-  // We treat systems where user namespaces are not supported
-  // as unprivileged containers where clone()/unshare() are not accessible
-  // and in those cases our sandbox will work best effort.
-  if (!user_namespace) 
-    res = UNPRIVILEGED_CONTAINER;
 
   return res;
 }

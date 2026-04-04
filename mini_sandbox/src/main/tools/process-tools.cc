@@ -16,6 +16,7 @@
 #include "src/main/tools/logging.h"
 #include "src/main/tools/error-handling.h"
 #include "src/main/tools/linux-sandbox-options.h"
+#include "src/main/tools/constants.h"
 
 #include <mntent.h>
 
@@ -42,6 +43,7 @@
 #include <sys/wait.h>
 #include <sys/utsname.h>
 #include <unistd.h>
+#include <system_error>
 #if __has_include(<filesystem>)
 #include <filesystem>
 namespace fs = std::filesystem;
@@ -60,7 +62,7 @@ namespace fs = std::experimental::filesystem;
 #include <cctype>
 
 #define MAX_ATTEMPTS 100
-#define INTERNAL_MINI_SANDBOX_ENV "__INTERNAL_MINI_SANDBOX_ON"
+
 
 static UserNamespaceSupport user_ns_support = NON_INIT;
 
@@ -282,7 +284,7 @@ int GetCWD(std::string& res) {
 
 
 int CountMounts() {
-    FILE* fp = setmntent("/proc/self/mounts", "r");
+    FILE* fp = setmntent(kMounts, "r");
     if (!fp) return -1;
 
     int count = 0;
@@ -319,45 +321,40 @@ static int ValidateDevId(const char* mnt_dir, dev_t st_dev ) {
 }
 
 std::string GetMountPointOf(const std::string& dir) {
-    PRINT_DEBUG("Executing %s\n", __func__);
+  const char* dir_str = dir.c_str();  
+  struct stat dirStat;
+  if (stat(dir_str, &dirStat) != 0) {  
+    return "";
+  }
 
-    const char* dir_str = dir.c_str();
-    
-    struct stat dirStat;
-    if (stat(dir_str, &dirStat) != 0) {
-        perror("stat");
-        return "";
+  FILE* mtab = setmntent("/etc/mtab", "r");
+  if (!mtab) {      
+    return "";
+  }
+
+  std::string mountPoint;
+  size_t currMountPointLen = 0;
+  struct mntent* ent;
+  while ((ent = getmntent(mtab)) != nullptr) {
+    if (isSubpath(ent->mnt_dir, dir_str)) {
+      if (ValidateDevId(ent->mnt_dir, dirStat.st_dev) == 0) {
+        if (mountPoint.empty()) {
+          mountPoint = ent->mnt_dir;
+          currMountPointLen = strlen(ent->mnt_dir);
+        } 
+        else {
+          size_t newMountPointLen = strlen(ent->mnt_dir);
+          if (newMountPointLen > currMountPointLen) {
+              mountPoint = ent->mnt_dir;
+          }
+        } 
+      }
     }
+  }
+  PRINT_DEBUG("Final mount point -> %s\n", mountPoint.c_str());
 
-    FILE* mtab = setmntent("/etc/mtab", "r");
-    if (!mtab) {
-        perror("setmntent");
-        return "";
-    }
-
-    std::string mountPoint;
-    size_t currMountPointLen = 0;
-    struct mntent* ent;
-    while ((ent = getmntent(mtab)) != nullptr) {
-        if (isSubpath(ent->mnt_dir, dir_str)) {
-	    if (ValidateDevId(ent->mnt_dir, dirStat.st_dev) == 0) {
-                if (mountPoint.empty()) {
-                    mountPoint = ent->mnt_dir;
-                    currMountPointLen = strlen(ent->mnt_dir);
-                } 
-                else {
-                    size_t newMountPointLen = strlen(ent->mnt_dir);
-                    if (newMountPointLen > currMountPointLen) {
-                        mountPoint = ent->mnt_dir;
-                    }
-                } 
-            }
-        }
-    }
-    PRINT_DEBUG("Final mount point -> %s\n", mountPoint.c_str());
-
-    endmntent(mtab);
-    return mountPoint;
+  endmntent(mtab);
+  return mountPoint;
 }
 
 
@@ -514,7 +511,7 @@ gid_t get_outer_gid() {
 
 
 int MiniSbxSetInternalEnv() {
-  if (setenv(INTERNAL_MINI_SANDBOX_ENV, "1", 1) != 0) {
+  if (setenv(kInternalMiniSandboxEnv, "1", 1) != 0) {
       std::cerr << "Failed to set environment variable." << std::endl;
       MiniSbxReportGenericError("Failed to set environment variable __INTERNAL_MINI_SANDBOX_ON");
   }
@@ -523,7 +520,7 @@ int MiniSbxSetInternalEnv() {
 
 
 int MiniSbxGetInternalEnv() {
-  const char* value = getenv(INTERNAL_MINI_SANDBOX_ENV);
+  const char* value = getenv(kInternalMiniSandboxEnv);
   if (value) {
     return 0;
   } 
@@ -666,9 +663,7 @@ bool CanCreateUserNamespace() {
 bool UserNamespaceSupported() {
   bool res = false;
   if (user_ns_support != NON_INIT)
-    res = (user_ns_support == USER_NS_SUPPORTED) ? true : false ;
-  else if (std::getenv("MINI_SANDBOX_FORCE_USER_NAMESPACE") != nullptr)
-    res = true;
+    res = (user_ns_support == USER_NS_SUPPORTED);
   else {
     res = HasUserNamespaceSupport() && CanCreateUserNamespace();
     user_ns_support = (res) ? USER_NS_SUPPORTED : USER_NS_NOT_SUPPORTED;
@@ -676,3 +671,298 @@ bool UserNamespaceSupported() {
   return res;
 }
 
+
+
+bool IsDir(const char* path, int* out_fd) {
+  int fd = open(path, O_PATH | O_CLOEXEC);
+  if (fd < 0)
+      return false;
+
+  struct stat st{};
+  if (fstat(fd, &st) != 0) {
+      close(fd);
+      return false;
+  }
+
+  if (out_fd) {
+      *out_fd = fd;
+  } else {
+      close(fd);
+  }
+
+  return S_ISDIR(st.st_mode);
+}
+
+#ifdef  _EXPERIMENTAL_FILESYSTEM_
+static fs::path make_relative(const fs::path& target, const fs::path& base) {
+    auto target_abs = fs::canonical(target);
+    auto base_abs = fs::canonical(base);
+
+    auto target_it = target_abs.begin();
+    auto base_it = base_abs.begin();
+
+    // Skip common prefix
+    while (target_it != target_abs.end() && base_it != base_abs.end() && *target_it == *base_it) {
+        ++target_it;
+        ++base_it;
+    }
+
+    if (base_it != base_abs.end())
+        // This should be unreachable as we assume that the mount dir
+        // always contains the CWD
+        return fs::path("");
+
+    fs::path result;
+    for (; target_it != target_abs.end(); ++target_it) {
+        result /= *target_it;
+    }
+
+    if (result == ".")
+        result = fs::path("");
+    return result;
+}
+#endif
+
+
+fs::path GetRelative( const fs::path& target, const fs::path& base) {
+  fs::path rel("");
+  try {
+#ifndef  _EXPERIMENTAL_FILESYSTEM_
+    rel = fs::relative(target, base);
+#else
+    rel = make_relative(target, base);
+#endif
+  }
+  catch (const fs::filesystem_error &e) {
+    std::string msg = e.what();
+    PRINT_DEBUG("Filesystem error: %s\n", msg.c_str());
+  } catch (const std::exception &e) {
+    std::string msg = e.what();
+    PRINT_DEBUG("General error: %s\n", msg.c_str());
+  }
+  return rel;
+}
+
+
+std::string TopLevelRelativeFolder(const std::string& mount_point, const std::string& workdir) {
+  try {
+    fs::path mount_fs = mount_point;
+    fs::path wd_fs = workdir;
+    fs::path rel = GetRelative(wd_fs, mount_fs);
+    PRINT_DEBUG("Relative path from WorkingDir to MountFS is: %s", rel.string().c_str());
+    auto it = rel.begin();
+    if (std::distance(it, rel.end()) >= 1) {
+      if (rel.filename() == fs::path("."))
+        return "";
+      fs::path top_level_fs = mount_fs / *it;
+      return fs::absolute(top_level_fs).string();
+    } else {
+      return "";
+    }
+  } catch (const fs::filesystem_error &e) {
+    std::string msg = e.what();
+    PRINT_DEBUG("Filesystem error: %s\n", msg.c_str());
+  } catch (const std::exception &e) {
+    std::string msg = e.what();
+    PRINT_DEBUG("General error: %s\n", msg.c_str());
+  }
+  return "";
+}
+
+std::string GetTopLevelFolder(const std::string& mount_point, const std::string& home, const std::string& working_dir) {
+  if (mount_point.empty())
+    return "";
+
+  // top_level is the first directory between our CWD and its respective mount
+  // point. For instance, if our mount point is /A and CWD is /A/B/C/D,
+  // the top_level dir will be /A/B . The top_level dirs and all subdirs until
+  // the CWD will be mounted as overlay and their content will be mapped to allow
+  // by default access to parent folder' files
+  std::string top_level = TopLevelRelativeFolder(mount_point, working_dir);
+
+  if (top_level == "" ) {
+    return "";
+  }
+
+  // If the top_level folder contains the home dir we would end up mounting
+  // the home dir as overlay but that might leak secrets so we try to get the
+  // new top_level dir from the home_dir to our working dir
+  // e.g., /home/user/top_level/working_dir -> top_level will be /home/user/top_level
+  if (isSubpath(top_level, home) ) {
+    top_level = TopLevelRelativeFolder(home, working_dir);
+  }
+
+  PRINT_DEBUG("top_level -> %s\n", top_level.c_str());
+  return top_level;
+}
+
+bool EndsWith(const char *mnt_dir, const char *suffix) {
+  if (!mnt_dir || !suffix) return false;
+  size_t len_dir = strlen(mnt_dir);
+  size_t len_suffix = strlen(suffix);
+  if (len_dir < len_suffix)
+    return false;
+  return strcmp(mnt_dir + len_dir - len_suffix, suffix) == 0;
+}
+
+
+bool StartsWith(const char* mnt_dir, const char* prefix) {
+  if (!mnt_dir || !prefix) return false;
+  size_t len_dir = strlen(mnt_dir);
+  size_t len_prefix = strlen(prefix);
+  if (len_dir < len_prefix)
+    return false;
+  return strncmp(mnt_dir, prefix, len_prefix) == 0;
+  
+}
+
+
+bool ShouldBeWritable(const std::string &mnt_dir) {
+  if (mnt_dir == opt.working_dir) {
+    return true;
+  }
+
+  if (EndsWith(mnt_dir.c_str(), kProc)) 
+    return true;
+
+  if (EndsWith(mnt_dir.c_str(), kTmp))
+    return true;
+
+  if (StartsWith(mnt_dir.c_str(), kDev))
+    return true;
+
+  if (opt.enable_pty && mnt_dir == kDevPts) {
+    return true;
+  }
+
+  for (const std::string &writable_file : opt.writable_files) {
+    if (mnt_dir == writable_file) {
+      return true;
+    }
+  }
+
+  for (const std::string &tmpfs_dir : opt.tmpfs_dirs) {
+    if (mnt_dir == tmpfs_dir) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+
+// This function is intended for usage in the APIs, so it's safe to assume that
+// every error is not recoverable
+std::string CanonicPath(const std::string path_str, bool resolve_symlink, bool* is_symlink_out) {
+  bool is_symlink = false;
+  std::string res;
+  try {    
+    fs::path path(path_str);
+    if (fs::exists(path)) {
+      is_symlink = fs::is_symlink(path);
+      if (!resolve_symlink && is_symlink) {
+        res = fs::absolute(path).string();
+      } 
+      else {
+        res = fs::canonical(path).string();
+      }
+    } else {
+      res = path.string(); 
+      // If the path doesn't exist the best that we can do is
+      // to return the original path. The parsing will likely
+      // fail when we call ValidateDirPath, which instead requires
+      // that the path exists.
+    }
+  } catch (const fs::filesystem_error &e) {
+    PRINT_DEBUG("Filesystem error %s:", e.what());
+    MiniSbxReportGenericError("Fs exception");
+    res = "";    
+  }
+  if (is_symlink_out)
+    *is_symlink_out = is_symlink;
+  return res;
+
+}
+
+
+bool IsInsideHomeDir(const fs::path path){
+  fs::path path_canon = fs::path(CanonicPath(path, true, nullptr));
+  fs::path home_dir = GetHomeDir();
+  return isSubpath( home_dir,path_canon);
+}
+
+
+int SetEnvHome(const std::string& value) {
+  if (::setenv("HOME", value.c_str(), /*overwrite=*/1) != 0) {
+    return -1;
+  }
+  return 0;
+}
+
+
+static int CreateSymlinksToHomeFiles(std::vector<std::string>& files, const fs::path& fakeHome) {
+  const fs::path realHome = fs::path(GetHomeDir());
+  for (const std::string& p : files) {
+    if (!IsInsideHomeDir(p)) continue;
+
+    std::error_code ec;
+
+    const fs::path src = fs::path(p);
+    fs::path rel = GetRelative(src, realHome);
+
+    // If relative() fails or escapes home, fall back to basename.
+    // (The ".." check prevents weird paths like "../etc".)
+    if (rel.empty() || rel.native().rfind("..", 0) == 0) {
+      rel = src.filename();
+    }
+
+
+    const fs::path linkPath = fakeHome / rel;
+    // We dont want to create the symlink the entire path that we requested via -w/-M but
+    // only to its top level directory from the home. If the path we added as write is
+    // $HOME/a/b/c , we wanna create the symlink so that we have $FAKE_HOME/a -> $HOME/a 
+    std::string topLvl = TopLevelRelativeFolder(fakeHome, linkPath.string());
+    const fs::path topLvlP = fs::path(topLvl);
+    if (fs::exists(topLvlP, ec)) {
+      PRINT_DEBUG("No need to re-create link for %s , we already have %s", linkPath.c_str(), topLvl.c_str());
+      return 0;
+    }
+
+    std::string topLvlReal = TopLevelRelativeFolder(realHome, p);
+    const fs::path topLvlRealP = fs::path(topLvlReal);
+
+    PRINT_DEBUG("Create symlink src: %s, linkPath: %s\n", src.c_str(), linkPath.c_str());
+    fs::create_symlink(topLvlRealP, topLvlP, ec);
+    if (ec) return -1;
+    PRINT_DEBUG("Created");
+  }
+  return 0;
+}
+
+
+// Returns 0 on success, -1 on failure.
+int MakeFakeHome(const std::string& fakeHomeStr) {
+  const fs::path fakeHome = fs::path(fakeHomeStr);
+
+  {
+    std::error_code ec;
+    if (fs::exists(fakeHome, ec)) {
+      if (ec) return -1;
+      fs::remove_all(fakeHome, ec);
+      if (ec) return -1;
+    } else if (ec) {
+      return -1;
+    }
+
+    fs::create_directories(fakeHome, ec);
+    if (ec) return -1;
+  }
+  PRINT_DEBUG("Create links to binds");
+  CreateSymlinksToHomeFiles(opt.bind_mount_sources, fakeHome);
+
+  PRINT_DEBUG("Create links to writable files");
+  CreateSymlinksToHomeFiles(opt.writable_files, fakeHome);
+
+  SetEnvHome(fakeHomeStr);
+  return 0;
+}

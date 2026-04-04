@@ -51,7 +51,6 @@ namespace fs = std::filesystem;
 #else
 #include <experimental/filesystem>
 namespace fs = std::experimental::filesystem;
-#define _EXPERIMENTAL_FILESYSTEM_
 #endif
 #include <chrono>
 #include <cstring>
@@ -73,7 +72,9 @@ namespace fs = std::experimental::filesystem;
 #include "src/main/tools/logging.h"
 #include "src/main/tools/process-tools.h"
 #include "src/main/tools/linux-sandbox-pid1.h"
+#include "src/main/tools/caps-isolation.h"
 #include "src/main/tools/docker-support.h"
+#include "src/main/tools/constants.h"
 
 #ifndef XFS_SUPER_MAGIC
 #define XFS_SUPER_MAGIC 0x58465342
@@ -82,14 +83,6 @@ namespace fs = std::experimental::filesystem;
 #define ROOT "/"
 #define MINISBX_TMP_INIT "/tmp/mini-sandbox-init"
 
-#ifndef TMP
-#define TMP "/tmp"
-#endif
-
-#define DEV_LINKS 4
-#define CAP_VERSION _LINUX_CAPABILITY_VERSION_3
-#define CAP_WORDS   _LINUX_CAPABILITY_U32S_3
-#define BIT(n)                       (1UL << (n))
 #define OVELAY_MAX_DEPTH 5
 #define OVELAY_DEPTH_THRESHOLD 2
 
@@ -106,51 +99,19 @@ namespace fs = std::experimental::filesystem;
   })
 #endif // TEMP_FAILURE_RETRY
 
-#ifdef  _EXPERIMENTAL_FILESYSTEM_
-fs::path make_relative(const fs::path& target, const fs::path& base) {
-    auto target_abs = fs::canonical(target);
-    auto base_abs = fs::canonical(base);
-
-    auto target_it = target_abs.begin();
-    auto base_it = base_abs.begin();
-
-    // Skip common prefix
-    while (target_it != target_abs.end() && base_it != base_abs.end() && *target_it == *base_it) {
-        ++target_it;
-        ++base_it;
-    }
-
-    if (base_it != base_abs.end())
-        // This should be unreachable as we assume that the mount dir
-        // always contains the CWD
-        return "";
-
-    fs::path result;
-
-
-    for (; target_it != target_abs.end(); ++target_it) {
-        result /= *target_it;
-    }
-
-    if (result == ".")
-        result = fs::path("");
-    return result;
-}
-#endif
-
 static int global_child_pid __attribute__((unused));
 extern DockerMode docker_mode;
 std::string home_dir;
-std::set<std::string> ReadOnlyPaths;
+
 
 
 void MountAllOverlayFs(std::vector<std::string> list_of_dirs, int depth);
 void MountOverlayFs(std::string lowerdir, int depth);
 std::vector<std::string> GenerateListForOverlayFS();
 bool isSubpath(const fs::path &base, const fs::path &sub);
-bool ToBeMounted(const char *str);
+bool ToBeMounted(const char *str, const char* home);
 
-static bool isDevPath(const char *str) { return std::strcmp(str, "/dev") == 0; }
+static bool isDevPath(const char *str) { return std::strcmp(str, kDev) == 0; }
 
 
 bool isXFS(const std::string &path) {
@@ -477,67 +438,6 @@ void MountOverlayFs(std::string lowerdir, int depth) {
 }
 
 
-static bool ends_with(const char *mnt_dir, const char *suffix) {
-  if (!mnt_dir || !suffix) return false;
-  size_t len_dir = strlen(mnt_dir);
-  size_t len_suffix = strlen(suffix);
-  if (len_dir < len_suffix)
-    return false;
-  return strcmp(mnt_dir + len_dir - len_suffix, suffix) == 0;
-}
-
-
-static bool starts_with(const char* mnt_dir, const char* prefix) {
-  if (!mnt_dir || !prefix) return false;
-  size_t len_dir = strlen(mnt_dir);
-  size_t len_prefix = strlen(prefix);
-  if (len_dir < len_prefix)
-    return false;
-  return strncmp(mnt_dir, prefix, len_prefix) == 0;
-  
-}
-
-
-// We later remount everything read-only, except the paths for which this method
-// returns true.
-static bool ShouldBeWritable(const std::string &mnt_dir) {
-  if (mnt_dir == opt.working_dir) {
-    return true;
-  }
-
-  if (ends_with(mnt_dir.c_str(), "/proc")) 
-    return true;
-
-  if (ends_with(mnt_dir.c_str(), TMP))
-    return true;
-
-  if (starts_with(mnt_dir.c_str(), "/dev"))
-    return true;
-
-  if (opt.enable_pty && mnt_dir == "/dev/pts") {
-    return true;
-  }
-
-  for (const std::string &writable_file : opt.writable_files) {
-    if (mnt_dir == writable_file) {
-      return true;
-    }
-  }
-
-  for (const std::string &tmpfs_dir : opt.tmpfs_dirs) {
-    if (mnt_dir == tmpfs_dir) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-bool contains(const std::vector<std::string> &vec, const char *str) {
-  return std::find(vec.begin(), vec.end(), std::string(str)) != vec.end();
-}
-
-
 // When we are running in opt.default mode, we wanna try to mount the filesystem
 // starting from root as read-only. However, we want to do this by taking into 
 // account the user input that tell us how to mount certain locations
@@ -545,7 +445,7 @@ bool contains(const std::vector<std::string> &vec, const char *str) {
 // This method checks if any of the subpath of the root "/" is going to be mounted 
 // according to a specific policy, or if we should just mount it as read-only, which
 // is our default in most of the cases.
-bool ToBeMounted(const char *str) {
+bool ToBeMounted(const char *str, const char* home_str) {
 
   fs::path inputPath(str);
   PRINT_DEBUG("is %s already mounted?\n", str);
@@ -555,8 +455,8 @@ bool ToBeMounted(const char *str) {
 
   // The home directory is critical so we handle it and its subfolders
   // separately later
-  if (isSubpath(home_dir, inputPath) || isSubpath(inputPath, home_dir)) {
-    PRINT_DEBUG("home_dir subpath %s", home_dir.c_str());
+  if (isSubpath(home_str, inputPath) || isSubpath(inputPath, home_str)) {
+    PRINT_DEBUG("home_str subpath %s", home_str);
     return true;
   }
 
@@ -605,7 +505,7 @@ bool ToBeMounted(const char *str) {
   // /tmp and all its subpaths have to be excluded cause that's where
   // we're going to have the sandbox_root and the overlayfs work dir.
   // We'll have a dedicated policy for mounting /tmp
-  fs::path tmp(TMP);
+  fs::path tmp(kTmp);
   if (isSubpath(tmp, inputPath)) {
     PRINT_DEBUG("/tmp subpath");
     return true;
@@ -659,11 +559,12 @@ static bool CanIterateRoot() {
 // options (see opt struct) we add it ti opt.bind_mount_sources and the
 // following functions will make sure to mount it. The goal is to make sure that
 // all system folders are mounted (then we'll make them read-only)
-static void
+void
 AddLeftoverFoldersToReadOnlyPaths() {
 
   std::string root_path = ROOT;
   std::error_code ec;
+  std::string home_dir = GetHomeDir();
 
   fs::directory_iterator it(
     root_path,
@@ -690,7 +591,7 @@ AddLeftoverFoldersToReadOnlyPaths() {
         if (fs::is_directory(entry.status())) {
           std::string path = entry.path().string();
           const char *entry_path_str = path.c_str();
-          bool deferred_mount = ToBeMounted(entry_path_str); 
+          bool deferred_mount = ToBeMounted(entry_path_str, home_dir.c_str()); 
           PRINT_DEBUG(" result of ToBeMounted() == %d\n", deferred_mount);
   
           // If deferred_mount is false it means that nobody have indicated a policy
@@ -719,7 +620,7 @@ AddLeftoverFoldersToReadOnlyPaths() {
 // uses the parent's root, we use the toggle 'need_mount' to state that we need to mount before remounting as read-only.
 static void MakeFilesystemPartiallyReadOnly(bool need_mount, int num_of_mounts) {
 
-  FILE *mounts = setmntent("/proc/self/mounts", "r");
+  FILE *mounts = setmntent(kMounts, "r");
   if (mounts == nullptr) {
     DIE("setmntent");
   }
@@ -732,7 +633,7 @@ static void MakeFilesystemPartiallyReadOnly(bool need_mount, int num_of_mounts) 
       break;
 
     count +=1;
-    if (ends_with(ent->mnt_dir, "/proc"))
+    if (EndsWith(ent->mnt_dir, kProc))
       continue;
 
     std::string mnt_dir(ent->mnt_dir);
@@ -844,7 +745,7 @@ static void MakeFilesystemPartiallyReadOnly(bool need_mount, int num_of_mounts) 
 static void MountProcAndSys() {
 // Mount a new proc on top of the old one, because the old one still refers to
 // our parent PID namespace.
-  if (mount("/proc", "/proc", "proc", MS_NODEV | MS_NOEXEC | MS_NOSUID,
+  if (mount(kProc, kProc, "proc", MS_NODEV | MS_NOEXEC | MS_NOSUID,
             nullptr) < 0) {
     DIE("mount /proc");
   }
@@ -915,43 +816,6 @@ static void EnterWorkingDirectory() {
 
     DIE("chdir(%s)", path.c_str());
   }
-}
-
-static void drop_caps_ep_except(uint64_t keep) {
-  struct __user_cap_header_struct hdr = {
-    .version = CAP_VERSION,
-    .pid = 0,
-  };
-  struct __user_cap_data_struct data[CAP_WORDS];
-  int i;
-
-  if (syscall(SYS_capget, &hdr, data))
-    DIE("Couldn't get current capabilities"); 
-
-  for (i = 0; i < CAP_WORDS; i++) {
-    uint32_t mask = (uint32_t)(keep >> (32 * i));
-
-    data[i].effective &= mask;
-    data[i].permitted &= mask;
-    data[i].inheritable &= mask;
-  }
-
-  if (syscall(SYS_capset, &hdr, data))
-    DIE("Couldn't drop capabilities");
-}
-
-
-void DropCapabilities() {
-  std::cout << "Warning: Sandbox cannot be fully enabled (either due to Docker or AppArmor). "
-          "We'll just drop the capabilities of the current process but cannot provide advanced "
-          "features such as usernamespace, overlayfs, rootless firewall, etc." << std::endl;
-
-  uint64_t keep;
-  keep = BIT(CAP_NET_BIND_SERVICE) | BIT(CAP_CHOWN) | BIT(CAP_DAC_READ_SEARCH) |
-         BIT(CAP_KILL) | BIT(CAP_SYS_RESOURCE) | BIT(CAP_FOWNER);
-
-  drop_caps_ep_except(keep);
-  return;
 }
 
 #if (!(LIBMINISANDBOX))
@@ -1090,8 +954,6 @@ static void MountDev() {
   if (CreateTarget("dev", true) < 0) {
     DIE("CreateTarget /dev");
   }
-  const char *devs[] = {"/dev/null", "/dev/random", "/dev/urandom", "/dev/zero",
-                        "/dev/full", "/dev/tty", "/dev/console", NULL };
 
   for (int i = 0; devs[i] != NULL; i++) {
     struct stat st;
@@ -1102,17 +964,7 @@ static void MountDev() {
       DIE("mount %s", devs[i]);
     }
   }
- 
-  static const struct {
-      const char *link_path;
-      const char *target;
-  } links[DEV_LINKS] = {
-      { "dev/fd",     "/proc/self/fd"   },
-      { "dev/stdin",  "/proc/self/fd/0" },
-      { "dev/stdout", "/proc/self/fd/1" },
-      { "dev/stderr", "/proc/self/fd/2" },
-  };
- 
+
   for (int i = 0; i < DEV_LINKS; i++) {
     PRINT_DEBUG("symlink(%s, %s)\n", links[i].target, links[i].link_path);
     if (symlink(links[i].target, links[i].link_path) < 0) {
@@ -1336,79 +1188,6 @@ std::vector<std::string> GenerateListForOverlayFS() {
   return existingPaths;
 }
 
-static void dumpOpt() {
-#ifndef DEBUG
-  return;
-#endif
-
-  std::cout << "Working Directory: " << opt.working_dir << "\n";
-  std::cout << "Timeout (secs): " << opt.timeout_secs << "\n";
-  std::cout << "Kill Delay (secs): " << opt.kill_delay_secs << "\n";
-  std::cout << "SIGINT sends SIGTERM: " << std::boolalpha
-            << opt.sigint_sends_sigterm << "\n";
-  std::cout << "Writable Files: ";
-  for (const auto &f : opt.writable_files)
-    std::cout << f << " ";
-  std::cout << "\nTmpfs Dirs: ";
-  for (const auto &d : opt.tmpfs_dirs)
-    std::cout << d << " ";
-  std::cout << "\nBind Mount Sources: ";
-  for (const auto &s : opt.bind_mount_sources)
-    std::cout << s << " ";
-  std::cout << "\nBind Mount Targets: ";
-  for (const auto &t : opt.bind_mount_targets)
-    std::cout << t << " ";
-  std::cout << "\nFake Hostname: " << opt.fake_hostname << "\n";
-  std::cout << "Fake Root: " << opt.fake_root << "\n";
-  std::cout << "Fake Username: " << opt.fake_username << "\n";
-  std::cout << "Enable PTY: " << opt.enable_pty << "\n";
-  std::cout << "Debug Path: " << opt.debug_path << "\n";
-  std::cout << "Hermetic: " << opt.hermetic << "\n";
-  std::cout << "Sandbox Root: " << opt.sandbox_root << "\n";
-  std::cout << "Use OverlayFS: " << opt.use_overlayfs << "\n";
-  std::cout << "Tmp OverlayFS: " << opt.tmp_overlayfs << "\n";
-  std::cout << "OverlayFS Mounts: ";
-  for (const auto &m : opt.overlayfsmount)
-    std::cout << m << " ";
-  std::cout << "\nArgs: ";
-  for (const auto &a : opt.args)
-    std::cout << a << " ";
-  std::cout << "\nUse Default: " << opt.use_default << "\n";
-  //std::cout << "Firewall Rules Path: " << opt.firewall_rules_path << "\n";
-
-}
-
-static std::string TopLevelRelativeFolder(const std::string& mount_point, const std::string& workdir) {
-  try {
-    fs::path mount_fs = mount_point;
-    fs::path wd_fs = workdir;
-
-#ifndef  _EXPERIMENTAL_FILESYSTEM_
-    fs::path rel = fs::relative(wd_fs, mount_fs);
-#else
-    fs::path rel = make_relative(wd_fs, mount_fs);
-#endif
-    PRINT_DEBUG("Relative path from WorkingDir to MountFS is: %s", rel.string().c_str());
-    auto it = rel.begin();
-    if (std::distance(it, rel.end()) >= 1) {
-      if (rel.filename() == fs::path("."))
-        return "";
-      fs::path top_level_fs = mount_fs / *it;
-      return fs::absolute(top_level_fs).string();
-    } else {
-      return "";
-    }
-  } catch (const fs::filesystem_error &e) {
-    std::string msg = e.what();
-    PRINT_DEBUG("Filesystem error: %s\n", msg.c_str());
-  } catch (const std::exception &e) {
-    std::string msg = e.what();
-    PRINT_DEBUG("General error: %s\n", msg.c_str());
-  }
-  return "";
-}
-
-
 static int MountOverlaySubfolders(std::string& top_level_dir, std::string& workdir) {
   fs::path top_level = top_level_dir;
   fs::path working_dir = workdir;
@@ -1430,63 +1209,40 @@ static int MountOverlaySubfolders(std::string& top_level_dir, std::string& workd
   }
   fs::path current = top_level;
   while (true) {
-      if (current == working_dir) {
-          break;
-      }
-      fs::path rel;
-        
-      try {
-#ifndef  _EXPERIMENTAL_FILESYSTEM_
-      rel = fs::relative(working_dir, current);
-#else
-      rel = make_relative(working_dir, current);
-#endif
-      } catch (fs::filesystem_error& e) {
-        std::string msg = e.what();
-        PRINT_DEBUG("Could not invoke relative() %s\n", msg.c_str());
-        rel.clear();
-      }
+    if (current == working_dir) {
+        break;
+    }  
+    fs::path rel;
+    try {
+      rel = GetRelative(working_dir, current);
+    } catch (fs::filesystem_error& e) {
+      std::string msg = e.what();
+      PRINT_DEBUG("Could not invoke relative() %s\n", msg.c_str());
+      rel.clear();
+    }
 
-      if (rel.empty() || rel.filename() == fs::path(".") ) 
-          break;
-      std::string current_str = current.string();
-      PRINT_DEBUG("Adding %s to the overlayfs\n", current_str.c_str());
-      MiniSbxMountOverlay(current);
-      current /= *rel.begin();
+    if (rel.empty() || rel.filename() == fs::path(".") ) 
+        break;
+    std::string current_str = current.string();
+    PRINT_DEBUG("Adding %s to the overlayfs\n", current_str.c_str());
+    MiniSbxMountOverlay(current);
+    current /= *rel.begin();
   }
   return 0;
 }
 
 
+
+
 static void MountWorkingDirMountPoint(const std::string& mount_point) {
   PRINT_DEBUG("mount_point -> %s\n", mount_point.c_str());
-  if (mount_point.empty())
-    return;
 
-  // top_level is the first directory between our CWD and its respective mount
-  // point. For instance, if our mount point is /A and CWD is /A/B/C/D,
-  // the top_level dir will be /A/B . The top_level dirs and all subdirs until
-  // the CWD will be mounted as overlay and their content will be mapped to allow
-  // by default access to parent folder' files
-  std::string top_level = TopLevelRelativeFolder(mount_point, opt.working_dir);
-
-  if (top_level == "" ) {
-    return;
-  }
-
-  // If the top_level folder contains the home dir we would end up mounting
-  // the home dir as overlay but that might leak secrets so we try to get the
-  // new top_level dir from the home_dir to our working dir
-  // e.g., /home/user/top_level/working_dir -> top_level will be /home/user/top_level
-  if (isSubpath(top_level, home_dir) ) {
-    top_level = TopLevelRelativeFolder(home_dir, opt.working_dir);
-  }
-  PRINT_DEBUG("top_level -> %s\n", top_level.c_str());
+  std::string top_level = GetTopLevelFolder(mount_point, home_dir, opt.working_dir);
 
   // if the top_level folder is empty just return.
   // The code later will mount this as overlay
   // without mapping the files in the parents folder tho
-  if (top_level == "" ) {
+  if (top_level.empty()) {
     return;
   }
 
@@ -1527,9 +1283,8 @@ static int InitDone() {
         return -1;
     }
 
-    const char buf[] = "1\n";            // include newline if you like
-    ssize_t n = write(fd, buf, sizeof(buf) - 1);
-    if (n != (ssize_t)(sizeof(buf) - 1)) {
+    ssize_t n = write(fd, kInitStatus, sizeof(kInitStatus) - 1);
+    if (n != (ssize_t)(sizeof(kInitStatus) - 1)) {
         perror("write");
         close(fd);
         return -1;
@@ -1602,7 +1357,6 @@ int Pid1Main(void *args) {
     SetupUtsNamespace();
   }
 
-  dumpOpt();
   if (docker_mode == PRIVILEGED_CONTAINER) {
     if (opt.use_overlayfs)
         MountOverlayDirAsTmpfs();
@@ -1615,8 +1369,9 @@ int Pid1Main(void *args) {
     // the read-only sandbox. 
     PRINT_DEBUG("opt.use_default && !CanIterateRoot");
     const std::string mount_point = GetMountPointOf(opt.working_dir);
-    MiniSbxMountWrite(mount_point);
-    MiniSbxMountWrite(TMP);
+    if (!mount_point.empty())
+      MiniSbxMountWrite(mount_point);
+    MiniSbxMountWrite(kTmp);
     MountFilesystems();
     mounts = CountMounts();
     MakeFilesystemPartiallyReadOnly(false, mounts);
@@ -1633,7 +1388,8 @@ int Pid1Main(void *args) {
       PRINT_DEBUG("opt.default");
       const std::string mount_point = GetMountPointOf(opt.working_dir);
       mounts = CountMounts();
-      MountWorkingDirMountPoint(mount_point);
+      if (!mount_point.empty())
+        MountWorkingDirMountPoint(mount_point);
       AddLeftoverFoldersToReadOnlyPaths();
       MountAllMounts();
       MakeFilesystemPartiallyReadOnly(true, mounts);
@@ -1658,7 +1414,7 @@ int Pid1Main(void *args) {
     // everything as read-only
     PRINT_DEBUG("Sandbox enabled in read-only mode\n");
 
-    MiniSbxMountWrite(TMP);
+    MiniSbxMountWrite(kTmp);
     MountFilesystems();
     mounts = CountMounts();
     // In this case overlay_dirs will be empty but we need it when
@@ -1674,17 +1430,19 @@ int Pid1Main(void *args) {
 
   // Set up init status useful mostly in library mode
   InitDone();
+
 #if (!(LIBMINISANDBOX))
   // Ignore terminal signals; we hand off the terminal to the child in
   // SpawnChild below.
   IgnoreSignal(SIGTTIN);
   IgnoreSignal(SIGTTOU);
+
   // Fork the child process.
   SpawnChild(false);
   InstallSignalHandler(SIGTERM, ForwardSignal);
   return WaitForChild();
 #else
-  drop_caps_ep_except(0);
+  DropCapabilitiesExcept(0);
   return 0;
 #endif
 }

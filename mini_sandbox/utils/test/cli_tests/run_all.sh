@@ -6,6 +6,8 @@
 
 set -ex
 
+uname -a
+
 SCRIPT_PATH="$(realpath "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
 WORKSPACE="/local/mnt/workspace/"
@@ -25,28 +27,39 @@ check_exit() {
 
 check_exit $SCRIPT_DIR/test_err.sh
 check_exit $SCRIPT_DIR/test_tap_err.sh
+
+# Following tests are for overlayfs and work only for 
+# namespaces sandbox so we dont run them if we're testing
+# landlock
+if [[ "${LANDLOCK_TEST:-}" != "1" ]]; then
+  check_exit $SCRIPT_DIR/test_default_overlay.sh  
+  
+  if [ "$HOME" != "/root" ]; then
+      check_exit $SCRIPT_DIR/test_default_parents_folders_overlay.sh $HOME
+  fi
+  
+  if [ -d $WORKSPACE ]; then
+      check_exit $SCRIPT_DIR/test_default_parents_folders_overlay.sh $WORKSPACE
+  fi
+  
+  IFS=":" read -ra paths <<< "$OTHER_PATH"
+  
+  for p in "${paths[@]}"; do
+      echo -e "\nTesting additional path $p"
+      check_exit $SCRIPT_DIR/test_default_parents_folders_overlay.sh $p
+  done
+
+  check_exit $SCRIPT_DIR/test_default_overlay_over_readonly.sh
+else
+  mini-sandbox -D /tmp/dbg.log -- echo 'Ok'
+  grep "Landlock ABI" /tmp/dbg.log
+
+fi
+
 check_exit $SCRIPT_DIR/test_default_base.sh  
-check_exit $SCRIPT_DIR/test_default_overlay.sh  
-
-if [ "$HOME" != "/root" ]; then
-    check_exit $SCRIPT_DIR/test_default_parents_folders_overlay.sh $HOME
-fi
-
-if [ -d $WORKSPACE ]; then
-    check_exit $SCRIPT_DIR/test_default_parents_folders_overlay.sh $WORKSPACE
-fi
-
-IFS=":" read -ra paths <<< "$OTHER_PATH"
-
-for p in "${paths[@]}"; do
-    echo -e "\nTesting additional path $p"
-    check_exit $SCRIPT_DIR/test_default_parents_folders_overlay.sh $p
-done
-
 check_exit $SCRIPT_DIR/test_default_write.sh
 check_exit $SCRIPT_DIR/test_default_tap.sh
 check_exit $SCRIPT_DIR/test_tap_firewall.sh
 check_exit $SCRIPT_DIR/test_readonly.sh
 check_exit $SCRIPT_DIR/test_custom_base.sh
-check_exit $SCRIPT_DIR/test_default_overlay_over_readonly.sh
 check_exit $SCRIPT_DIR/test_mount_single_file.sh

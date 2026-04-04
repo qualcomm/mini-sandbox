@@ -12,18 +12,19 @@
 #include <unistd.h>
 #include <libgen.h>
 
-#include "firewall.h"
+#include "src/main/tools/firewall.h"
+#include "src/main/tools/constants.h"
 
 
 
-int set_max_connections(int max_connections, FirewallRules* fw_rules) {
+int SetMaxConnections(int max_connections, FirewallRules* fw_rules) {
   fw_rules->mode = FirewallMode::FirewallMaxConnections;
   fw_rules->max_connections = max_connections;
   return 0;
 }
 
 
-int set_firewall_rule(const char *rule, FirewallRules *fw_rules) {
+int SetFirewallRule(const char *rule, FirewallRules *fw_rules) {
   if (fw_rules->count > MAX_RULES) 
     return RULES_OVERFLOW;
   
@@ -41,14 +42,38 @@ int set_firewall_rule(const char *rule, FirewallRules *fw_rules) {
   return 0;
 }
 
-int reset_firewall_rules(FirewallRules *fw_rules) {
+int SetFirewallPort(uint16_t port, FirewallRules* fw_rules) {
+  if (fw_rules->ports_count > MAX_RULES)
+    return RULES_OVERFLOW;
 
+  if (fw_rules->mode == FirewallMode::FirewallDisabled)
+    return RULES_CONFIG_ALREADY_SET;
+
+  fw_rules->mode = FirewallMode::FirewallEnabled;
+  fw_rules->ports[fw_rules->ports_count] = port;
+  fw_rules->ports_count++;
+  return 0;
+}
+
+int ResetFirewallRules(FirewallRules *fw_rules) {
   if (fw_rules->mode == FirewallMode::FirewallEnabled)
     return RULES_CONFIG_ALREADY_SET;
   fw_rules->mode = FirewallMode::FirewallDisabled;
   fw_rules->count = 0; 
   return 0;
 }
+
+
+void SetPorts(FirewallRules* fw_rules) {
+  if (fw_rules->ports_count != 0)
+    return;
+  for (int i = 0; i < DEFAULT_PORTS; i++) {
+    fw_rules->ports[i] = kDefaultPorts[i];
+    fw_rules->ports_count += 1;
+  }
+}
+
+
 
 
 // This method dumps the policy that the minitap backend binary
@@ -81,7 +106,7 @@ void DumpRules(FirewallRules* fw_rules, std::string& filepath) {
   // Then we dump all the IP addresses/ domain names / subnets we wanna 
   // allow in the new network
     for (size_t i = 0; i < fw_rules->count; ++i) {
-      if (fw_rules->rules[i] != NULL) {
+      if (fw_rules->rules[i][0] != '\0') {
         fprintf(file, "%s\n", fw_rules->rules[i]);
       }
     }

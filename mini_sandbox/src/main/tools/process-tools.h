@@ -97,6 +97,14 @@ std::string GetHomeDir();
 std::string GetLocalBin();
 std::string GetLocalLib();
 std::string GetRngSeed();
+bool EndsWith(const char* dir, const char* suffix);
+bool StartsWith(const char* dir, const char* prefix);
+bool ShouldBeWritable(const std::string &mnt_dir);
+std::string CanonicPath(const std::string path_str, bool resolve_symlink, bool* is_symlink_out);
+bool IsInsideHomeDir(const fs::path path);
+int SetEnvHome(const std::string& value);
+int MakeFakeHome(const std::string& fakeHome) ;
+int MaybeChdirWorkingDirUnderFakeHome( const std::string& fakeHome, std::string& newWorkingDir);
 uid_t get_outer_uid();
 gid_t get_outer_gid();
 
@@ -110,7 +118,10 @@ bool GetOSName(std::string& printable_name, std::string& version_id);
 bool GetKernelInfo(struct utsname* buf);
 bool UserNamespaceSupported();
 void KillAndWait(pid_t pid);
+bool IsDir(const char* path, int* out_fd);
 
+std::string GetTopLevelFolder(const std::string& mount_point, const std::string& home, const std::string& working_dir);
+fs::path GetRelative( const fs::path& target, const fs::path& base);
 
 enum UserNamespaceSupport {
     NON_INIT,

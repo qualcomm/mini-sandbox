@@ -15,20 +15,19 @@
 #ifndef SRC_MAIN_TOOLS_LINUX_SANDBOX_PID1_H_
 #define SRC_MAIN_TOOLS_LINUX_SANDBOX_PID1_H_
 
+#include <unordered_set>
+#include <set>
+
 struct Pid1Args {
   int *pipe_to_parent;
   int *pipe_from_parent;
 };
 
-#if defined(__cplusplus)
-extern "C" {
-#endif
+extern std::set<std::string> ReadOnlyPaths;
+
+
+void AddLeftoverFoldersToReadOnlyPaths();
 int Pid1Main(void *pid1Args);
 void SpawnChild(bool nested);
-void DropCapabilities();
-
-#if defined(__cplusplus)
-}
-#endif
 
 #endif
