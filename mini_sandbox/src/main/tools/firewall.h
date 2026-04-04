@@ -31,14 +31,17 @@ enum class FirewallMode : int {
 struct FirewallRules {
     char rules[MAX_RULES][MAX_RULE_LENGTH];
     size_t count = 0;
+    uint16_t ports[MAX_RULES];
+    size_t ports_count = 0;
     int max_connections = -1;
     FirewallMode mode = FirewallMode::FirewallUninitialized;
 };
 
-int set_firewall_rule(const char* rule, FirewallRules* fw_rules);
-int set_max_connections(int max_connections, FirewallRules* fw_rules);
-int reset_firewall_rules(FirewallRules* fw_rules);
+int SetFirewallRule(const char* rule, FirewallRules* fw_rules);
+int SetFirewallPort(uint16_t port, FirewallRules* fw_rules);
+int SetMaxConnections(int max_connections, FirewallRules* fw_rules);
+int ResetFirewallRules(FirewallRules* fw_rules);
 void DumpRules(FirewallRules* fw_rules, std::string& filepath);
-
+void SetPorts(FirewallRules* fw_rules);
 
 #endif

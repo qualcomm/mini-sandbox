@@ -18,6 +18,9 @@
 #include "src/main/tools/error-handling.h"
 #include "src/main/tools/firewall.h"
 #include "src/main/tools/constants.h"
+
+#include "landlock_compat.h"
+
 #include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
@@ -52,20 +55,17 @@ namespace fs = std::experimental::filesystem;
 #include <string>
 #include <system_error>
 #include <vector>
-
 #include <chrono>
 #include <cstring>
 #include <dirent.h>
 #include <numeric>
 #include <stdexcept>
 #include <thread>
-
-
-#include "landlock_compat.h"
+#include <mntent.h>
 #include <sys/syscall.h>
 
 std::set<std::string> ReadOnlyPaths;
-static int ruleset = -1;
+static int gRuleset = -1;
 static int gABI = -1;
 
 static int SysLandlockCreateRuleset(const struct landlock_ruleset_attr* attr,
@@ -128,6 +128,29 @@ static inline __u64 AccessFile() {
   return access & ABIMask();
 }
 
+static int AddTcpRule(int ruleset_fd, uint64_t port) {
+  struct landlock_net_port_attr rule = {
+    .allowed_access = LANDLOCK_ACCESS_NET_CONNECT_TCP,
+    .port = port,
+  };
+
+  if (SysLandlockAddRule(ruleset_fd, LANDLOCK_RULE_NET_PORT, &rule, 0) < 0)
+    return -1;
+  return 0;
+}
+
+static int MapPorts(int ruleset_fd, const uint16_t* ports, size_t num_ports) { 
+  int res = 0;
+  if (!ports && num_ports != 0)
+    return -1;
+  
+  for (size_t i = 0; i < num_ports; ++i) {
+    res += AddTcpRule(ruleset_fd, (uint64_t)ports[i]);
+  }
+  
+  return res;
+}
+
 static int CreateBasicRulesetFd() {
   if (gABI < 0)
     gABI = LandlockProbeABI();
@@ -135,11 +158,26 @@ static int CreateBasicRulesetFd() {
   struct landlock_ruleset_attr ruleset_attr = {};
   ruleset_attr.handled_access_fs = ll_supported_fs_mask_for_abi(gABI);
 
-  // TODO Handle network in Network subclasses 
-  // ruleset_attr.handled_access_net = 0;
-  // ruleset_attr.scoped = 0;
+  // We set up the network policy here. We can have three distinct cases
+  // Case1: User wants to have a firewall like behavior as we used to have 
+  // with minitap. For now the best effort is to allow only a subset of TCP
+  // ports
+  if (opt.fw_rules.mode == FirewallMode::FirewallEnabled) {
+    ruleset_attr.handled_access_net = ll_supported_net_mask_for_abi(gABI);
+  }
+  // Case2: We don't add any ports' rule meaning that all TCP ports are denied
+  else if (opt.create_netns == NETNS_WITH_LOOPBACK || opt.create_netns == NETNS) {
+    ruleset_attr.handled_access_net = ll_supported_net_mask_for_abi(gABI);
+  }
+  // Case3: We don't add any network restriction meaning that all connections are
+  // allowed
+  else
+    ruleset_attr.handled_access_net = 0;
+
+  ruleset_attr.scoped = ll_supported_scope_mask_for_abi(gABI);
 
   int fd = SysLandlockCreateRuleset(&ruleset_attr, sizeof(ruleset_attr), 0);
+
   if (fd < 0) return -errno;
   return fd;
 }
@@ -150,7 +188,7 @@ static int AddPathRule(int ruleset_fd, const std::string& path, __u64 allowed_ac
   int fd = -1;
   bool is_dir = IsDir(path.c_str(), &fd);
   if (fd < 0) {
-    return -1;
+    return MiniSbxReportErrorAndMessage(path, ErrorCode::LLDirNotExist);
   }
 
   struct landlock_path_beneath_attr rule = {};
@@ -162,10 +200,9 @@ static int AddPathRule(int ruleset_fd, const std::string& path, __u64 allowed_ac
   }
 
   int rc = SysLandlockAddRule(ruleset_fd, LANDLOCK_RULE_PATH_BENEATH, &rule, 0);
-  int saved_errno = errno;
   close(fd);
 
-  if (rc < 0) return -saved_errno;
+  if (rc < 0) return MiniSbxReportErrorAndMessage(path, ErrorCode::LLFailedAddRule);
   return 0;
 }
 
@@ -174,14 +211,14 @@ static int AddPathRule(int ruleset_fd, const std::string& path, __u64 allowed_ac
 
 
 static int MapReadOnlyPath(const std::string& path) {
-  int res = AddPathRule(ruleset, path, AccessRO());  
+  int res = AddPathRule(gRuleset, path, AccessRO());  
   PRINT_DEBUG("Map %s as RO == %d", path.c_str(), res);
   return res;
 }
 
 
 static int MapReadWritePath(const std::string& path) {
-  int res = AddPathRule(ruleset, path, AccessRW());  
+  int res = AddPathRule(gRuleset, path, AccessRW());  
   PRINT_DEBUG("Map %s as RW == %d", path.c_str(), res);
   return res;
 }
@@ -211,21 +248,28 @@ static int LLMapReadWritePaths() {
   return rc;
 }
 
-static int MapWorkingDirMountPoint(const std::string& mount_point) {
-  int res = 0;
+static void MapWorkingDirMountPoint(const std::string& mount_point) {
+
   std::string home_dir = GetHomeDir();
   std::string top_level = GetTopLevelFolder(mount_point, home_dir, opt.working_dir);
-  if (top_level.empty()) 
-    return -1;
+  if (top_level.empty()) {
+    MiniSbxReportGenericError("Top level folder is empty");
+    return;
+  }
+
   if (opt.parents_writable)
-    res = MiniSbxMountWrite(top_level);
+    MiniSbxMountWrite(top_level);
   else 
-    res = MiniSbxMountBind(top_level);
+    MiniSbxMountBind(top_level);
   PRINT_DEBUG("Top level: %s\n", top_level.c_str());
-  return res;
+  return;
 }
 
 static int MapAllFilesystem() {
+  for (auto overlay_path : opt.overlayfsmount) {
+    PRINT_DEBUG("Move %s from overlay into writables", overlay_path.c_str());
+    addIfNotPresent(opt.writable_files, overlay_path.c_str());
+  }
   int res = LLMapReadOnlyPaths();
   res += LLMapReadWritePaths(); 
   return res;
@@ -234,12 +278,18 @@ static int MapAllFilesystem() {
 
 static void MapDev() {
   struct stat st;
-  for (int i = 0; devs[i] != NULL; i++) {
+  int i = 0;
+  for (i = 0; ll_devs[i] != NULL; i++) {
+    if (stat(ll_devs[i], &st) != 0) 
+      continue;
+    MapReadWritePath(ll_devs[i]);
+  }
+  for (i = 0; devs[i] != NULL; i++) {
     if (stat(devs[i], &st) != 0)
       continue;
     MapReadWritePath(devs[i]);
   }
-  for (int i = 0; i < DEV_LINKS; i++) {
+  for (i = 0; i < DEV_LINKS; i++) {
     std::string abs = links[i].link_path;   
     if (!abs.empty() && abs.front() != '/') {
       abs.insert(abs.begin(), '/');      
@@ -249,55 +299,91 @@ static void MapDev() {
 }
 
 
+static int MapFilesystemPartiallyReadOnly() {
+  int res = 0;
+  FILE *mounts = setmntent(kMounts, "r");  
+  if (mounts == nullptr) { 
+    return MiniSbxReportGenericError("setmntent failed");
+  }
+
+  struct mntent* ent;
+  while ((ent = getmntent(mounts)) != nullptr) {
+    if (EndsWith(ent->mnt_dir, kProc))    
+      continue;
+
+    if (!ShouldBeWritable(ent->mnt_dir) ) {
+      res += MapReadOnlyPath(ent->mnt_dir);
+    }
+    else {
+      res += MapReadWritePath(ent->mnt_dir);
+    }
+  }
+  return res;
+}
+
+
+
 static int LLRunTime() {
 
   if (! LandlockSupported() ) {
     return MiniSbxReportError(ErrorCode::LLNotSupported);
   }
 
-  ruleset = CreateBasicRulesetFd();
-  int res = 0;
-  if (ruleset < 0) return ruleset;
+  gRuleset = CreateBasicRulesetFd();
+  int ll_res = 0, port_res = 0;
+  if (gRuleset < 0) return MiniSbxReportError(ErrorCode::LLFailedRuleset);
 
   if (opt.use_default) {
     const std::string mount_point = GetMountPointOf(opt.working_dir);
     MiniSbxMountWrite(kTmp);
     MiniSbxMountWrite(opt.working_dir);
-    res += MapWorkingDirMountPoint(mount_point);
+    MapWorkingDirMountPoint(mount_point);
     AddLeftoverFoldersToReadOnlyPaths();
-    res += MapAllFilesystem();
+    ll_res = MapAllFilesystem();
     MapDev();
-
-  } else {
-    res = MapAllFilesystem(); 
+    MakeFakeHome(kFakeHome);
+  } else if (opt.hermetic || opt.use_overlayfs) {
+    ll_res = MapAllFilesystem(); 
   }
+  else {
+    MiniSbxMountWrite(kTmp);
+    MiniSbxMountWrite(opt.working_dir);
+    ll_res = MapFilesystemPartiallyReadOnly();
+    ll_res += MapAllFilesystem();
+  }  
+
+  if (opt.fw_rules.mode == FirewallMode::FirewallEnabled) {    
+    SetPorts(&opt.fw_rules);
+    port_res = MapPorts(gRuleset, opt.fw_rules.ports, opt.fw_rules.ports_count);    
+    if (port_res < 0)
+      MiniSbxReportError(ErrorCode::LLPortsNotSet);
+  } 
+
  
   if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0)) {
   	return MiniSbxReportGenericError("Failed to restrict privileges");
   } 
  
-  if (SysLandlockRestrictSelf(ruleset, 0) < 0) {
-    close(ruleset);
+  if (SysLandlockRestrictSelf(gRuleset, 0) < 0) {
+    close(gRuleset);
     return MiniSbxReportGenericError("LandlockRestrictSelf failed");
   }
    
-  close(ruleset);
-  return res;
+  close(gRuleset);
+  
+  return (ll_res < 0) ? ll_res : port_res;
 
 }
 
 
 int LLRunTimeCLI() {
   PRINT_DEBUG("Start landlock CLI isolation\n");
-  int res = LLRunTime();
 
+  int res = LLRunTime();
   if (res < 0) 
     return res;
-  opt.args.push_back(nullptr);
-  if (execvp(opt.args[0], opt.args.data()) < 0) {
-    MiniSbxReportGenericError("execvp failed");  
-    return -1;
-  }
+
+  SpawnChild(true);
   return res;
 }
 

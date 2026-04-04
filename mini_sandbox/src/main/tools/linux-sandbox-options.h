@@ -98,7 +98,7 @@ extern struct Options opt;
 
 // Handles parsing all command line flags and populates the global opt struct.
 void ParseOptions(int argc, char *argv[]);
-void SetupDefaultMounts();
+void SetupEssentialMounts();
 int ValidateOverlayOutOfFolder(const std::string& overlay_dir, const std::string& sandbox_dir);
 int ValidateReadWritePaths(std::vector<std::string>& readables, std::vector<std::string>& writables);
 int ValidateTmpNotRemounted(std::vector<std::string>& paths);
@@ -131,6 +131,7 @@ int MiniSbxShareNetNamespace() ;
 int MiniSbxAllowConnections(const std::string& path);
 int MiniSbxAllowMaxConnections(int max_connections);
 int MiniSbxAllowIpv4(const std::string& ip);
+int MiniSbxAllowPort(const std::string& port);
 int MiniSbxAllowDomain(const std::string& domain);
 int MiniSbxAllowAllDomains();
 int MiniSbxAllowIpv4Subnet(const std::string& subnet);

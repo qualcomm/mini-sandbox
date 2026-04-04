@@ -17,6 +17,14 @@
 struct Options;
 extern Options opt;
 
+// In namespace based isolation we would get these from /proc/self/mounts
+// but in landlock we don't know "what's already been mounted" so for now
+// it's just easier to hardcode these
+inline const char* ll_devs[] = {"/dev/pts", "/dev/shm", 
+                                "/dev/hugepages", 
+                                "/dev/mqueue", NULL};
+
+
 int LLRunTimeLib();
 int LLRunTimeCLI();
 int LandlockSupported();

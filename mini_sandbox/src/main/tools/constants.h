@@ -7,6 +7,8 @@
 #ifndef SRC_MAIN_TOOLS_CONSTANTS_H_
 #define SRC_MAIN_TOOLS_CONSTANTS_H_
 
+#include <cstdint>
+
 // The isolation mode that it's going to be used if this env var is specified, 
 // "namespaces", "landlock" or "capabilities"
 inline constexpr const char kIsolationModeEnv[] = "MINI_SANDBOX_ISOLATION_MODE";
@@ -30,6 +32,7 @@ inline constexpr const char kProc[] = "/proc";
 inline constexpr const char kDevPts[] = "/dev/pts";
 inline constexpr const char kTmp[] = "/tmp";
 inline constexpr const char kDockerPath[] = "/.dockerenv";
+inline constexpr const char kMounts[] = "/proc/self/mounts";
 
 inline const char *devs[] = {"/dev/null", "/dev/random", "/dev/urandom", "/dev/zero",
                       "/dev/full", "/dev/tty", "/dev/console", NULL };
@@ -50,5 +53,12 @@ enum class MiniSbxExecMode {
   CLI,
   LIB,
 };
+
+
+#define DEFAULT_PORTS 3
+inline constexpr const uint16_t kDefaultPorts[3] = { 80, 443, 53 };
+
+inline constexpr const char kFakeHome[] = "/tmp/sbx-fake-home";
+
 
 #endif
