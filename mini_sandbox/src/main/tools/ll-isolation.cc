@@ -343,6 +343,7 @@ static int LLRunTime() {
     MapDev();
     MakeFakeHome(kFakeHome);
   } else if (opt.hermetic || opt.use_overlayfs) {
+    MiniSbxMountWrite(opt.working_dir);
     ll_res = MapAllFilesystem(); 
   }
   else {
