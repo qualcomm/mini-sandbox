@@ -16,6 +16,7 @@
 #include "connect_with_timeout.h"
 
 #include "linux-sandbox-api.h"
+#include "utils.h"
 
 
 
@@ -56,11 +57,6 @@ void start_thread() {
 #define NOT_ALLOWED_IP "129.46.98.181"
 #define NOT_ALLOWED_DOMAIN "qualcomm.com"
 
-
-int landlock_test_enabled(void) {
-    const char *env = getenv("LANDLOCK_TEST");
-    return env != NULL && strcmp(env, "1") == 0;
-}
 
 
 int main(int argc, char* argv[]) {

@@ -19,6 +19,7 @@
 #include <assert.h>
 
 #include "linux-sandbox-api.h"
+#include "utils.h"
 
 
 
@@ -67,12 +68,6 @@ void start_thread() {
 
     // Wait for the thread to finish
     pthread_join(thread, NULL);
-}
-
-
-int landlock_test_enabled(void) {
-    const char *env = getenv("LANDLOCK_TEST");
-    return env != NULL && strcmp(env, "1") == 0;
 }
 
 

@@ -186,7 +186,7 @@ static int CreateBasicRulesetFd() {
 static int AddPathRule(int ruleset_fd, const std::string& path, __u64 allowed_access) {
  
   int fd = -1;
-  bool is_dir = IsDir(path.c_str(), &fd);
+  bool is_dir = OpenDirOrFile(path.c_str(), &fd);
   if (fd < 0) {
     return MiniSbxReportErrorAndMessage(path, ErrorCode::LLDirNotExist);
   }
@@ -360,8 +360,7 @@ static int LLRunTime() {
   } else if (opt.hermetic || opt.use_overlayfs) {
     MiniSbxMountWrite(opt.working_dir);
     ll_res = MapAllFilesystem(); 
-  }
-  else {
+  } else {
     MiniSbxMountWrite(kTmp);
     MiniSbxMountWrite(opt.working_dir);
     ll_res = MapFilesystemPartiallyReadOnly();

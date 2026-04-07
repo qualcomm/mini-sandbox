@@ -675,7 +675,7 @@ bool UserNamespaceSupported() {
 
 
 
-bool IsDir(const char* path, int* out_fd) {
+bool OpenDirOrFile(const char* path, int* out_fd) {
   int fd = open(path, O_PATH | O_CLOEXEC);
   if (fd < 0)
       return false;
