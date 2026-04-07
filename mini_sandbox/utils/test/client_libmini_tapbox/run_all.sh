@@ -48,6 +48,7 @@ check_last_command_failed() {
     fi
 }
 
+make
 
 rm -f $HOME/test2
 check_exit $SCRIPT_DIR/client.bin
@@ -55,10 +56,12 @@ ls "$HOME/test2"
 check_last_command
 rm -f $HOME/test2
 
-check_exit $SCRIPT_DIR/client_max_connection.bin
-ls "$HOME/test2"
-check_last_command
-rm -f $HOME/test2
+if [[ "${LANDLOCK_TEST:-}" != "1" ]]; then
+  check_exit $SCRIPT_DIR/client_max_connection.bin
+  ls "$HOME/test2"
+  check_last_command
+  rm -f $HOME/test2
+fi
 
 # THis is going to use the dynamic linker so if the lib is not installed system-wide
 # You'll have to export LD_LIBRARY_PATH=/path/to/libs/

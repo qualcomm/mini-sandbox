@@ -33,6 +33,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <vector>
+#include <cstdint>
+#include <limits>
 #if __has_include(<filesystem>)
 #include <filesystem>
 namespace fs = std::filesystem;
@@ -618,7 +620,7 @@ int MiniSbxAllowPort(const std::string& port) {
     return -1;
   }
   unsigned long p = std::stoul(port);
-  if (p == 0 || p > 65535) {
+  if (p == 0 || p > UINT16_MAX) {
     return MiniSbxReportError(ErrorCode::IllegalNetworkConfiguration);
   }
   if(SetFirewallPort((uint16_t)p, &opt.fw_rules) < 0)

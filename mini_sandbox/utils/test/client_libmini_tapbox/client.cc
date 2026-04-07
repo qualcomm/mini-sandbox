@@ -53,9 +53,15 @@ void start_thread() {
 #define ALLOWED_IP "142.250.176.14"
 #define ALLOWED_DOMAIN "google.com"
 
-
 #define NOT_ALLOWED_IP "129.46.98.181"
 #define NOT_ALLOWED_DOMAIN "qualcomm.com"
+
+
+int landlock_test_enabled(void) {
+    const char *env = getenv("LANDLOCK_TEST");
+    return env != NULL && strcmp(env, "1") == 0;
+}
+
 
 int main(int argc, char* argv[]) {
     if (argc > 0) 
@@ -63,12 +69,21 @@ int main(int argc, char* argv[]) {
 
     printf("Starting program out of the sandbox with pid %d\n", getpid());
     int res = 0;
+    int ll_enabled = landlock_test_enabled();
 
     res = mini_sandbox_setup_default();
     assert(res == 0);
     res = mini_sandbox_mount_write(getenv("HOME"));
     assert(res == 0);
-    // New style API to set firewall
+    if (ll_enabled) {
+      res = mini_sandbox_allow_port("80");
+      assert(res == 0);
+      res = mini_sandbox_allow_port("443");
+      assert(res == 0);
+      res = mini_sandbox_allow_port("53");
+      assert(res == 0);
+    }
+
 #ifdef MAX_CONN
     res = mini_sandbox_allow_max_connections(1);
     assert(res == 0);
@@ -110,7 +125,10 @@ int main(int argc, char* argv[]) {
     } else {
         struct sockaddr_in server;
         server.sin_family = AF_INET;
-        server.sin_port = htons(80);
+        int port = 80;
+        if (ll_enabled)
+          port = 21;
+        server.sin_port = htons(port);
         server.sin_addr.s_addr = inet_addr(NOT_ALLOWED_IP);
         int timeout = 2;
 

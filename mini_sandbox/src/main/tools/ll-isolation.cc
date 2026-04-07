@@ -248,10 +248,9 @@ static int LLMapReadWritePaths() {
   return rc;
 }
 
-static void MapWorkingDirMountPoint(const std::string& mount_point) {
+static void MapWorkingDirMountPoint(const std::string& mountPoint, const std::string& homeDir) {
 
-  std::string home_dir = GetHomeDir();
-  std::string top_level = GetTopLevelFolder(mount_point, home_dir, opt.working_dir);
+  std::string top_level = GetTopLevelFolder(mountPoint, homeDir, opt.working_dir);
   if (top_level.empty()) {
     MiniSbxReportGenericError("Top level folder is empty");
     return;
@@ -322,6 +321,21 @@ static int MapFilesystemPartiallyReadOnly() {
 }
 
 
+// If the user requested to make the home writable, we don't need
+// to create the fake home
+static void MakeHome(const std::string& realHome) {
+  bool fakeHome = true;
+  for (auto w : opt.writable_files) {
+    if (isSubpath(w, realHome)) {
+      fakeHome = false;
+      break;
+    }
+  }
+  if (fakeHome)
+    MakeFakeHome(kFakeHome);
+
+}
+
 
 static int LLRunTime() {
 
@@ -334,14 +348,15 @@ static int LLRunTime() {
   if (gRuleset < 0) return MiniSbxReportError(ErrorCode::LLFailedRuleset);
 
   if (opt.use_default) {
-    const std::string mount_point = GetMountPointOf(opt.working_dir);
+    const std::string mountPoint = GetMountPointOf(opt.working_dir);
+    const std::string realHome = GetHomeDir();
     MiniSbxMountWrite(kTmp);
     MiniSbxMountWrite(opt.working_dir);
-    MapWorkingDirMountPoint(mount_point);
+    MapWorkingDirMountPoint(mountPoint, realHome);
     AddLeftoverFoldersToReadOnlyPaths();
     ll_res = MapAllFilesystem();
     MapDev();
-    MakeFakeHome(kFakeHome);
+    MakeHome(realHome);
   } else if (opt.hermetic || opt.use_overlayfs) {
     MiniSbxMountWrite(opt.working_dir);
     ll_res = MapAllFilesystem(); 

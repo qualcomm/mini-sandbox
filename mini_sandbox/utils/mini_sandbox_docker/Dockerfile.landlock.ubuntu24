@@ -39,7 +39,7 @@ ENV WORKSPACE="/app/mini-sandbox"
 ENV LANDLOCK_TEST=1
 
 
-ENTRYPOINT ["sh", "-c", "set -e && cd /app/mini-sandbox/mini_sandbox/utils/test/cli_tests && /app/mini-sandbox/mini_sandbox/utils/test/cli_tests/run_all.sh"]
+ENTRYPOINT ["sh", "-c", "set -e && cd /app/mini-sandbox/mini_sandbox/utils/test/cli_tests && /app/mini-sandbox/mini_sandbox/utils/test/cli_tests/run_all.sh && /app/mini-sandbox/mini_sandbox/utils/test/client_libmini_sandbox/run_all.sh && /app/mini-sandbox/mini_sandbox/utils/test/client_libmini_tapbox/run_all.sh "]
 #ENTRYPOINT ["sh", "-c", "cd /app && /bin/bash"]
 
 

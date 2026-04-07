@@ -53,6 +53,7 @@ int mini_sandbox_allow_ipv4(const char* ip);
 int mini_sandbox_allow_domain(const char* domain);
 int mini_sandbox_allow_all_domains();
 int mini_sandbox_allow_ipv4_subnet(const char* subnet);
+int mini_sandbox_allow_port(const char* port);
 #endif
 
 #if defined(__cplusplus)

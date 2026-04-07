@@ -118,6 +118,10 @@ int mini_sandbox_allow_all_domains() {
 int mini_sandbox_allow_ipv4_subnet(const char* subnet) {
   return MiniSbxAllowIpv4Subnet(subnet);
 }
+
+int mini_sandbox_allow_port(const char* port) {
+  return MiniSbxAllowPort(port);
+}
 #endif
 
 #endif
