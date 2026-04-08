@@ -171,8 +171,9 @@ static int CreateBasicRulesetFd() {
   }
   // Case3: We don't add any network restriction meaning that all connections are
   // allowed
-  else
+  else {
     ruleset_attr.handled_access_net = 0;
+  }
 
   ruleset_attr.scoped = ll_supported_scope_mask_for_abi(gABI);
 

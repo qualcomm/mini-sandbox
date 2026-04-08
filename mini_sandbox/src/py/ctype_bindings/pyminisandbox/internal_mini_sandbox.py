@@ -64,6 +64,8 @@ def init(tap_mode = False):
         
     if _lib is not None:
         _lib.mini_sandbox_get_last_error_msg.restype = ctypes.c_char_p
+        _lib.mini_sandbox_get_home.restype = ctypes.c_char_p
+
 
 def is_platform_supported():
     return platform.system() == "Linux" and (platform.machine() in ("x86_64", "i386", "i686"))
@@ -137,7 +139,17 @@ def mini_sandbox_start():
             return MiniSandboxErrors.LIB_NOT_LOADED
         else:
             return MiniSandboxErrors.NOERROR
-    return _lib.mini_sandbox_start()
+    res = _lib.mini_sandbox_start()
+    if res < 0:
+      return res
+    new_home = _lib.mini_sandbox_get_home()
+    if not new_home:
+      return MiniSandboxErrors.LIB_NOT_LOADED
+    new_home = new_home.decode("utf-8")
+    old_home = os.path.expanduser("~")
+    if old_home != new_home:
+      os.environ["HOME"] = new_home
+    return res
 
 def mini_sandbox_mount_bind(path):
     if _lib is None:
@@ -224,6 +236,16 @@ def mini_sandbox_allow_ipv4(ip):
             return MiniSandboxErrors.NOERROR
     if _tap and hasattr(_lib, "mini_sandbox_allow_ipv4"):
         return _lib.mini_sandbox_allow_ipv4(ip.encode())
+    return MiniSandboxErrors.FEATURE_NOT_AVAILABLE
+
+def mini_sandbox_allow_port(port):
+    if _lib is None:
+        if is_platform_supported():
+            return MiniSandboxErrors.LIB_NOT_LOADED
+        else:
+            return MiniSandboxErrors.NOERROR
+    if _tap and hasattr(_lib, "mini_sandbox_allow_port"):
+        return _lib.mini_sandbox_allow_port(port.encode())
     return MiniSandboxErrors.FEATURE_NOT_AVAILABLE
 
 def mini_sandbox_allow_domain(domain):
