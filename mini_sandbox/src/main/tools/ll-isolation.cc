@@ -386,6 +386,8 @@ static int LLRunTime() {
   }
    
   close(gRuleset);
+
+  opt.is_running = RUNNING;
   
   return (ll_res < 0) ? ll_res : port_res;
 
