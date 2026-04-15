@@ -18,8 +18,6 @@
 #include "src/main/tools/linux-sandbox-options.h"
 #include "src/main/tools/constants.h"
 
-#include <mntent.h>
-
 #include <array>
 #include <cerrno>
 #include <csignal>
@@ -43,6 +41,7 @@
 #include <sys/wait.h>
 #include <sys/utsname.h>
 #include <unistd.h>
+#include <mntent.h>
 #include <system_error>
 #if __has_include(<filesystem>)
 #include <filesystem>
@@ -751,7 +750,8 @@ std::string TopLevelRelativeFolder(const std::string& mount_point, const std::st
     fs::path mount_fs = mount_point;
     fs::path wd_fs = workdir;
     fs::path rel = GetRelative(wd_fs, mount_fs);
-    PRINT_DEBUG("Relative path from WorkingDir to MountFS is: %s", rel.string().c_str());
+    PRINT_DEBUG("Relative path from WorkingDir (%s) to mount_point (%s) is: %s", workdir.c_str(),
+    mount_point.c_str(), rel.string().c_str());
     auto it = rel.begin();
     if (std::distance(it, rel.end()) >= 1) {
       if (rel.filename() == fs::path("."))
@@ -853,42 +853,74 @@ bool ShouldBeWritable(const std::string &mnt_dir) {
 }
 
 
-// This function is intended for usage in the APIs, so it's safe to assume that
-// every error is not recoverable
-std::string CanonicPath(const std::string path_str, bool resolve_symlink, bool* is_symlink_out) {
-  bool is_symlink = false;
-  std::string res;
-  try {    
-    fs::path path(path_str);
-    if (fs::exists(path)) {
-      is_symlink = fs::is_symlink(path);
-      if (!resolve_symlink && is_symlink) {
-        res = fs::absolute(path).string();
-      } 
-      else {
-        res = fs::canonical(path).string();
-      }
-    } else {
-      res = path.string(); 
-      // If the path doesn't exist the best that we can do is
-      // to return the original path. The parsing will likely
-      // fail when we call ValidateDirPath, which instead requires
-      // that the path exists.
-    }
-  } catch (const fs::filesystem_error &e) {
-    PRINT_DEBUG("Filesystem error %s:", e.what());
-    MiniSbxReportGenericError("Fs exception");
-    res = "";    
+static fs::path StripTrailingSeparators(fs::path p) {
+  while (!p.empty() &&
+         p != p.root_path() &&
+         (p.filename().empty())) {
+    p = p.parent_path();
   }
-  if (is_symlink_out)
-    *is_symlink_out = is_symlink;
-  return res;
-
+  return p;
 }
 
 
+static bool IsSymlink(fs::path p) {
+  bool res = false;
+  try {
+    if (fs::exists(p)) {
+      fs::path normalized = StripTrailingSeparators(p.lexically_normal());
+      fs::path canonic = fs::canonical(p);
+      PRINT_DEBUG("normalized: %s, canonic: %s\n", normalized.string().c_str(), canonic.string().c_str());
+      res = (canonic != normalized);
+    }
+  }
+  catch (const fs::filesystem_error &e) {
+    res = false;
+  }
+  return res;
+}
+
+
+std::string CanonicPath(const std::string& path_str,
+                        bool resolve_symlink,
+                        bool* is_symlink_out) {
+  fs::path p(path_str);
+  std::error_code ec;
+
+  if (is_symlink_out) {
+    *is_symlink_out = false;
+  }
+
+  if (!fs::exists(p, ec)) {
+    if (ec)
+      return "";
+    return path_str;
+  }
+
+  bool is_symlink = IsSymlink(p);
+
+  if (is_symlink_out) {
+    *is_symlink_out = is_symlink;
+  }
+
+  fs::path out;
+  if (resolve_symlink) {
+    out = fs::canonical(p, ec);
+    if (ec) {
+      out = "";
+    }
+  } else {
+    out = fs::absolute(p, ec);
+    if (ec) {
+      out = "";
+    }
+    out = out.lexically_normal();
+  }
+  return out.string();
+}
+
 bool IsInsideHomeDir(const fs::path path){
-  fs::path path_canon = fs::path(CanonicPath(path, true, nullptr));
+  std::string canonic = CanonicPath(path, true, nullptr);
+  fs::path path_canon = fs::path(canonic);
   fs::path home_dir = GetHomeDir();
   return isSubpath( home_dir,path_canon);
 }
@@ -904,6 +936,7 @@ int SetEnvHome(const std::string& value) {
 
 static int CreateSymlinksToHomeFiles(std::vector<std::string>& files, const fs::path& fakeHome) {
   const fs::path realHome = fs::path(GetHomeDir());
+  std::vector<std::pair<fs::path, fs::path>> links;
   for (const std::string& p : files) {
     if (!IsInsideHomeDir(p)) continue;
 
@@ -916,26 +949,30 @@ static int CreateSymlinksToHomeFiles(std::vector<std::string>& files, const fs::
     // (The ".." check prevents weird paths like "../etc".)
     if (rel.empty() || rel.native().rfind("..", 0) == 0) {
       rel = src.filename();
+      PRINT_DEBUG("Fall back to rel = %s", rel.string().c_str()); 
     }
-
 
     const fs::path linkPath = fakeHome / rel;
     // We dont want to create the symlink the entire path that we requested via -w/-M but
     // only to its top level directory from the home. If the path we added as write is
     // $HOME/a/b/c , we wanna create the symlink so that we have $FAKE_HOME/a -> $HOME/a 
+    if (fs::exists(linkPath, ec)) {
+      PRINT_DEBUG("No need to re-create link for %s , we already have it", linkPath.c_str());
+      continue;
+    }
+
     std::string topLvl = TopLevelRelativeFolder(fakeHome, linkPath.string());
     const fs::path topLvlP = fs::path(topLvl);
-    if (fs::exists(topLvlP, ec)) {
-      PRINT_DEBUG("No need to re-create link for %s , we already have %s", linkPath.c_str(), topLvl.c_str());
-      return 0;
-    }
 
     std::string topLvlReal = TopLevelRelativeFolder(realHome, p);
     const fs::path topLvlRealP = fs::path(topLvlReal);
 
-    PRINT_DEBUG("Create symlink src: %s, linkPath: %s\n", src.c_str(), linkPath.c_str());
+    PRINT_DEBUG("Create symlink src: %s, linkPath: %s\n", topLvlRealP.c_str(), topLvlP.c_str());
     fs::create_symlink(topLvlRealP, topLvlP, ec);
-    if (ec) return -1;
+    if (ec) {
+      PRINT_DEBUG("Error creating symlink");
+      continue;
+    }
     PRINT_DEBUG("Created");
   }
   return 0;
