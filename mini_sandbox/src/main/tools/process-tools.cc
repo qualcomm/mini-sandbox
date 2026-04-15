@@ -867,7 +867,7 @@ static bool IsSymlink(fs::path p) {
   bool res = false;
   try {
     if (fs::exists(p)) {
-      fs::path normalized = StripTrailingSeparators(p.lexically_normal());
+      fs::path normalized = StripTrailingSeparators(fs::absolute(p));
       fs::path canonic = fs::canonical(p);
       PRINT_DEBUG("normalized: %s, canonic: %s\n", normalized.string().c_str(), canonic.string().c_str());
       res = (canonic != normalized);
@@ -913,7 +913,6 @@ std::string CanonicPath(const std::string& path_str,
     if (ec) {
       out = "";
     }
-    out = out.lexically_normal();
   }
   return out.string();
 }
