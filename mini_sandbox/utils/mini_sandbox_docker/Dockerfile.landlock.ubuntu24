@@ -16,8 +16,11 @@ RUN apt-get update && \
         iptables \
         python3 \
         python3-pip \
-	python3-requests && \
+	python3-requests \
+        ca-certificates && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd -r app && useradd --no-log-init -r -g app app
 
 WORKDIR /app
 RUN mkdir /app/mini-sandbox
@@ -25,7 +28,7 @@ ARG V=dist
 COPY ${V}/ /app/
 
 COPY ./ /app/mini-sandbox
-
+RUN chown -R app:app /app
 RUN /app/mini-sandbox/clean.sh
 
 ENV MINI_SANDBOX_DOCKER_PRIVILEGED=1
@@ -38,9 +41,5 @@ ENV LDFLAGS="-lstdc++fs"
 ENV WORKSPACE="/app/mini-sandbox"
 ENV LANDLOCK_TEST=1
 
-
-ENTRYPOINT ["sh", "-c", "set -e && cd /app/mini-sandbox/mini_sandbox/utils/test/cli_tests && /app/mini-sandbox/mini_sandbox/utils/test/cli_tests/run_all.sh"]
-#ENTRYPOINT ["sh", "-c", "cd /app && /bin/bash"]
-
-
-
+USER app
+ENTRYPOINT ["sh", "-c", "set -e && cd /app/mini-sandbox/mini_sandbox/utils/test/ && export HOME=/app && ./test_all.sh"]

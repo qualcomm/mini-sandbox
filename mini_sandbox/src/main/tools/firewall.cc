@@ -64,6 +64,8 @@ int ResetFirewallRules(FirewallRules *fw_rules) {
 }
 
 
+// If the user has already set the accessible ports via API or CLI
+// we just return, otherwise we at least open the default ones 
 void SetPorts(FirewallRules* fw_rules) {
   if (fw_rules->ports_count != 0)
     return;

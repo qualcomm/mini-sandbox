@@ -296,7 +296,9 @@ int CountMounts() {
     return count;
 }
 
-
+// Check if sub is a subpath of base . For instance if sub == "/a/b/c"
+// and base == "/a/b", the method returns true because the c/ folder is under 
+// "/a/b". Is sub == base, returns true as well.
 bool isSubpath(const fs::path &base, const fs::path &sub) {
   auto baseIt = base.begin();
   auto subIt = sub.begin();
@@ -673,7 +675,7 @@ bool UserNamespaceSupported() {
 
 
 
-bool IsDir(const char* path, int* out_fd) {
+bool OpenDirOrFile(const char* path, int* out_fd) {
   int fd = open(path, O_PATH | O_CLOEXEC);
   if (fd < 0)
       return false;
