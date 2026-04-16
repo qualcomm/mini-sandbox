@@ -909,9 +909,12 @@ std::string CanonicPath(const std::string& path_str,
       out = "";
     }
   } else {
-    out = fs::absolute(p, ec);
-    if (ec) {
-      out = "";
+    try {
+      out = fs::absolute(p);
+    } catch (const fs::filesystem_error&) {
+      out.clear();
+    } catch (const std::exception&) {
+      out.clear();
     }
   }
   return out.string();
