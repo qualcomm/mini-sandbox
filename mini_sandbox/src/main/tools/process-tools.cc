@@ -920,11 +920,17 @@ std::string CanonicPath(const std::string& path_str,
   return out.string();
 }
 
-bool IsInsideHomeDir(const fs::path path){
+bool IsInsideHomeDir(const fs::path path) {
   std::string canonic = CanonicPath(path, true, nullptr);
   fs::path path_canon = fs::path(canonic);
   fs::path home_dir = GetHomeDir();
-  return isSubpath( home_dir,path_canon);
+  return isSubpath(home_dir, path_canon);
+}
+
+
+bool IsPathInsideHomeDir(const fs::path path) {
+  fs::path home_dir = GetHomeDir();
+  return isSubpath(home_dir, path);
 }
 
 
@@ -936,48 +942,39 @@ int SetEnvHome(const std::string& value) {
 }
 
 
-static int CreateSymlinksToHomeFiles(std::vector<std::string>& files, const fs::path& fakeHome) {
-  const fs::path realHome = fs::path(GetHomeDir());
-  std::vector<std::pair<fs::path, fs::path>> links;
-  for (const std::string& p : files) {
-    if (!IsInsideHomeDir(p)) continue;
+static bool IsAllowedSubpath(const fs::path& target, const std::vector<std::string>& allowedPaths) {
+  for (auto allowed : allowedPaths) {
+    fs::path p = fs::path(allowed);
+    if (isSubpath(target, p)) {
+      return true;
+    }
+  }
+  return false;
+}
 
+
+bool PopulateFakeHomeShallow(const fs::path& inputRoot,
+                             const fs::path& fakeHome) {
     std::error_code ec;
 
-    const fs::path src = fs::path(p);
-    fs::path rel = GetRelative(src, realHome);
+    fs::directory_iterator It(inputRoot, ec);
+    if (ec) return false;
 
-    // If relative() fails or escapes home, fall back to basename.
-    // (The ".." check prevents weird paths like "../etc".)
-    if (rel.empty() || rel.native().rfind("..", 0) == 0) {
-      rel = src.filename();
-      PRINT_DEBUG("Fall back to rel = %s", rel.string().c_str()); 
+    for (const fs::directory_entry& entry : It) {
+        const fs::path target = entry.path();
+        bool allowed = IsAllowedSubpath(target, opt.bind_mount_sources) || 
+                       IsAllowedSubpath(target, opt.writable_files);
+        if (!allowed)
+          continue;
+        const fs::path linkPath = fakeHome / target.filename();
+        fs::create_symlink(target, linkPath, ec);
+        if (ec) {
+            PRINT_DEBUG("Error Creating symlink Target==%s, LinkPath==%s\n",
+                        target.string().c_str(), linkPath.string().c_str());
+            continue;
+        }
     }
-
-    const fs::path linkPath = fakeHome / rel;
-    // We dont want to create the symlink the entire path that we requested via -w/-M but
-    // only to its top level directory from the home. If the path we added as write is
-    // $HOME/a/b/c , we wanna create the symlink so that we have $FAKE_HOME/a -> $HOME/a 
-    if (fs::exists(linkPath, ec)) {
-      PRINT_DEBUG("No need to re-create link for %s , we already have it", linkPath.c_str());
-      continue;
-    }
-
-    std::string topLvl = TopLevelRelativeFolder(fakeHome, linkPath.string());
-    const fs::path topLvlP = fs::path(topLvl);
-
-    std::string topLvlReal = TopLevelRelativeFolder(realHome, p);
-    const fs::path topLvlRealP = fs::path(topLvlReal);
-
-    PRINT_DEBUG("Create symlink src: %s, linkPath: %s\n", topLvlRealP.c_str(), topLvlP.c_str());
-    fs::create_symlink(topLvlRealP, topLvlP, ec);
-    if (ec) {
-      PRINT_DEBUG("Error creating symlink");
-      continue;
-    }
-    PRINT_DEBUG("Created");
-  }
-  return 0;
+    return true;
 }
 
 
@@ -998,11 +995,8 @@ int MakeFakeHome(const std::string& fakeHomeStr) {
     fs::create_directories(fakeHome, ec);
     if (ec) return -1;
   }
-  PRINT_DEBUG("Create links to binds");
-  CreateSymlinksToHomeFiles(opt.bind_mount_sources, fakeHome);
-
-  PRINT_DEBUG("Create links to writable files");
-  CreateSymlinksToHomeFiles(opt.writable_files, fakeHome);
+  std::string home = GetHomeDir();
+  PopulateFakeHomeShallow(home , fakeHome);
 
   SetEnvHome(fakeHomeStr);
   return 0;

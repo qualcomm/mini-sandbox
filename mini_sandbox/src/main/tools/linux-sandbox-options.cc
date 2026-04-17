@@ -703,7 +703,7 @@ int MiniSbxMountBind(const std::string &input_path) { // -M
     return -1;
   }
   bool is_symlink = false;
-  const std::string path = CanonicPath(input_path, false, &is_symlink);
+  const std::string path = CanonicPath(input_path, true, &is_symlink);
   int res = 0;
   bool exist = false;
   if ((res = ValidatePath(path, &exist)) < 0)
@@ -744,7 +744,7 @@ int MiniSbxMountWrite(const std::string &input_path) {
     return -1;
   }
   bool is_symlink = false;
-  const std::string path = CanonicPath(input_path, false, &is_symlink);
+  const std::string path = CanonicPath(input_path, true, &is_symlink);
   int res = 0;
   bool exist = false;
   if ((res = ValidatePath(path, &exist)) < 0)
@@ -782,7 +782,7 @@ int MiniSbxMountOverlay(const std::string &input_path) {
     return -1;
   }
   bool is_symlink = false;
-  const std::string path = CanonicPath(input_path, false, &is_symlink);
+  const std::string path = CanonicPath(input_path, true, &is_symlink);
   int res = 0;
   bool exist = false;
   if (opt.use_overlayfs) {
