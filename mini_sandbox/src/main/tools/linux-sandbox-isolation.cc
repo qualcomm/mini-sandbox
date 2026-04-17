@@ -103,11 +103,15 @@ std::unique_ptr<MiniSbxIsolation> MakeMiniSbxIsolation() {
 
   if (UserNamespaceSupported()) {
     return std::make_unique<MiniSbxIsolationNamespaces>();
-  }
-  else if (LandlockSupported()) {
-    return std::make_unique<MiniSbxIsolationLandlock>();
   } else { 
     return std::make_unique<MiniSbxIsolationCapabilities>();
   }
+
+  // For now we don't automatically fall back to landlock if user namespaces are not supported
+  // Landlock APIs are still unstable. User can activate via env variable (see above)
+  //
+  // if (LandlockSupported()) {
+  //   return std::make_unique<MiniSbxIsolationLandlock>();
+  // }  
 
 }

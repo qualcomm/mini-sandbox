@@ -87,9 +87,10 @@ void DropCapabilitiesExcept(uint64_t keep) {
 
 
 void DropCapabilities() {
-  std::cout << "Warning: Sandbox cannot be fully enabled (either due to Docker or AppArmor). "
+  // Printing this to stdout can trigger build issues, we'll just log for now
+  PRINT_DEBUG("Warning: Sandbox cannot be fully enabled (either due to Docker or AppArmor). "
           "We'll just drop the capabilities of the current process but cannot provide advanced "
-          "features such as usernamespace, overlayfs, rootless firewall, etc." << std::endl;
+          "features such as usernamespace, overlayfs, rootless firewall, etc.");
 
   uint64_t keep = 0;
   // TODO: Add either a CLI flag/API or env variable to configure capabilities
