@@ -7,6 +7,7 @@
 DIR="/tmp/sbx_dir"
 EXPECTED_MOUNTS=12
 export EXPECTED_MOUNTS
+
 mini-sandbox -o $DIR -d $DIR -k /etc -k /lib -k /lib64 -k /sbin -k /bin -k /usr -M /var -M /opt -- /bin/bash << 'EOF'
 
 check_last_command() {
@@ -43,12 +44,27 @@ check_ls_count() {
     fi
 }
 
-echo -e "\nTest that only $EXPECTED_MOUNTS mounts are under /"
-count=$(ls / | wc -l)
-check_ls_count $count $EXPECTED_MOUNTS
+
+if [[ "${LANDLOCK_TEST:-}" != "1" ]]; then
+  echo -e "\nTest that only $EXPECTED_MOUNTS mounts are under /"
+  count=$(ls / | wc -l)
+  check_ls_count $count $EXPECTED_MOUNTS
+fi
+
+
+for p in /etc /lib /lib64 /sbin /bin /usr /var /opt; do
+  ls -d "$p"
+  check_last_command
+done
+
+for p in /proc /sys /run ; do
+  ls "$p"
+  check_last_command_failed
+done
+
 
 echo -e "\nTest showing the network is unavailable"
-wget google.com -T 1
+wget google.com -T 1 -t 1
 check_last_command_failed
 EOF
 

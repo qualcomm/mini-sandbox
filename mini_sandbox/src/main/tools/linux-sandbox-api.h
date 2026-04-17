@@ -43,6 +43,7 @@ int mini_sandbox_get_last_error_code();
 const char* mini_sandbox_get_last_error_msg();
 
 int mini_sandbox_is_running();
+const char* mini_sandbox_get_home();
 
 #ifndef MINITAP
 int mini_sandbox_share_network();
@@ -53,6 +54,7 @@ int mini_sandbox_allow_ipv4(const char* ip);
 int mini_sandbox_allow_domain(const char* domain);
 int mini_sandbox_allow_all_domains();
 int mini_sandbox_allow_ipv4_subnet(const char* subnet);
+int mini_sandbox_allow_port(const char* port);
 #endif
 
 #if defined(__cplusplus)

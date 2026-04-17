@@ -50,7 +50,7 @@ count=$(ls $PWD/../ | wc -l)
 check_ls_count $count 1
 
 echo -e "\nTest showing the network is unavailable"
-wget google.com -T 1
+wget google.com -T 1 -t 1
 check_last_command_failed
 EOF
 

@@ -41,10 +41,3 @@ To load the new profile execute
 sudo apparmor_parser -r /etc/apparmor.d/ /etc/apparmor.d/mini-sandbox
 sudo aa-status | grep mini # Verify the outcome
 ```
-
-At this point, you can set the environment variable "MINI_SANDBOX_FORCE_USER_NAMESPACE" and make sure that mini-sanbdox leverages user namespaces.
-
-
-```
-echo MINI_SANDBOX_FORCE_USER_NAMESPACE=1>>/etc/environment
-```

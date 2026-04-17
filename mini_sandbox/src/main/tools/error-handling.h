@@ -14,6 +14,7 @@
 #include <cstdarg>
 #include <vector>
 #include <cstring>
+#include "src/main/tools/constants.h"
 
 #define MAX_ERR_LEN 255
 
@@ -21,12 +22,6 @@
 #define RECOVERABLE_FAIL -2
 #define RECOVERABLE_ERROR_CODES -200
 
-
-
-enum class Mode {
-    CLI,
-    Library
-};
 
 enum class ErrorCode : int {
   None = 0,
@@ -41,11 +36,21 @@ enum class ErrorCode : int {
   FileReadAndWrite = -9,
   IllegalNetworkConfiguration = -10,
   TmpNotRemounted = -11,
+  LLNotSupported = -12,
+  UserNSNotSupported = -13,
+  PRSetNoNewPrivsFail = -14,
+  SysCapset = -15,
+  SysCapget = -16,
+  LLFailedRuleset = -17,  
   GeneralOSError = -100,
   // Error codes from -201 are recoverables
   NestedSandbox = -201,
-  SandboxAlreadyStarted=-202,//The difference between this and NESTED_SANDBOX is that NESTED_SANDBOX is returned when the parent process started the sandbox, while SAN
-
+  //The difference between this and NESTED_SANDBOX is that NESTED_SANDBOX is returned when the parent process started the sandbox
+  SandboxAlreadyStarted = -202,
+  SandboxModeAlreadySet = -203,
+  LLPortsNotSet = -204,
+  LLDirNotExist = -205,
+  LLFailedAddRule = -206,
   Unknown = -1000
 };
 
@@ -72,15 +77,35 @@ inline std::string GetErrorMessage(ErrorCode code) {
     case ErrorCode::FileReadAndWrite:
       return "Illegal configuration. File mounted as read and write at the same time";
     case ErrorCode::NestedSandbox:
-      return " : Cannot nest multiple sandbox. The process is already running inside mini-sandbox.";
+      return "Cannot nest multiple sandbox. The process is already running inside mini-sandbox.";
     case ErrorCode::SandboxAlreadyStarted:
-      return " : Sandbox was already started. Cannot change the configuration.";
+      return "Sandbox was already started. Cannot change the configuration.";
+    case ErrorCode::SandboxModeAlreadySet:
+      return "Sandbox mode of running was already set. Cannot change mode";
     case ErrorCode::GeneralOSError:
       return "OS Error";
     case ErrorCode::IllegalNetworkConfiguration:
       return "Cannot allow all domains after specifying one network rule";
     case ErrorCode::TmpNotRemounted:
       return "/tmp cannot be remounted when running in default mode";
+    case ErrorCode::LLNotSupported:
+      return "Landlock not supported";
+    case ErrorCode::UserNSNotSupported:
+      return "User Namespaces not supported";
+    case ErrorCode::PRSetNoNewPrivsFail:
+      return "prctl(PR_SET_NO_NEW_PRIVS) failed";
+    case ErrorCode::SysCapset:
+      return "SYS_capset failed";
+    case ErrorCode::SysCapget:
+      return "SYS_capget failed";
+    case ErrorCode::LLPortsNotSet:
+      return "Landlock could not add net rules for requested ports";
+    case ErrorCode::LLFailedRuleset:
+      return "Landlock failed to create ruleset";
+    case ErrorCode::LLFailedAddRule:
+      return "Landlock failed to add a new rule";
+    case ErrorCode::LLDirNotExist:
+      return "Landlock dir does not exist";
     case ErrorCode::Unknown:
     default:
       return "Unknown error occurred";

@@ -72,6 +72,11 @@ if __name__ == "__main__":
         assert (res == 0)
         #mn_sbx.mini_sandbox_allow_ipv4_subnet("172.0.0.0/8") # With this and previous, google connection should go through
         # mn_sbx.mini_sandbox_allow_all_domains() # With this all the connection should go through
+        res = mn_sbx.mini_sandbox_allow_port("80")
+        assert (res == 0)
+        res = mn_sbx.mini_sandbox_allow_port("53")
+        assert (res == 0)
+
 
     res = mn_sbx.mini_sandbox_start()
 
