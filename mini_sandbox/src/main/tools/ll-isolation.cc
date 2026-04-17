@@ -344,6 +344,8 @@ static int LLRunTime() {
     return MiniSbxReportError(ErrorCode::LLNotSupported);
   }
 
+  MiniSbxSetInternalEnv();
+
   gRuleset = CreateBasicRulesetFd();
   int ll_res = 0, port_res = 0;
   if (gRuleset < 0) return MiniSbxReportError(ErrorCode::LLFailedRuleset);

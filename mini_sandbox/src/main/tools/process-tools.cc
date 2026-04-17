@@ -920,11 +920,11 @@ std::string CanonicPath(const std::string& path_str,
   return out.string();
 }
 
-bool IsInsideHomeDir(const fs::path path){
+bool IsInsideHomeDir(const fs::path path) {
   std::string canonic = CanonicPath(path, true, nullptr);
   fs::path path_canon = fs::path(canonic);
   fs::path home_dir = GetHomeDir();
-  return isSubpath( home_dir,path_canon);
+  return isSubpath(home_dir, path_canon);
 }
 
 
@@ -942,22 +942,35 @@ int SetEnvHome(const std::string& value) {
 }
 
 
+static bool IsAllowedSubpath(const fs::path& target, const std::vector<std::string>& allowedPaths) {
+  for (auto allowed : allowedPaths) {
+    fs::path p = fs::path(allowed);
+    if (isSubpath(target, p)) {
+      return true;
+    }
+  }
+  return false;
+}
 
 
-bool PopulateFakeHomeShallow(const fs::path& InputRoot,
-                             const fs::path& FakeHome) {
+bool PopulateFakeHomeShallow(const fs::path& inputRoot,
+                             const fs::path& fakeHome) {
     std::error_code ec;
 
-    fs::directory_iterator It(InputRoot, ec);
+    fs::directory_iterator It(inputRoot, ec);
     if (ec) return false;
 
-    for (const fs::directory_entry& Entry : It) {
-        const fs::path Target = Entry.path();
-        const fs::path LinkPath = FakeHome / Target.filename();
-        fs::create_symlink(Target, LinkPath, ec);
+    for (const fs::directory_entry& entry : It) {
+        const fs::path target = entry.path();
+        bool allowed = IsAllowedSubpath(target, opt.bind_mount_sources) || 
+                       IsAllowedSubpath(target, opt.writable_files);
+        if (!allowed)
+          continue;
+        const fs::path linkPath = fakeHome / target.filename();
+        fs::create_symlink(target, linkPath, ec);
         if (ec) {
             PRINT_DEBUG("Error Creating symlink Target==%s, LinkPath==%s\n",
-                        Target.string().c_str(), LinkPath.string().c_str());
+                        target.string().c_str(), linkPath.string().c_str());
             continue;
         }
     }
