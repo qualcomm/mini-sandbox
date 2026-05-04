@@ -456,8 +456,7 @@ void Cleanup() {
         }
       }
     } catch (const std::exception &e) {
-      std::cerr << "Warning: Could not remove the trash files: " << e.what()
-                << std::endl;
+      PRINT_DEBUG("Warning: Could not remove the trash files");
     }
   }
 }
@@ -515,7 +514,6 @@ gid_t get_outer_gid() {
 
 int MiniSbxSetInternalEnv() {
   if (setenv(INTERNAL_MINI_SANDBOX_ENV, "1", 1) != 0) {
-      std::cerr << "Failed to set environment variable." << std::endl;
       MiniSbxReportGenericError("Failed to set environment variable __INTERNAL_MINI_SANDBOX_ON");
   }
   return 0;
