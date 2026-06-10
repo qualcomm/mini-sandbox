@@ -57,6 +57,8 @@ namespace fs = std::experimental::filesystem;
 #include <string>
 #include <vector>
 #include <memory>
+
+extern std::string mini_sbx_tmp_per_session;
 #include <fstream>
 #include <cctype>
 
@@ -451,6 +453,13 @@ void Cleanup() {
         makeWritable(overlayfs_dir, 0, MAX_DEPTH_OVERLAYFS_ROOT);
         if (fs::remove_all(overlayfs_dir) < 0) {
           MiniSbxReportGenericError("ERROR when removing the overlay directory");
+        }
+      }
+
+      if (opt.use_default && !mini_sbx_tmp_per_session.empty()) {
+        fs::path session_tmp_dir = mini_sbx_tmp_per_session.c_str();
+        if (fs::remove_all(session_tmp_dir) < 0) {
+          MiniSbxReportGenericError("ERROR when removing the session tmp directory");
         }
       }
     } catch (const std::exception &e) {

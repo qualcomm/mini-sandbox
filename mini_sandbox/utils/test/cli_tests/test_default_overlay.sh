@@ -113,6 +113,3 @@ if [ -d "$DIR" ]; then
 	check_last_command_failed
 fi
 
-echo -e "\nCheck that /tmp has been written (/tmp/mini-sandbox-tmp/)"
-ls /tmp/mini-sandbox-tmp/test.txt
-check_last_command

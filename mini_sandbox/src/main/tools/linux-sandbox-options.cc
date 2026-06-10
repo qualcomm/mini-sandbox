@@ -49,6 +49,7 @@ namespace fs = std::experimental::filesystem;
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <netdb.h>
+#include <ctime>
 #include <random>
 
 using std::ifstream;
@@ -56,6 +57,8 @@ using std::unique_ptr;
 using std::vector;
 
 struct Options opt;
+std::string mini_sbx_tmp_per_session("");
+
 static int MiniSbxSetupSandboxRootWithOverlay(const std::string& path);
 static int MiniSbxSetupOverlayfsFolder(std::string path);
 void MountHomeSymlinks(const std::string path, std::vector<std::string>* sources, std::vector<std::string>* targets );
@@ -800,11 +803,21 @@ int MiniSbxMountOverlay(const std::string &input_path) {
   return res;
 }
 
+static int MiniSbxSetUpTempPerSession(){
+  std::string tmp_folder;
+  std::string tmp(TMP);
 
+  srand(time(NULL));
+  tmp_folder = std::string(MINI_SBX_TMP) + "_" + std::to_string(rand());
+  int res = CreateDirectory(TMP, tmp_folder, mini_sbx_tmp_per_session);
+  res += MiniSbxMountBindSourceToTarget(mini_sbx_tmp_per_session, tmp);
+  return res;
+
+}
 
 static void MiniSbxGetInitFile(std::string& init_path) {
   if (opt.use_default) {
-    init_path = std::string(TMP) + "/" + std::string(MINI_SBX_TMP) + "/" + std::string(MINI_SBX_INIT);
+    init_path = std::string(mini_sbx_tmp_per_session) + "/" + std::string(MINI_SBX_INIT);
   }
   else if (! opt.sandbox_root.empty()) {
     init_path = opt.sandbox_root + "/" + std::string(TMP) + "/" + std::string(MINI_SBX_INIT);
@@ -876,13 +889,11 @@ int MiniSbxSetupDefault() {
 #endif
   opt.use_default = true;
   opt.use_overlayfs = true;
-  std::string tmp(TMP);
-  std::string sbx_temp_dir;
-  res = CreateDirectory(TMP, MINI_SBX_TMP, sbx_temp_dir);
+  res = MiniSbxSetUpTempPerSession();
   if (res < 0)
     return res;
-  MiniSbxMountBindSourceToTarget(sbx_temp_dir, tmp);
   SetupEssentialMounts();
+  std::string tmp(TMP);
   res += CreateSandboxRoot(tmp);
   res += CreateOverlayfsDir(tmp);
   PRINT_DEBUG("Sandbox root %s\n", opt.sandbox_root.c_str());
