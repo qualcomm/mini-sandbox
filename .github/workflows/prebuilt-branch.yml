@@ -93,7 +93,7 @@ jobs:
 
       - name: Checkout the release tag (full source tree)
         # ref is a validated value passed as an action input (not shell).
-        uses: actions/checkout@v4   # consider pinning to a commit SHA for supply-chain hardening
+        uses: actions/checkout@v7   # consider pinning to a commit SHA for supply-chain hardening
         with:
           ref: ${{ env.TAG }}
           fetch-depth: 0       # need full history so we can branch and push
