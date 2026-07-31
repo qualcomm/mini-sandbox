@@ -1,12 +1,10 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"io"
 	"net"
-	"os"
 	"strings"
 
 	"github.com/miekg/dns"
@@ -273,46 +271,69 @@ func dnsTypeCode(t uint16) string {
 }
 
 var upstreamDNS string
-
-func ReadFirstDNSServerWithPort() (string, error) {
-	file, err := os.Open("/etc/resolv.conf")
-	if err != nil {
-		return "", fmt.Errorf("failed to open /etc/resolv.conf: %w", err)
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.HasPrefix(line, "nameserver") {
-			fields := strings.Fields(line)
-			if len(fields) >= 2 {
-				return fields[1] + ":53", nil
-			}
-		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		return "", fmt.Errorf("error reading /etc/resolv.conf: %w", err)
-	}
-
-	return "", fmt.Errorf("no nameserver found in /etc/resolv.conf")
-}
+var searchDomains []string
+var ndots = 1
 
 func setUpstreamDNS() {
-	if upstreamDNS == "" {
-		dns, err := ReadFirstDNSServerWithPort()
-		if err != nil {
-			fmt.Println("Warning: could not read DNS from resolv.conf, using default.")
-			upstreamDNS = "8.8.8.8:53"
-		} else {
-			upstreamDNS = dns
+	if upstreamDNS != "" {
+		return
+	}
+	config, err := dns.ClientConfigFromFile("/etc/resolv.conf")
+	if err != nil || len(config.Servers) == 0 {
+		fmt.Println("Warning: could not read DNS from resolv.conf, using default.")
+		upstreamDNS = "8.8.8.8:53"
+	} else {
+		port := config.Port
+		if port == "" {
+			port = "53"
 		}
-		verbosef("Using %s as DNS", upstreamDNS)
-		if host, _, err := net.SplitHostPort(upstreamDNS); err == nil {
-			allowedIps[host] = 1
+		upstreamDNS = net.JoinHostPort(config.Servers[0], port)
+		searchDomains = config.Search
+		if config.Ndots > 0 {
+			ndots = config.Ndots
 		}
 	}
+	verbosef("Using %s as DNS (search=%v ndots=%d)", upstreamDNS, searchDomains, ndots)
+	if host, _, err := net.SplitHostPort(upstreamDNS); err == nil {
+		allowedIps[host] = 1
+	}
+}
+
+// lookupWithSearch resolves name using net.DefaultResolver, applying the
+// search list from /etc/resolv.conf per standard ndots semantics. It returns
+// the candidate that actually resolved, its IPs, and any error from the last
+// failed attempt.
+func lookupWithSearch(ctx context.Context, name string) (string, []net.IP, error) {
+	stripped := strings.TrimSuffix(name, ".")
+	dotCount := strings.Count(stripped, ".")
+
+	var candidates []string
+	appendSearch := func() {
+		for _, s := range searchDomains {
+			candidates = append(candidates, stripped+"."+strings.TrimSuffix(s, ".")+".")
+		}
+	}
+	
+	if dotCount >= ndots || len(searchDomains) == 0 {
+		//if the name looks fully qualified, try first the name and then the variants with the suffix
+		candidates = append(candidates, name)
+		appendSearch()
+	} else {
+		//if the name is not fully qualified, try first the suffixes and then the bare name
+
+		appendSearch()
+		candidates = append(candidates, name)
+	}
+
+	var lastErr error
+	for _, cand := range candidates {
+		ips, err := net.DefaultResolver.LookupIP(ctx, "ip4", cand)
+		if err == nil {
+			return cand, ips, nil
+		}
+		lastErr = err
+	}
+	return name, nil, lastErr
 }
 
 // handleDNSQuery answers DNS queries according to:
@@ -337,12 +358,10 @@ func handleDNSQuery(ctx context.Context, req *dns.Msg) ([]dns.RR, error) {
 	// handle the request ourselves
 	switch question.Qtype {
 	case dns.TypeA:
-		var ips []net.IP
-		var err error
 		if !firewallDns(question.Name) {
 			return nil, fmt.Errorf("Request denied by custom firewall")
 		}
-		ips, err = net.DefaultResolver.LookupIP(ctx, "ip4", question.Name)
+		resolvedName, ips, err := lookupWithSearch(ctx, question.Name)
 		if err != nil {
 			return nil, fmt.Errorf("for an A record the default resolver said: %w", err)
 		}
@@ -352,7 +371,11 @@ func handleDNSQuery(ctx context.Context, req *dns.Msg) ([]dns.RR, error) {
 			answers: ips,
 		})
 
-		verbosef("resolved %v to %v with default resolver", question.Name, ips)
+		if resolvedName != question.Name {
+			verbosef("resolved %v (as %v) to %v with default resolver", question.Name, resolvedName, ips)
+		} else {
+			verbosef("resolved %v to %v with default resolver", question.Name, ips)
+		}
 
 		var rrs []dns.RR
 		for _, ip := range ips {
