@@ -31,6 +31,10 @@ on:
       tag:
         description: 'Release tag to publish a prebuilt branch for (e.g. v1.1.15)'
         required: true
+      publish_as:
+        description: 'Publish the branch as prebuilt-<publish_as> instead of prebuilt-<tag>. Use to point a stable branch name (e.g. v1.1.15) at a newer source tag (e.g. v1.1.15.r1). Defaults to <tag>.'
+        required: false
+        default: ''
       force:
         description: 'Overwrite the prebuilt-<TAG> branch if it already exists'
         type: boolean
@@ -67,6 +71,7 @@ jobs:
         env:
           EVENT_TAG: ${{ github.event.release.tag_name }}
           INPUT_TAG: ${{ github.event.inputs.tag }}
+          INPUT_PUBLISH_AS: ${{ github.event.inputs.publish_as }}
           INPUT_FORCE: ${{ github.event.inputs.force }}
           INPUT_ALLOW_UNVERIFIED: ${{ github.event.inputs.allow_unverified }}
         run: |
@@ -82,14 +87,29 @@ jobs:
             echo "::error::Tag '$TAG' is not an allowed release-tag format."
             exit 1
           fi
+          # BRANCH_TAG controls only the published branch NAME (prebuilt-<BRANCH_TAG>).
+          # It lets a stable branch (e.g. prebuilt-v1.1.15) be repointed at a newer
+          # source tag (e.g. v1.1.15.r1) so downstream consumers who pinned the branch
+          # get the fixes without changing their pipelines. Everything that determines
+          # WHAT ships (checkout ref, asset download, digest verification) still uses
+          # TAG. Defaults to TAG when publish_as is not provided.
+          BRANCH_TAG="${INPUT_PUBLISH_AS:-}"
+          if [ -z "$BRANCH_TAG" ]; then
+            BRANCH_TAG="$TAG"
+          fi
+          if ! printf '%s' "$BRANCH_TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z]+)*$'; then
+            echo "::error::publish_as '$BRANCH_TAG' is not an allowed release-tag format."
+            exit 1
+          fi
           FORCE="${INPUT_FORCE:-false}"
           ALLOW_UNVERIFIED="${INPUT_ALLOW_UNVERIFIED:-false}"
           {
             echo "TAG=$TAG"
+            echo "BRANCH_TAG=$BRANCH_TAG"
             echo "FORCE=$FORCE"
             echo "ALLOW_UNVERIFIED=$ALLOW_UNVERIFIED"
           } >> "$GITHUB_ENV"
-          echo "Using TAG=$TAG FORCE=$FORCE ALLOW_UNVERIFIED=$ALLOW_UNVERIFIED"
+          echo "Using TAG=$TAG BRANCH_TAG=$BRANCH_TAG FORCE=$FORCE ALLOW_UNVERIFIED=$ALLOW_UNVERIFIED"
 
       - name: Checkout the release tag (full source tree)
         # ref is a validated value passed as an action input (not shell).
@@ -101,7 +121,7 @@ jobs:
       - name: Stop if prebuilt branch already exists
         run: |
           set -euo pipefail
-          BRANCH="prebuilt-${TAG}"
+          BRANCH="prebuilt-${BRANCH_TAG}"
           if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
             if [ "$FORCE" = "true" ]; then
               echo "Branch $BRANCH exists; FORCE=true, it will be overwritten."
@@ -234,7 +254,7 @@ jobs:
       - name: Commit prebuilts/ to a new prebuilt-<TAG> branch and push
         run: |
           set -euo pipefail
-          BRANCH="prebuilt-${TAG}"
+          BRANCH="prebuilt-${BRANCH_TAG}"
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
