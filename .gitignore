@@ -20,3 +20,4 @@ release/
 dist/
 .vscode/**
 pypi_dist/
+.claude/

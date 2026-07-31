@@ -512,7 +512,7 @@ void ParseOptions(int argc, char *argv[]) {
 #ifdef MINITAP
 
 std::regex ipv4_regex(R"(^(\d{1,3}\.){3}\d{1,3}$)");
-std::regex domain_regex(R"(^([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$)");
+std::regex domain_regex(R"(^([a-zA-Z0-9-]+\.)*[a-zA-Z0-9-]+$)");
 std::regex subnet_regex(R"(^(\d{1,3}\.){3}\d{1,3}/\d{1,2}$)");
 
 static int ValidateFilePath(const std::string &path) {
