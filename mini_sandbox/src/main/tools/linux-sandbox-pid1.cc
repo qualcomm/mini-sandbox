@@ -739,11 +739,17 @@ static void MakeFilesystemPartiallyReadOnly(bool need_mount, int num_of_mounts) 
     if (need_mount) {
       PRINT_DEBUG("%s need to mount %s ?", __func__, ent->mnt_dir);
 
-      // We First check if we are dealing with autofs/nfs . In those cases we do not want to mount 
-      // each mount point under the autofs/nfs entry point cause it'd take too much time.
+      // We first check if we are dealing with a network/automount filesystem. In those cases we do
+      // not want to mount each mount point under the entry point: it'd take too much time, and worse,
+      // any stat() on such a path (e.g. the fs::exists() check below) can block forever. A hard NFS
+      // mount pointing at a dead server (e.g. a *_test filer) will hang a stat() indefinitely, and
+      // AT_NO_AUTOMOUNT does NOT help once the filesystem is already mounted. So we must skip these
+      // by TYPE alone, before any call that touches the path. Match nfs/nfs4/... by prefix so future
+      // variants are covered too.
       std::string type(ent->mnt_type);
-      if (type.compare("autofs") == 0 || type.compare("nfs") == 0) {
-        PRINT_DEBUG("%s mounted in autofs/nfs. Skipping", ent->mnt_dir);
+      if (type == "autofs" || type.rfind("nfs", 0) == 0 ||
+          type == "cifs"   || type.rfind("fuse", 0) == 0) {
+        PRINT_DEBUG("%s mounted in network fs (%s). Skipping", ent->mnt_dir, type.c_str());
         continue;
       }
 
