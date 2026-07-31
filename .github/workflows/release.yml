@@ -5,13 +5,11 @@ on:
     tags: [ 'v*' ]
 
 
-permissions:
-  contents: write        # required for creating release
-
-
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write        # required for creating the release and pushing to release-checksums
 
     steps:
       
@@ -25,13 +23,11 @@ jobs:
 
       - name: Derive TAG for this run
         id: meta
+        env:
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          # If this run is on a tag push, use the tag name.
-          # If it's a manual run, use the provided input or fallback to 'manual'.
-          TAG="${{ github.ref_type == 'tag' && github.ref_name || '' }}"
-          if [ -z "$TAG" ]; then
-            TAG="${{ github.event.inputs.version }}"
-          fi
+          # This workflow triggers only on tag pushes, so the tag name is the ref.
+          TAG="${REF_NAME}"
           if [ -z "$TAG" ]; then TAG="manual"; fi
           echo "TAG=$TAG" >> "$GITHUB_ENV"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
@@ -162,8 +158,10 @@ jobs:
 
       - name: Derive TAG for this run
         id: meta
+        env:
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          TAG="${{ github.ref_type == 'tag' && github.ref_name || '' }}"
+          TAG="${REF_NAME}"
           if [ -z "$TAG" ]; then TAG="manual"; fi
           echo "TAG=$TAG" >> "$GITHUB_ENV"
           echo "Using TAG=$TAG"

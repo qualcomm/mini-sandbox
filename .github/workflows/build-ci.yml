@@ -39,12 +39,15 @@ jobs:
 
       - name: Derive TAG for this run
         id: meta
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          # If this run is on a tag push, use the tag name.
-          # If it's a manual run, use the provided input or fallback to 'manual'.
-          TAG="${{ github.ref_type == 'tag' && github.ref_name || '' }}"
-          if [ -z "$TAG" ]; then
-            TAG="${{ github.event.inputs.version }}"
+          # On a tag push use the tag name; otherwise fall back to 'manual'.
+          if [ "$REF_TYPE" = "tag" ]; then
+            TAG="$REF_NAME"
+          else
+            TAG=""
           fi
           if [ -z "$TAG" ]; then TAG="manual"; fi
           echo "TAG=$TAG" >> "$GITHUB_ENV"
