@@ -79,6 +79,54 @@ jobs:
           sha256sum "mini-sandbox-${TAG}.tar.gz" > SHA256SUMS.txt
           ls -lah
 
+      - name: Record build-time digest on release-checksums branch
+        # Independent root of trust for prebuilt-branch.yml. The digest is written
+        # here, at build time, to a separate branch that can be protected so only
+        # this workflow's bot can push to it. prebuilt-branch.yml verifies the
+        # downloaded tarball against THIS value, not against the checksum file
+        # shipped inside the release asset — so swapping a release asset alone
+        # cannot pass verification.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          DIGEST="$(awk '{print $1}' dist/SHA256SUMS.txt)"
+          PATH_IN_REPO="${TAG}.sha256"
+          CONTENT_B64="$(printf '%s  mini-sandbox-%s.tar.gz\n' "$DIGEST" "$TAG" | base64 -w0)"
+
+          # Ensure the orphan branch exists (create empty on first use).
+          if ! gh api "repos/${REPO}/branches/release-checksums" >/dev/null 2>&1; then
+            BASE_SHA="$(gh api "repos/${REPO}/git/refs/heads/${GITHUB_REF_NAME}" -q '.object.sha' 2>/dev/null || true)"
+            # Fall back to default branch HEAD if the ref lookup above is unavailable.
+            if [ -z "${BASE_SHA:-}" ]; then
+              BASE_SHA="$(gh api "repos/${REPO}/git/refs/heads/main" -q '.object.sha')"
+            fi
+            gh api -X POST "repos/${REPO}/git/refs" \
+              -f ref="refs/heads/release-checksums" \
+              -f sha="$BASE_SHA" >/dev/null
+          fi
+
+          # A published release's digest is fixed forever. Re-recording the SAME
+          # digest is allowed (so re-running the release job is safe); only a
+          # DIFFERENT digest for an existing tag is rejected.
+          if EXIST_B64="$(gh api "repos/${REPO}/contents/${PATH_IN_REPO}?ref=release-checksums" -q '.content' 2>/dev/null)"; then
+            EXIST_DIGEST="$(printf '%s' "$EXIST_B64" | base64 -d | awk '{print $1}')"
+            if [ "$EXIST_DIGEST" = "$DIGEST" ]; then
+              echo "Digest for ${TAG} already recorded and matches; nothing to do."
+              exit 0
+            fi
+            echo "::error::A DIFFERENT digest for ${TAG} is already recorded on release-checksums; refusing to overwrite."
+            echo "::error::recorded=${EXIST_DIGEST} new=${DIGEST}"
+            exit 1
+          fi
+
+          gh api -X PUT "repos/${REPO}/contents/${PATH_IN_REPO}" \
+            -f message="Record digest for ${TAG}" \
+            -f branch="release-checksums" \
+            -f content="$CONTENT_B64" >/dev/null
+          echo "Recorded digest for ${TAG} on release-checksums: ${DIGEST}"
+
 
       - name: Upload dist for downstream jobs
         uses: actions/upload-artifact@v4

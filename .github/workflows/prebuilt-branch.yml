@@ -1,0 +1,254 @@
+
+name: Publish prebuilt branch
+# After a GitHub Release is published, create an immutable per-release branch
+# named "prebuilt-<TAG>" that holds the release source tree plus a top-level
+# "prebuilts/" folder with ready-to-use mini-sandbox binaries.
+#
+# The binaries are NOT recompiled here: they are downloaded from the assets that
+# release.yml already uploaded to the GitHub Releases page. Customers sync the
+# prebuilt-<TAG> branch from the Linaro / Gerrit mirrors and get a ready-to-run
+# tree without having to build anything.
+#
+# Only mini-sandbox artifacts are shipped; mini-tapbox / minitap files are
+# excluded by an explicit allowlist (see "Assemble prebuilts/" below).
+#
+# SECURITY MODEL
+#  - Triggers are privileged-only (release published / manual dispatch); a fork
+#    PR or any user without write access can never run this with the token.
+#  - All externally-influenced values (tag name, dispatch inputs) are passed via
+#    env: and referenced as "$VAR" — never interpolated into a run: script — and
+#    the tag is validated against a strict allowlist to block shell injection.
+#  - The downloaded tarball is verified against a digest recorded at BUILD TIME
+#    on the separate, protectable `release-checksums` branch (see release.yml),
+#    independent of any checksum file packaged inside the release asset. The
+#    tarball is only unpacked AFTER that check passes, so a verified tarball is
+#    provably our own build output — not attacker-controlled content.
+on:
+  release:
+    types: [ published ]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to publish a prebuilt branch for (e.g. v1.1.15)'
+        required: true
+      force:
+        description: 'Overwrite the prebuilt-<TAG> branch if it already exists'
+        type: boolean
+        default: false
+      allow_unverified:
+        description: 'Proceed even if no recorded digest exists (ONLY for trusted pre-existing releases)'
+        type: boolean
+        default: false
+
+
+concurrency:
+  # Serialize per tag so two runs never race to push the same branch.
+  group: prebuilt-${{ github.event.release.tag_name || github.event.inputs.tag }}
+  cancel-in-progress: false
+
+
+permissions:
+  contents: write          # required to push the prebuilt-<TAG> branch
+
+
+jobs:
+  publish-prebuilt:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install GitHub CLI
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y gh
+
+      - name: Derive and validate TAG / FORCE / ALLOW_UNVERIFIED
+        # Injection-safe: untrusted-influenced values arrive via env, never
+        # inlined into the script body, and TAG is allowlist-validated before use.
+        env:
+          EVENT_TAG: ${{ github.event.release.tag_name }}
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+          INPUT_FORCE: ${{ github.event.inputs.force }}
+          INPUT_ALLOW_UNVERIFIED: ${{ github.event.inputs.allow_unverified }}
+        run: |
+          set -euo pipefail
+          TAG="${EVENT_TAG:-${INPUT_TAG:-}}"
+          if [ -z "$TAG" ]; then
+            echo "::error::No tag available (neither release event nor workflow_dispatch input)."
+            exit 1
+          fi
+          # Strict allowlist: vMAJOR.MINOR.PATCH with optional dotted/dashed suffix.
+          # Rejects anything containing shell metacharacters or newlines.
+          if ! printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z]+)*$'; then
+            echo "::error::Tag '$TAG' is not an allowed release-tag format."
+            exit 1
+          fi
+          FORCE="${INPUT_FORCE:-false}"
+          ALLOW_UNVERIFIED="${INPUT_ALLOW_UNVERIFIED:-false}"
+          {
+            echo "TAG=$TAG"
+            echo "FORCE=$FORCE"
+            echo "ALLOW_UNVERIFIED=$ALLOW_UNVERIFIED"
+          } >> "$GITHUB_ENV"
+          echo "Using TAG=$TAG FORCE=$FORCE ALLOW_UNVERIFIED=$ALLOW_UNVERIFIED"
+
+      - name: Checkout the release tag (full source tree)
+        # ref is a validated value passed as an action input (not shell).
+        uses: actions/checkout@v4   # consider pinning to a commit SHA for supply-chain hardening
+        with:
+          ref: ${{ env.TAG }}
+          fetch-depth: 0       # need full history so we can branch and push
+
+      - name: Stop if prebuilt branch already exists
+        run: |
+          set -euo pipefail
+          BRANCH="prebuilt-${TAG}"
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+            if [ "$FORCE" = "true" ]; then
+              echo "Branch $BRANCH exists; FORCE=true, it will be overwritten."
+            else
+              echo "::error::Branch $BRANCH already exists. Re-run via workflow_dispatch with force=true to overwrite."
+              exit 1
+            fi
+          else
+            echo "Branch $BRANCH does not exist yet; proceeding."
+          fi
+
+      - name: Download release tarball
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir -p _dl
+          # Download ONLY the tarball. We deliberately do not trust any checksum
+          # file shipped alongside it in the release.
+          gh release download "$TAG" \
+            --repo "$REPO" \
+            --pattern "mini-sandbox-${TAG}.tar.gz" \
+            --dir _dl
+          echo "Downloaded:"
+          ls -lah _dl
+
+      - name: Verify tarball against independent build-time digest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          ACTUAL="$(sha256sum "_dl/mini-sandbox-${TAG}.tar.gz" | awk '{print $1}')"
+          echo "actual:   $ACTUAL"
+
+          # Expected digest comes from the separate `release-checksums` branch,
+          # written at build time by release.yml — NOT from the release asset.
+          if RAW="$(gh api "repos/${REPO}/contents/${TAG}.sha256?ref=release-checksums" \
+                       -q '.content' 2>/dev/null)"; then
+            EXPECTED="$(printf '%s' "$RAW" | base64 -d | awk '{print $1}')"
+            echo "expected: $EXPECTED"
+            if [ -z "$EXPECTED" ] || [ "$ACTUAL" != "$EXPECTED" ]; then
+              echo "::error::Tarball digest does not match the recorded digest for ${TAG}. Refusing to publish."
+              exit 1
+            fi
+            echo "Digest verified against release-checksums branch."
+          else
+            if [ "$ALLOW_UNVERIFIED" = "true" ]; then
+              echo "::warning::No recorded digest for ${TAG} on release-checksums; proceeding because allow_unverified=true."
+            else
+              echo "::error::No recorded digest for ${TAG} on release-checksums. Refusing to publish."
+              echo "::error::For a trusted pre-existing release, re-run via workflow_dispatch with allow_unverified=true."
+              exit 1
+            fi
+          fi
+
+      - name: Unpack verified tarball
+        # Runs only after verification passed, so the contents are provably our build.
+        run: |
+          set -euo pipefail
+          tar -C _dl -xzf "_dl/mini-sandbox-${TAG}.tar.gz"
+          test -d _dl/release || { echo "::error::expected 'release/' inside tarball"; exit 1; }
+
+      - name: Assemble prebuilts/ (mini-sandbox only, no tapbox)
+        run: |
+          set -euo pipefail
+          SRC="_dl/release"
+          DST="prebuilts"
+          rm -rf "$DST"
+          mkdir -p "$DST/bin" "$DST/lib" "$DST/include" "$DST/python/pyminisandbox"
+
+          # --- explicit allowlist: only mini-sandbox artifacts ship ---
+          cp "$SRC/bin/mini-sandbox"                 "$DST/bin/"
+          cp "$SRC/lib/libmini-sandbox.so"           "$DST/lib/"
+          cp "$SRC/lib/libmini-sandbox.a"            "$DST/lib/"
+          cp "$SRC/include/linux-sandbox-api.h"      "$DST/include/"
+
+          PY_SRC="$SRC/python/pyminisandbox"
+          PY_DST="$DST/python/pyminisandbox"
+          cp "$PY_SRC/__init__.py"                   "$PY_DST/"
+          cp "$PY_SRC/internal_mini_sandbox.py"      "$PY_DST/"
+          cp "$PY_SRC/pyminisandbox.py"              "$PY_DST/"
+          cp "$PY_SRC/libmini-sandbox.so"            "$PY_DST/"
+          # Deliberately excluded: minitap, mini-tapbox, libmini-tapbox.{so,a},
+          # pyminitapbox.py. The Python package always calls init(tap_mode=False),
+          # which never loads libmini-tapbox.so, so it stays fully functional.
+
+          echo "Assembled prebuilts/:"
+          find "$DST" -type f | sort
+
+      - name: Generate per-file checksums for prebuilts/
+        run: |
+          set -euo pipefail
+          # Customers see loose files (not the tarball) on this branch, so provide
+          # checksums over the actual shipped files for individual verification.
+          cd prebuilts
+          find . -type f ! -name SHA256SUMS.txt -print0 \
+            | sort -z \
+            | xargs -0 sha256sum > SHA256SUMS.txt
+          echo "prebuilts/SHA256SUMS.txt:"
+          cat SHA256SUMS.txt
+
+      - name: Add a README for the prebuilt branch
+        run: |
+          set -euo pipefail
+          cat > prebuilts/README.md <<EOF
+          # mini-sandbox prebuilt binaries — ${TAG}
+
+          This folder ships ready-to-use **mini-sandbox** binaries for release \`${TAG}\`,
+          downloaded from the GitHub Releases page (not rebuilt). No compilation needed.
+
+          Layout:
+          - \`bin/mini-sandbox\`            — the sandbox executable
+          - \`lib/libmini-sandbox.so\`      — shared library
+          - \`lib/libmini-sandbox.a\`       — static library
+          - \`include/linux-sandbox-api.h\` — public C header
+          - \`python/pyminisandbox/\`       — Python ctypes bindings
+          - \`SHA256SUMS.txt\`              — checksums of every file above
+
+          Verify with:
+          \`\`\`
+          cd prebuilts && sha256sum --check SHA256SUMS.txt
+          \`\`\`
+
+          mini-tapbox / minitap artifacts are intentionally not included.
+          The rest of this branch is the source tree of release \`${TAG}\`.
+          EOF
+
+      - name: Commit prebuilts/ to a new prebuilt-<TAG> branch and push
+        run: |
+          set -euo pipefail
+          BRANCH="prebuilt-${TAG}"
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Start the branch from the checked-out release tag.
+          git checkout -b "$BRANCH"
+
+          # .gitignore excludes *.so, *.a, release/, dist/ ... force-add prebuilts.
+          rm -rf _dl
+          git add -f prebuilts
+          git commit -m "Add prebuilt mini-sandbox binaries for ${TAG}"
+
+          if [ "$FORCE" = "true" ]; then
+            git push --force origin "$BRANCH"
+          else
+            git push origin "$BRANCH"
+          fi
+          echo "Pushed branch $BRANCH"
