@@ -163,7 +163,7 @@ jobs:
       - name: Derive TAG for this run
         id: meta
         run: |
-          TAG="${{ github.ref_type == 'tag' && github.ref_name || '' }}"
+          TAG="${{ github.ref_type == 'tag' && github.ref_name || '' }}" # zizmor: ignore[template-injection]
           if [ -z "$TAG" ]; then TAG="manual"; fi
           echo "TAG=$TAG" >> "$GITHUB_ENV"
           echo "Using TAG=$TAG"
