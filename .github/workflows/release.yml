@@ -91,12 +91,18 @@ jobs:
           PATH_IN_REPO="${TAG}.sha256"
           CONTENT_B64="$(printf '%s  mini-sandbox-%s.tar.gz\n' "$DIGEST" "$TAG" | base64 -w0)"
 
-          # Ensure the orphan branch exists (create empty on first use).
+          # Ensure the orphan branch exists (create on first use).
           if ! gh api "repos/${REPO}/branches/release-checksums" >/dev/null 2>&1; then
-            BASE_SHA="$(gh api "repos/${REPO}/git/refs/heads/${GITHUB_REF_NAME}" -q '.object.sha' 2>/dev/null || true)"
-            # Fall back to default branch HEAD if the ref lookup above is unavailable.
-            if [ -z "${BASE_SHA:-}" ]; then
-              BASE_SHA="$(gh api "repos/${REPO}/git/refs/heads/main" -q '.object.sha')"
+            # Base the new branch on the commit that this tag points to. GITHUB_SHA
+            # is always a single, valid 40-char commit SHA for the triggering event.
+            # (Do NOT look up refs/heads/<GITHUB_REF_NAME>: on a tag push that name is
+            # the tag, not a branch, and the refs API then returns an ARRAY of prefix
+            # matches, producing a malformed multi-SHA value that the create-ref call
+            # rejects with HTTP 422 "Only 40 characters are allowed".)
+            BASE_SHA="${GITHUB_SHA}"
+            if ! printf '%s' "$BASE_SHA" | grep -Eq '^[0-9a-f]{40}$'; then
+              echo "::error::Unexpected base SHA for release-checksums: '${BASE_SHA}'"
+              exit 1
             fi
             gh api -X POST "repos/${REPO}/git/refs" \
               -f ref="refs/heads/release-checksums" \
