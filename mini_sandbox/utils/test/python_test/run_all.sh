@@ -121,4 +121,7 @@ check_exit $PYTHON test_symlinks_write_2.py
 check_exit $PYTHON test_symlinks_overlay.py
 check_exit $PYTHON test_symlinks_overlay_2.py
 
+check_exit $PYTHON test_mini_sandbox_mount_parents_write.py
+check_exit $PYTHON test_mini_sandbox_mount_write_negative.py
+
 cd $ORIGINAL_DIR

@@ -155,6 +155,20 @@ def mini_sandbox_mount_write(path):
             return MiniSandboxErrors.NOERROR
     return _lib.mini_sandbox_mount_write(path.encode())
 
+def mini_sandbox_mount_write_with_missing_dirs(path):
+    if _lib is None:
+        if is_platform_supported():
+            return MiniSandboxErrors.LIB_NOT_LOADED
+        else:
+            return MiniSandboxErrors.NOERROR
+    current = os.path.abspath(path)
+    while not os.path.exists(current):
+        parent = os.path.dirname(current)
+        if parent == current or parent == "/":
+            return MiniSandboxErrors.PATH_DOES_NOT_EXIST
+        current = parent
+    return _lib.mini_sandbox_mount_write(current.encode())
+
 def mini_sandbox_mount_tmpfs(path):
     if _lib is None:
         if is_platform_supported():
