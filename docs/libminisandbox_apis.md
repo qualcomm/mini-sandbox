@@ -58,6 +58,13 @@ Mounts the specified path as a bind mount.
 
 Mounts the path with write permissions, allowing output from the sandbox.
 
+### `int mini_sandbox_mount_write_with_missing_dirs(std::string path);`
+
+Mounts the given path with write permissions, tolerating the case where the path does not yet exist on the host filesystem. The function walks up the path and locates the first ancestor directory that exists (excluding the root `/`), then mounts that ancestor in write mode. 
+The caller must ensure that it is safe to mount_write the ancestors.
+
+Returns `PATH_DOES_NOT_EXIST` if no non-root ancestor exists.
+
 ### `int mini_sandbox_mount_read_only(std::string path);`
 
 Mounts the path as read-only (default behavior).
