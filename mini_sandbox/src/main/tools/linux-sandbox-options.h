@@ -81,6 +81,8 @@ struct Options {
   bool use_default;
   // if we are running in docker or not
   bool docker = false;
+  // Force the capabilities sandbox even when namespaces are available (-c)
+  bool force_capabilities = false;
   // when using the overlay we can either mount the folders parents of CWD 
   // in the overlay or let them read/write. This field defaults to overlay 
   // but can be enabled via API to mount the parents of CWD as write until

@@ -106,6 +106,9 @@ static void Usage(char *program_name, const char *fmt, ...) {
       "the overlayfs directory\n"
       "  -x if set, activates a default version of the sandbox (w/ overlay, no "
       "network, chroot) \n"
+      "  -c if set, forces the capabilities sandbox (drops capabilities and "
+      "sets no-new-privs) instead of the namespace based one, same as setting "
+      "MINI_SANDBOX_DOCKER_UNPRIVILEGED=1\n"
       " -k directory ot mount as overlayfs inside the sanbdox. Only available "
       "with -o\n"
       "  -h <sandbox-dir>  if set, chroot to sandbox-dir and only "
@@ -303,7 +306,7 @@ static void ParseCommandLine(unique_ptr<vector<char *>> args) {
   int c;
 
   while ((c = getopt(args->size(), args->data(),
-                     ":S:G:W:T:t:il:L:w:e:M:m:h:HnNRUPF:D:o:d:k:x")) != -1) {
+                     ":S:G:W:T:t:il:L:w:e:M:m:h:HnNRUPF:D:o:d:k:xc")) != -1) {
 
     switch (c) {
     case 'W':
@@ -420,6 +423,9 @@ static void ParseCommandLine(unique_ptr<vector<char *>> args) {
       if (MiniSbxSetupDefault() < 0) {
           Usage(args->front(), MiniSbxGetErrorMsg());
       }
+      break;
+    case 'c':
+      opt.force_capabilities = true;
       break;
     case '?':
       Usage(args->front(), "Unrecognized argument: -%c (%d)", optopt, optind);
