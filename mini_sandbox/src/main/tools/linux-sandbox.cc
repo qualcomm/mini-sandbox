@@ -384,8 +384,14 @@ int MiniSbxStart() {
   PRINT_DEBUG("UserNamespaceSupported = %d", UserNamespaceSupported());
 
 #ifdef LIBMINISANDBOX
-  docker_mode = CheckDockerMode();   
+  docker_mode = CheckDockerMode();
 #endif
+
+  // The -c flag forces the capabilities sandbox even when the environment
+  // would allow the namespace based one.
+  if (opt.force_capabilities) {
+    docker_mode = UNPRIVILEGED_CONTAINER;
+  }
 
   // Ask the kernel to kill us with SIGKILL if our parent dies.
   if (prctl(PR_SET_PDEATHSIG, SIGKILL) < 0) {

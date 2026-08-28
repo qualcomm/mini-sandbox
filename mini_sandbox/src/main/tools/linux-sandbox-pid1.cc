@@ -89,9 +89,11 @@ namespace fs = std::experimental::filesystem;
 #define DEV_LINKS 4
 #define CAP_VERSION _LINUX_CAPABILITY_VERSION_3
 #define CAP_WORDS   _LINUX_CAPABILITY_U32S_3
-#define BIT(n)                       (1UL << (n))
+#define BIT(n)                       (1ULL << (n))
 #define OVELAY_MAX_DEPTH 5
 #define OVELAY_DEPTH_THRESHOLD 2
+
+#define KEEP 0
 
 #ifndef TEMP_FAILURE_RETRY
 // Some C standard libraries like musl do not define this macro, so we'll
@@ -931,8 +933,39 @@ static void drop_caps_ep_except(uint64_t keep) {
   struct __user_cap_data_struct data[CAP_WORDS];
   int i;
 
+  if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) < 0)
+    DIE("Couldn't set PR_SET_NO_NEW_PRIVS");
+
+  memset(data, 0, sizeof(data));
+
   if (syscall(SYS_capget, &hdr, data))
-    DIE("Couldn't get current capabilities"); 
+    DIE("Couldn't get current capabilities");
+
+  if (prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_CLEAR_ALL, 0, 0, 0) < 0 &&
+      errno != EINVAL && errno != EPERM)
+    PRINT_DEBUG("PR_CAP_AMBIENT_CLEAR_ALL failed: %s", strerror(errno));
+
+  if (data[CAP_SETPCAP >> 5].effective & (1U << (CAP_SETPCAP & 31))) {
+    long last_cap = 63;
+    FILE *cap_file = fopen("/proc/sys/kernel/cap_last_cap", "r");
+    if (cap_file != nullptr) {
+      if (fscanf(cap_file, "%ld", &last_cap) != 1)
+        last_cap = 63;
+      fclose(cap_file);
+    }
+    if (last_cap < 0)
+      last_cap = 0;
+    if (last_cap > 63)
+      last_cap = 63;
+
+    for (long cap = 0; cap <= last_cap; cap++) {
+      if (keep & (1ULL << cap))
+        continue;
+      if (prctl(PR_CAPBSET_DROP, cap, 0, 0, 0) < 0 && errno != EPERM &&
+          errno != EINVAL)
+        PRINT_DEBUG("PR_CAPBSET_DROP(%ld) failed: %s", cap, strerror(errno));
+    }
+  }
 
   for (i = 0; i < CAP_WORDS; i++) {
     uint32_t mask = (uint32_t)(keep >> (32 * i));
@@ -952,10 +985,7 @@ void DropCapabilities() {
           "We'll just drop the capabilities of the current process but cannot provide advanced "
           "features such as usernamespace, overlayfs, rootless firewall, etc.");
 
-  uint64_t keep;
-  keep = BIT(CAP_NET_BIND_SERVICE) | BIT(CAP_CHOWN) | BIT(CAP_DAC_READ_SEARCH) |
-         BIT(CAP_KILL) | BIT(CAP_SYS_RESOURCE) | BIT(CAP_FOWNER);
-
+  uint64_t keep = KEEP;
   drop_caps_ep_except(keep);
   return;
 }

@@ -52,6 +52,16 @@ mini-sandbox -o /local/mnt/workspace/sandbox/ -d /local/mnt/workspace/sandbox/ -
 ``` 
 
 
+### Capabilities sandbox (`-c`)
+
+When user namespaces are not available (for example inside a non-privileged Docker container) mini-sandbox falls back to the capabilities sandbox: instead of building a namespace it drops the capabilities of the current process and sets the `no-new-privs` flag, so the sandboxed command cannot regain privileges through setuid binaries or file capabilities. This fallback is normally detected automatically, and it could previously only be forced by exporting `MINI_SANDBOX_DOCKER_UNPRIVILEGED=1`. The `-c` flag forces the same mode directly from the command line:
+
+```bash
+mini-sandbox -c -- /bin/bash
+```
+
+The flag is equivalent to the environment variable and can be combined with the other flags. Note that in this mode the filesystem is not remounted and there is no chroot, so the filesystem-related options (including `-W`) do not apply.
+
 ### Network
 
 By default we create a different network namespace and so we won't have network inside it. If you need access to the host network interface you can use the option `-N`. If you want a more granular control over the network you 'll have to use the `tap` mode and switch to `mini-tapbox` or `libmini-tapbox`.
