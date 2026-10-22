@@ -77,13 +77,24 @@ fi
 echo "Success: -c overrides MINI_SANDBOX_DOCKER_PRIVILEGED."
 
 
-echo -e "\nTest that -c and MINI_SANDBOX_DOCKER_UNPRIVILEGED are equivalent"
-NNP_ENV="$(MINI_SANDBOX_DOCKER_UNPRIVILEGED=1 status_field_in_sandbox NoNewPrivs)"
+echo -e "\nTest that -c and MINI_SANDBOX_ISOLATION_MODE=capabilities are equivalent"
+NNP_ENV="$(MINI_SANDBOX_ISOLATION_MODE=capabilities status_field_in_sandbox NoNewPrivs)"
 if [ "$NNP_ENV" != "$NNP_WITH_C" ]; then
     echo "Error: env variable gave NoNewPrivs '${NNP_ENV}' but -c gave '${NNP_WITH_C}'."
     exit 1
 fi
 echo "Success: the flag and the environment variable behave the same."
+
+
+echo -e "\nTest that -c wins over MINI_SANDBOX_ISOLATION_MODE"
+# The flag is an explicit request on the command line, so it has to take
+# precedence over a conflicting isolation mode inherited from the environment.
+NNP_OVERRIDE="$(MINI_SANDBOX_ISOLATION_MODE=namespaces status_field_in_sandbox NoNewPrivs -c)"
+if [ "$NNP_OVERRIDE" != "1" ]; then
+    echo "Error: -c did not override MINI_SANDBOX_ISOLATION_MODE, NoNewPrivs is '${NNP_OVERRIDE}'."
+    exit 1
+fi
+echo "Success: -c overrides MINI_SANDBOX_ISOLATION_MODE."
 
 
 echo -e "\nTest that -c can be combined with the other flags"

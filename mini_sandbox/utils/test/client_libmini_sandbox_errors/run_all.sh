@@ -12,6 +12,7 @@ PARENT_FOLDER="$(dirname "$SCRIPT_DIR")"
 ORIGINAL_DIR="$(pwd)"
 
 cd $SCRIPT_DIR
+make
 
 check_exit() {
     "$@"
@@ -34,9 +35,11 @@ check_exit $SCRIPT_DIR/check_overlay_enabled.bin
 check_exit $SCRIPT_DIR/check_validate_path.bin
 check_exit $SCRIPT_DIR/only_one_log.bin
 check_exit $SCRIPT_DIR/check_exit_from_user.bin
-check_exit $SCRIPT_DIR/check_runtime_init_error.bin
-check_exit $SCRIPT_DIR/check_runtime_init_error_custom.bin
-check_exit $SCRIPT_DIR/check_runtime_init_error_readonly.bin
+if [[ "${LANDLOCK_TEST:-}" != "1" ]]; then
+  check_exit $SCRIPT_DIR/check_runtime_init_error.bin
+  check_exit $SCRIPT_DIR/check_runtime_init_error_custom.bin
+  check_exit $SCRIPT_DIR/check_runtime_init_error_readonly.bin
+fi
 check_exit $SCRIPT_DIR/check_mount_fails_after_init.bin
 
 cd $ORIGINAL_DIR

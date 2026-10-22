@@ -18,4 +18,4 @@ if os.getenv("MINISANDBOX_PYBIND") != None:
 bindings = os.path.join(bindings_abs_path, bindings_type)
 sys.path.append(bindings)
 
-
+LANDLOCK = bool(os.getenv("LANDLOCK_TEST"))

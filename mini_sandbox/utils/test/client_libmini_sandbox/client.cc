@@ -19,6 +19,7 @@
 #include <assert.h>
 
 #include "linux-sandbox-api.h"
+#include "utils.h"
 
 
 
@@ -69,11 +70,14 @@ void start_thread() {
     pthread_join(thread, NULL);
 }
 
+
 int main(int argc, char* argv[]) {
     if (argc > 0)
         printf("\n\nExecutable name: %s\n\n", argv[0]);
     printf("starting program out of the sandbox pid=%d\n", getpid());
     int res = 0;
+
+    int ll_enabled = landlock_test_enabled();
 
 #if defined(WORKDIR)
     char* buf = (char*) malloc(PATH_MAX);
@@ -131,8 +135,8 @@ int main(int argc, char* argv[]) {
     assert (res == 0);
     res = mini_sandbox_start();
     assert (res == 0);
-
-    
+ 
+    int expected = (ll_enabled) ? 1 : 0;
 
     printf("\n\nSandbox started with pid=%d. First Trying to connect to 8.8.8.8 via socket...\n", getpid());
     int sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -173,11 +177,11 @@ int main(int argc, char* argv[]) {
 #if defined(DEFAULT)
     assert(file_written == 0);
 #elif defined(CUSTOM)
-    assert(file_written == 0);
+    assert(file_written == expected);
 #elif defined(HERMETIC)
     assert(file_written == 1);
 #else
-	assert(file_written == 1);
+	  assert(file_written == 1);
 #endif
     free(dst);
 #if defined(WORKDIR)
@@ -186,18 +190,14 @@ int main(int argc, char* argv[]) {
     snprintf(parent_file, sizeof(parent_file), "%s/%s", parent, "libminisandbox.test");
     printf("\n\nTrying to write in the parent %s\n", parent_file);
     file_written = try_file_write(parent_file);
-    assert (file_written == 0);
+    assert (file_written == expected);
 
-    //char cwd[PATH_MAX];
-    //if (getcwd(cwd, sizeof(cwd)) != NULL) {
-    //  snprintf(cwd, sizeof(cwd), "%s/%s", cwd, "libminisandbox.test");
     const char* cwd_file = "libminisandbox.test";
     char cwd[PATH_MAX];
     assert (getcwd(cwd, sizeof(cwd)) != NULL);
     printf("\n\nTrying to write in the cwd (with cwd != wd) %s\n", cwd);
-      file_written = try_file_write(cwd_file);
-      assert (file_written == 0);
-
+    file_written = try_file_write(cwd_file);
+    assert (file_written == expected);
 
 #else
     char cwd[PATH_MAX];
@@ -208,14 +208,21 @@ int main(int argc, char* argv[]) {
       snprintf(parent_file, sizeof(parent_file), "%s/%s", parent, "libminisandbox.test");
       printf("\n\nTrying to write in the parent %s\n", parent_file);
       file_written = try_file_write(parent_file);
+
 #if defined(DEFAULT)
+
+  #if defined(DEFAULT_WRITE_PARENTS)
       assert(file_written == 0);
+  #else
+      assert(file_written == expected);
+  #endif
+
 #elif defined(CUSTOM)
-      assert(file_written == 0);
+      assert(file_written == expected);
 #elif defined(HERMETIC)
-      assert(file_written == 0);
+      assert(file_written == expected);
 #else
-	  assert(file_written == 1);
+	    assert(file_written == 1);
 #endif
     }
 

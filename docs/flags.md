@@ -54,13 +54,13 @@ mini-sandbox -o /local/mnt/workspace/sandbox/ -d /local/mnt/workspace/sandbox/ -
 
 ### Capabilities sandbox (`-c`)
 
-When user namespaces are not available (for example inside a non-privileged Docker container) mini-sandbox falls back to the capabilities sandbox: instead of building a namespace it drops the capabilities of the current process and sets the `no-new-privs` flag, so the sandboxed command cannot regain privileges through setuid binaries or file capabilities. This fallback is normally detected automatically, and it could previously only be forced by exporting `MINI_SANDBOX_DOCKER_UNPRIVILEGED=1`. The `-c` flag forces the same mode directly from the command line:
+When user namespaces are not available (for example inside a non-privileged Docker container) mini-sandbox falls back to the capabilities sandbox: instead of building a namespace it drops the capabilities of the current process and sets the `no-new-privs` flag, so the sandboxed command cannot regain privileges through setuid binaries or file capabilities. This fallback is normally detected automatically, and it can also be requested explicitly by exporting `MINI_SANDBOX_ISOLATION_MODE=capabilities`. The `-c` flag forces the same mode directly from the command line:
 
 ```bash
 mini-sandbox -c -- /bin/bash
 ```
 
-The flag is equivalent to the environment variable and can be combined with the other flags. Note that in this mode the filesystem is not remounted and there is no chroot, so the filesystem-related options (including `-W`) do not apply.
+The flag is equivalent to the environment variable and takes precedence over it when both are set. It can be combined with the other flags. Note that in this mode the filesystem is not remounted and there is no chroot, so the filesystem-related options (including `-W`) do not apply.
 
 ### Network
 

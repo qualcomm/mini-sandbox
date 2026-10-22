@@ -39,7 +39,10 @@ if __name__ == "__main__":
     parent_path = os.path.join(script_dir, "../test_pyminisandbox.test")
     print("Writing into " + str(parent_path))
     res = attempt_file_access(f = parent_path)    
-    assert(res == 0)
+    expected = 0
+    if os.environ.get("LANDLOCK_TEST"):
+      expected = -1
+    assert(res == expected)
 
 
     

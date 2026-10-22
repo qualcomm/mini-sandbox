@@ -1,0 +1,151 @@
+/*
+ * Copyright (c) 2025 Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * SPDX-License-Identifier: MIT
+ */
+
+#include "src/main/tools/linux-sandbox.h"
+#include "src/main/tools/docker-support.h"
+#include "src/main/tools/linux-sandbox-options.h"
+#include "src/main/tools/linux-sandbox-pid1.h"
+#include "src/main/tools/linux-sandbox-runtime.h"
+#include "src/main/tools/linux-sandbox-network.h"
+#include "src/main/tools/linux-sandbox-isolation.h"
+#include "src/main/tools/caps-isolation.h"
+#include "src/main/tools/logging.h"
+#include "src/main/tools/minitap-interface.h"
+#include "src/main/tools/process-tools.h"
+#include "src/main/tools/error-handling.h"
+#include "src/main/tools/firewall.h"
+#include "src/main/tools/constants.h"
+#include <ctype.h>
+#include <dirent.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <math.h>
+#include <sched.h>
+#include <signal.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/prctl.h>
+#include <sys/resource.h>
+#include <sys/stat.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <grp.h>
+
+#if __has_include(<filesystem>)
+#include <filesystem>
+namespace fs = std::filesystem;
+#else
+#include <experimental/filesystem>
+namespace fs = std::experimental::filesystem;
+#define _EXPERIMENTAL_FILESYSTEM_
+#endif
+
+#include <atomic>
+#include <iostream>
+#include <string>
+#include <system_error>
+#include <vector>
+
+#include <chrono>
+#include <cstring>
+#include <dirent.h>
+#include <numeric>
+#include <stdexcept>
+#include <sys/prctl.h>
+#include <linux/capability.h>
+#include <sys/syscall.h>
+
+
+
+int DropCapabilitiesExcept(uint64_t keep) {
+  struct __user_cap_header_struct hdr = {
+    .version = CAP_VERSION,
+    .pid = 0,
+  };
+  struct __user_cap_data_struct data[CAP_WORDS];
+  int i;
+
+  if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) < 0)
+    return MiniSbxReportError(ErrorCode::PRSetNoNewPrivsFail);
+
+  memset(data, 0, sizeof(data));
+
+  if (syscall(SYS_capget, &hdr, data))
+    return MiniSbxReportError(ErrorCode::SysCapget);
+
+  if (prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_CLEAR_ALL, 0, 0, 0) < 0 &&
+      errno != EINVAL && errno != EPERM)
+    PRINT_DEBUG("PR_CAP_AMBIENT_CLEAR_ALL failed: %s", strerror(errno));
+
+  if (data[CAP_SETPCAP >> 5].effective & (1U << (CAP_SETPCAP & 31))) {
+    long last_cap = 63;
+    FILE *cap_file = fopen("/proc/sys/kernel/cap_last_cap", "r");
+    if (cap_file != nullptr) {
+      if (fscanf(cap_file, "%ld", &last_cap) != 1)
+        last_cap = 63;
+      fclose(cap_file);
+    }
+    if (last_cap < 0)
+      last_cap = 0;
+    if (last_cap > 63)
+      last_cap = 63;
+
+    for (long cap = 0; cap <= last_cap; cap++) {
+      if (keep & (1ULL << cap))
+        continue;
+      if (prctl(PR_CAPBSET_DROP, cap, 0, 0, 0) < 0 && errno != EPERM &&
+          errno != EINVAL)
+        PRINT_DEBUG("PR_CAPBSET_DROP(%ld) failed: %s", cap, strerror(errno));
+    }
+  }
+
+  for (i = 0; i < CAP_WORDS; i++) {
+    uint32_t mask = (uint32_t)(keep >> (32 * i));
+
+    data[i].effective &= mask;
+    data[i].permitted &= mask;
+    data[i].inheritable &= mask;
+  }
+
+  if (syscall(SYS_capset, &hdr, data))
+    return MiniSbxReportError(ErrorCode::SysCapset);
+
+  return 0;
+}
+
+
+int DropCapabilities() {
+  // Printing this to stdout can trigger build issues, we'll just log for now
+  PRINT_DEBUG("Warning: Sandbox cannot be fully enabled (either due to Docker or AppArmor). "
+          "We'll just drop the capabilities of the current process but cannot provide advanced "
+          "features such as usernamespace, overlayfs, rootless firewall, etc.");
+
+  uint64_t keep = 0;
+  // TODO: Add either a CLI flag/API or env variable to configure capabilities
+  return DropCapabilitiesExcept(keep);
+}
+
+
+int CapsRunTime() {
+  return DropCapabilities(); 
+}
+
+int CapsRunTimeCLI() {
+  PRINT_DEBUG("Start capabilities CLI isolation\n");
+  int res = CapsRunTime();
+  if (res == 0) 
+    SpawnChild(true);
+  return res;
+}
+
+int CapsRunTimeLib() {
+  PRINT_DEBUG("Start capabilities LIB isolation");
+  return CapsRunTime();
+}
+

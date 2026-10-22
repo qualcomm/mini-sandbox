@@ -15,6 +15,7 @@
 #include <sys/mount.h>
 
 #include "linux-sandbox-api.h"
+#include "utils.h"
 
 int main() {
     printf("starting program out of the sandbox pid=%d\n", getpid());
@@ -22,7 +23,8 @@ int main() {
     mini_sandbox_setup_default();
     int res = mini_sandbox_start();
     assert (res == 0);
-    assert (getpid() != initial);  
+    if (!landlock_test_enabled())
+      assert (getpid() != initial);  
     assert (access("/tmp", F_OK) == 0);
     printf("Setup ok.\n");
     res = mount("/tmp", "/tmp", NULL, MS_BIND, NULL);

@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-GO_VERSION="1.25.0"
+GO_VERSION="1.25.14"
 ARCH="amd64"
 OS="linux"
 INSTALL_DIR="/usr/local"
