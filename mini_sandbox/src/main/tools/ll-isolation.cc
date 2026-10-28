@@ -354,6 +354,7 @@ static int LLRunTime() {
     const std::string mountPoint = GetMountPointOf(opt.working_dir);
     const std::string realHome = GetHomeDir();
     MiniSbxMountWrite(kTmp);
+    MiniSbxMountWrite(kVarTmp);
     MiniSbxMountWrite(opt.working_dir);
     MapWorkingDirMountPoint(mountPoint, realHome);
     AddLeftoverFoldersToReadOnlyPaths();
@@ -365,6 +366,7 @@ static int LLRunTime() {
     ll_res = MapAllFilesystem(); 
   } else {
     MiniSbxMountWrite(kTmp);
+    MiniSbxMountWrite(kVarTmp);
     MiniSbxMountWrite(opt.working_dir);
     ll_res = MapFilesystemPartiallyReadOnly();
     ll_res += MapAllFilesystem();
