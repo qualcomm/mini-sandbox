@@ -21,7 +21,7 @@ ifeq ($(CXX),)
 endif
 
 FLAGS = -DMINITAP -DLIBMINISANDBOX -g -Wno-writable-strings -std=c++17
-
+UTILS = -I../utils/
 
 LDFLAGS += -lpthread -ldl
 
@@ -44,13 +44,13 @@ SO_NAME = mini-tapbox
 all: $(TARGET_A) $(TARGET_SO) $(TARGET_MAX_CONN)
 
 $(TARGET_MAX_CONN): $(SRC)
-	$(CXX) $(FLAGS) -DMAX_CONN $(CXXFLAGS) -I$(MINI) $(SRC) $(LIBS) -o $(TARGET_MAX_CONN) $(LDFLAGS)
+	$(CXX) $(FLAGS) -DMAX_CONN $(CXXFLAGS) -I$(MINI) $(UTILS) $(SRC) $(LIBS) -o $(TARGET_MAX_CONN) $(LDFLAGS)
 
 $(TARGET_A): $(SRC)
-	$(CXX) $(FLAGS) $(CXXFLAGS) -I$(MINI) $(SRC) $(LIBS) -o $(TARGET_A) $(LDFLAGS)
+	$(CXX) $(FLAGS) $(CXXFLAGS) -I$(MINI) $(UTILS) $(SRC) $(LIBS) -o $(TARGET_A) $(LDFLAGS)
 
 $(TARGET_SO): $(SRC)
-	$(CXX) $(FLAGS) $(CXXFLAGS) -I$(MINI) $(SRC) -L$(SO_PATH) -l$(SO_NAME) -o $(TARGET_SO) $(LDFLAGS)
+	$(CXX) $(FLAGS) $(CXXFLAGS) -I$(MINI) $(UTILS) $(SRC) -L$(SO_PATH) -l$(SO_NAME) -o $(TARGET_SO) $(LDFLAGS)
 
 clean:
 	rm -f *.bin *.o

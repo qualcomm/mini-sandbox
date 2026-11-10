@@ -4,12 +4,12 @@
 ## SPDX-License-Identifier: MIT
 ##
 
-mini-sandbox -x -- /bin/bash << 'EOF'
-exit 1
+mini-sandbox -x -D /tmp/log -- /bin/bash << 'EOF'
+exit 5
 EOF
-
-if [ $? -ne 1 ]; then
-	echo "Failed (exited with $?)"
+R=$?
+if [ $R -ne 5 ]; then
+	echo "Failed (exited with $R)"
 	exit 1;
 else
 	echo "Success"

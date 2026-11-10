@@ -8,6 +8,7 @@
 #include "error-handling.h"
 #include "src/main/tools/linux-sandbox-options.h"
 #include "src/main/tools/linux-sandbox.h"
+#include "src/main/tools/process-tools.h"
 
 
 
@@ -84,13 +85,16 @@ int mini_sandbox_mount_parents_write() {
   return MiniSbxMountParentsWrite();
 }
 
+const char* mini_sandbox_get_home() {
+  static std::string h = GetHomeDir();
+  return h.c_str();
+}
+
 #ifndef MINITAP
 int mini_sandbox_share_network() {
   return MiniSbxShareNetNamespace();
 }
-#endif
-
-#ifdef MINITAP
+#else
 int mini_sandbox_allow_max_connections(int max_connections) {
   return MiniSbxAllowMaxConnections(max_connections);
 }
@@ -117,6 +121,10 @@ int mini_sandbox_allow_all_domains() {
 
 int mini_sandbox_allow_ipv4_subnet(const char* subnet) {
   return MiniSbxAllowIpv4Subnet(subnet);
+}
+
+int mini_sandbox_allow_port(const char* port) {
+  return MiniSbxAllowPort(port);
 }
 #endif
 

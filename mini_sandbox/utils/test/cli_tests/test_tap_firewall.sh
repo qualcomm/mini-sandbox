@@ -7,20 +7,20 @@
 SCRIPT_PATH="$(realpath "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
 IP_RULES="$SCRIPT_DIR/ip.list"
-
-#cat "/etc/resolv.conf" | grep -e "nameserver\ [0-9]*" | awk '{print $2}' >> $IP_RULES
-echo "Using following IP rules"
-cat $IP_RULES
-
+PORTS_RULES="$SCRIPT_DIR/ports.list"
 
 which minitap
-
 if [[ $? -ne 0 ]]; then
     exit $?
 fi
 
+if [ "$LANDLOCK_TEST" = "1" ]; then
+	RULES=$PORTS_RULES
+else
+	RULES=$IP_RULES
+fi
 
-mini-tapbox -x -F $IP_RULES -- /bin/bash << 'EOF'
+mini-tapbox -x -F $RULES -- /bin/bash << 'EOF'
 
 check_last_command() {
     if [ $? -ne 0 ]; then
@@ -56,6 +56,19 @@ check_ls_count() {
     fi
 }
 
+test_port_not_reachable() {
+    local host="$1"
+    local port="$2"
+
+    if timeout 3 nc -z "$host" "$port" 2>/dev/null; then
+        echo "$host:$port reachable"
+        exit 1
+    else
+        echo "$host:$port blocked as expected"
+        return 0
+    fi
+}
+
 
 echo -e "\nTest writing in HOME dir"
 echo "sandbox-test" > $HOME/test.txt
@@ -66,12 +79,18 @@ count=$(ls $PWD/../ | wc -l)
 check_ls_count $count 1
 
 echo -e "\nTest showing the network is available"
-wget www.google.com -T 1
+wget www.google.com -T 1 -t 1
 check_last_command
 
-echo -e "\nTest showing the network is unavailable"
-wget qualcomm.com --tries=3 --timeout=1
-check_last_command_failed
+
+if [ "$LANDLOCK_TEST" = "1" ]; then
+  test_port_not_reachable google.com 22
+  test_port_not_reachable google.com 12345
+else
+  echo -e "\nTest showing the network is unavailable"
+  wget qualcomm.com --tries=3 --timeout=1
+  check_last_command_failed
+fi
 
 EOF
 

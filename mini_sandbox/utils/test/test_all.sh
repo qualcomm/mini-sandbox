@@ -12,6 +12,9 @@ uname -a
 
 SCRIPT_PATH="$(realpath "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
+
+$SCRIPT_DIR/landlock_probe.sh
+
 pushd $SCRIPT_DIR > /dev/null
 make
 $SCRIPT_DIR/cli_tests/run_all.sh
