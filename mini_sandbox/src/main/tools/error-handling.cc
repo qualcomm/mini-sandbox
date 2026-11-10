@@ -11,9 +11,9 @@
 
 
 #if defined(LIBMINISANDBOX)
-Mode mode = Mode::Library;
+MiniSbxExecMode mode = MiniSbxExecMode::LIB;
 #else
-Mode mode = Mode::CLI;
+MiniSbxExecMode mode = MiniSbxExecMode::CLI;
 #endif
 
 MiniSbxError sbx_err;
@@ -27,7 +27,7 @@ static void GenErrorMessage(const std::string& err_msg, const char* file,
 
 static void MiniSbxSetError(const std::string& err_msg, ErrorCode code, int& ret) {
   bool recoverable = (static_cast<int>(code) < RECOVERABLE_ERROR_CODES);
-  if (mode == Mode::Library || recoverable) {
+  if (mode == MiniSbxExecMode::LIB || recoverable) {
     memset(sbx_err.msg, 0, MAX_ERR_LEN - 1);
     strncpy(sbx_err.msg, err_msg.c_str(), MAX_ERR_LEN - 1);
     sbx_err.msg[MAX_ERR_LEN - 1] = '\0';

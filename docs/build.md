@@ -6,7 +6,7 @@
 - `golang` (only if you need to run the TAP mode / root-less firewall). To install golang you can run the following commands
 
 ```bash
-GO_VERSION=1.25.3
+GO_VERSION=1.25.14
 wget "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz"
 tar -C /usr/local -xzf go${GO_VERSION}.linux-amd64.tar.gz
 ```

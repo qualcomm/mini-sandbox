@@ -70,14 +70,17 @@ if __name__ == "__main__":
         assert (res == 0)
         res = mn_sbx.mini_sandbox_allow_ipv4_subnet("142.0.0.0/8") # With this and previous, google connection should go through
         assert (res == 0)
-
+        res = mn_sbx.mini_sandbox_allow_port("80")
+        assert (res == 0)
+        res = mn_sbx.mini_sandbox_allow_port("53")
+        assert (res == 0)
     res = mn_sbx.mini_sandbox_start()
     assert (res == 0)
     
     print("Running inside the sandbox...")
     res = attempt_network_connection("http://www.google.com") 
     assert (res == 0)
-    res = attempt_network_connection("http://www.qualcomm.com")
+    res = attempt_network_connection("https://www.qualcomm.com")
     if tap:
         assert(res < 0)
     else:

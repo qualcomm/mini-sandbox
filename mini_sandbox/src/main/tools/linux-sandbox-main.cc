@@ -6,12 +6,13 @@
 #include "src/main/tools/docker-support.h"
 #include "src/main/tools/linux-sandbox-options.h"
 #include "src/main/tools/linux-sandbox.h"
+#include "src/main/tools/ll-isolation.h"
 
 int main(int argc, char *argv[]) {
   int exit_code = 0;
   docker_mode = CheckDockerMode();
   ParseOptions(argc, argv);
-  exit_code = MiniSbxStart();
+  exit_code = MiniSbxStartCLI();
   return exit_code;
 
 }

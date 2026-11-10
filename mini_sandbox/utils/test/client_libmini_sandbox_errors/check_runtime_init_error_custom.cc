@@ -21,6 +21,7 @@ int main() {
     mini_sandbox_mount_overlay("/bin");
     mini_sandbox_mount_overlay("/lib");
     mini_sandbox_mount_overlay("/lib64");
+
     // /etc/passwd is a file that we cannot mount as overlay. Mounting
     // as overlay a file will make Pid1 exit with failure. In this case we 
     // want to return and not exit

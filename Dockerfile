@@ -20,7 +20,7 @@ RUN mkdir /rel
 ARG VER
 ENV VERSION=$VER
 
-ENV GO_VERSION=1.25.3
+ENV GO_VERSION=1.25.14
 ENV DOCKER_BUILD=1
 
 RUN wget "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" && \

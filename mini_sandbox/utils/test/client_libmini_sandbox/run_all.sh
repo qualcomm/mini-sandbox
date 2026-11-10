@@ -13,6 +13,8 @@ ORIGINAL_DIR="$(pwd)"
 
 cd $SCRIPT_DIR
 
+make
+
 check_exit() {
     "$@"
     local status=$?

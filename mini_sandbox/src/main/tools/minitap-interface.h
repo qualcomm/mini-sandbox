@@ -11,5 +11,6 @@
 // if we do not want to set any specific network restriction
 // via firewall
 int RunTCPIP(uid_t uid, gid_t gid, std::string& rules);
+int RunMiniTap();
 
 #endif
