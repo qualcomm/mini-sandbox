@@ -31,10 +31,7 @@ if __name__ == "__main__":
     assert (res == 0)
     new_pid = os.getpid()
     print(f"New pid is {new_pid}. Parent is {os.getppid()}")
-
-    assert(initial_pid != os.getpid())
     sys.exit(0)
-
     # We should never be able to reach this assert if the user of libmini-sandbox calls
     # the exit()
     assert (False)

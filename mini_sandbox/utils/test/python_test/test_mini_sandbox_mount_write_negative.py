@@ -41,6 +41,17 @@ if __name__ == "__main__":
         assert(res == 0)
 
         print("Running inside the sandbox...")
+        if env.LANDLOCK:
+            # Landlock can only grant access to paths that already exist and
+            # has no mount namespace to fake them, so the missing directory
+            # cannot be made writable: creating it must be denied.
+            try:
+                os.makedirs(missing_dir, exist_ok=True)
+            except PermissionError:
+                print("Creating {0} was denied (as expected with landlock)".format(missing_dir))
+                exit(0)
+            print("Creating {0} succeeded (not expected with landlock)".format(missing_dir))
+            exit(1)
         os.makedirs(missing_dir, exist_ok=True)
         with open(target_path, "w") as fd:
             fd.write(expected_content)
