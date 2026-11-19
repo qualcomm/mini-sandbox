@@ -100,6 +100,11 @@ static inline __u64 AccessRO() {
   return access & ABIMask();
 }
 
+static inline __u64 AccessReadDir() {
+  __u64 access = LANDLOCK_ACCESS_FS_READ_DIR;
+  return access & ABIMask();
+}
+
 static inline __u64 AccessRW() {
  __u64 access = AccessRO() |
          LANDLOCK_ACCESS_FS_WRITE_FILE |
@@ -221,6 +226,16 @@ static int MapReadOnlyPath(const std::string& path) {
 static int MapReadWritePath(const std::string& path) {
   int res = AddPathRule(gRuleset, path, AccessRW());  
   PRINT_DEBUG("Map %s as RW == %d", path.c_str(), res);
+  return res;
+}
+
+
+// Allows only listing/opening the directory (READ_DIR). Landlock rules apply
+// to the whole subtree, so this lets every directory under path be listed but
+// grants no READ_FILE or EXECUTE on the files in it.
+static int MapReadDirPath(const std::string& path) {
+  int res = AddPathRule(gRuleset, path, AccessReadDir());
+  PRINT_DEBUG("Map %s as READ_DIR only == %d", path.c_str(), res);
   return res;
 }
 
@@ -358,6 +373,7 @@ static int LLRunTime() {
     MiniSbxMountWrite(opt.working_dir);
     MapWorkingDirMountPoint(mountPoint, realHome);
     AddLeftoverFoldersToReadOnlyPaths();
+    MapReadDirPath(kRoot);
     ll_res = MapAllFilesystem();
     MapDev();
     MakeHome(realHome);

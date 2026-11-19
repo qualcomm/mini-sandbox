@@ -27,6 +27,7 @@ inline constexpr const char kInternalMiniSandboxEnv[] = "__INTERNAL_MINI_SANDBOX
 
 // Some constants values used in the code
 inline constexpr const char kInitStatus[] = "1\n";
+inline constexpr const char kRoot[] = "/";
 inline constexpr const char kDev[] = "/dev";
 inline constexpr const char kProc[] = "/proc";
 inline constexpr const char kDevPts[] = "/dev/pts";
@@ -57,7 +58,7 @@ enum class MiniSbxExecMode {
 
 
 #define DEFAULT_PORTS 3
-inline constexpr const uint16_t kDefaultPorts[3] = { 80, 443, 53 };
+inline constexpr const uint16_t kDefaultPorts[DEFAULT_PORTS] = { 80, 443, 53 };
 
 inline constexpr const char kFakeHome[] = "/tmp/sbx-fake-home";
 
